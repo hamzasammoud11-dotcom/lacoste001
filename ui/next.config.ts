@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   compress: true,
-  output: "standalone",
   cacheComponents: true,
   turbopack: {},
   experimental: {

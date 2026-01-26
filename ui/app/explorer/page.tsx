@@ -1,46 +1,27 @@
 import { Suspense } from "react"
-import { getApiUrl } from "@/lib/api-utils"
+import { getExplorerPoints } from "@/lib/explorer-service"
 import { ExplorerControls } from "./components"
 import { ExplorerChart } from "./chart"
 import { Loader2 } from "lucide-react"
-import { ExplorerResponse } from "@/types/explorer"
 
 interface ExplorerPageProps {
-  searchParams?: { [key: string]: string | string[] | undefined }
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-async function getExplorerData(dataset: string, view: string) {
-  try {
-    const apiUrl = getApiUrl()
-    const baseUrl = apiUrl || "http://localhost:3000"
-
-    const res = await fetch(
-      `${baseUrl}/api/explorer?dataset=${encodeURIComponent(dataset)}&view=${encodeURIComponent(view)}`,
-      { cache: "no-store" }
-    )
-
-    if (!res.ok) {
-      console.error(`Failed to fetch data: ${res.status} ${res.statusText}`)
-      return []
-    }
-
-    const json = (await res.json()) as ExplorerResponse
-    return json.points || []
-  } catch (error) {
-    console.error("Error fetching explorer data:", error)
-    return []
-  }
-}
-
-function pickParam(v: string | string[] | undefined) {
-  return Array.isArray(v) ? v[0] : v
+function pickParam(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v[0]
+  return v
 }
 
 export default async function ExplorerPage({ searchParams }: ExplorerPageProps) {
-  const dataset = pickParam(searchParams?.dataset) || "DAVIS"
-  const view = pickParam(searchParams?.view) || "PCA"
+  // Await searchParams as required by Next.js 16/15
+  const params = await searchParams
+  
+  const dataset = pickParam(params.dataset) || "DrugBank"
+  const view = pickParam(params.view) || "UMAP"
+  const colorBy = pickParam(params.colorBy) || "Activity"
 
-  const data = await getExplorerData(dataset, view)
+  const { points: data } = await getExplorerPoints(dataset, view, colorBy)
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -60,7 +41,7 @@ export default async function ExplorerPage({ searchParams }: ExplorerPageProps) 
 
         <div className="lg:col-span-3">
           <Suspense
-            key={`${dataset}-${view}`}
+            key={`${dataset}-${view}-${colorBy}`}
             fallback={
               <div className="h-[500px] flex items-center justify-center border rounded-lg bg-muted/10">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
