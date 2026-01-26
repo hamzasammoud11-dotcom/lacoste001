@@ -16,6 +16,7 @@ import {
   Sparkles,
   Terminal,
   User,
+  Workflow,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -59,6 +60,21 @@ const navMain = [
     url: '/',
     icon: Home,
     isActive: true,
+  },
+  {
+    title: 'Workflow',
+    url: '/workflow',
+    icon: Workflow,
+    items: [
+      {
+        title: 'Pipeline Builder',
+        url: '/workflow',
+      },
+      {
+        title: 'Templates',
+        url: '/workflow#templates',
+      },
+    ],
   },
   {
     title: 'Discovery',

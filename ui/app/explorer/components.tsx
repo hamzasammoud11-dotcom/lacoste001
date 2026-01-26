@@ -49,9 +49,9 @@ export function ExplorerControls() {
                         <SelectValue placeholder="Select dataset" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="DrugBank">DrugBank</SelectItem>
-                        <SelectItem value="ChEMBL">ChEMBL</SelectItem>
-                        <SelectItem value="ZINC">ZINC</SelectItem>
+                        <SelectItem value="KIBA">KIBA (23.5K)</SelectItem>
+                        <SelectItem value="DAVIS">DAVIS Kinase</SelectItem>
+                        <SelectItem value="BindingDB">BindingDB Kd</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
