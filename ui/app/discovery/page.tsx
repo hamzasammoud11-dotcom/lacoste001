@@ -1,14 +1,15 @@
 "use client"
 
+import { ArrowRight,CheckCircle2, Circle, Loader2, Microscope, Search } from "lucide-react"
 import * as React from "react"
+
 import { PageHeader, SectionHeader } from "@/components/page-header"
-import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Microscope, Search, CheckCircle2, Circle, Loader2, ArrowRight } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent,TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 
 export default function DiscoveryPage() {
   const [query, setQuery] = React.useState("")

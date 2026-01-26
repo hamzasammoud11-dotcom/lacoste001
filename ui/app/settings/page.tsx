@@ -1,14 +1,15 @@
 "use client"
 
+import { Brain, Save,Settings } from "lucide-react"
+
 import { PageHeader, SectionHeader } from "@/components/page-header"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardDescription,CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
-import { Settings, Brain, Save } from "lucide-react"
+import { Tabs, TabsContent,TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function SettingsPage() {
   return (

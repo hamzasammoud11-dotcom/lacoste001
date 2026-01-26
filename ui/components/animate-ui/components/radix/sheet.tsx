@@ -1,28 +1,28 @@
+import { XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import {
   Sheet as SheetPrimitive,
-  SheetTrigger as SheetTriggerPrimitive,
-  SheetOverlay as SheetOverlayPrimitive,
   SheetClose as SheetClosePrimitive,
-  SheetPortal as SheetPortalPrimitive,
-  SheetContent as SheetContentPrimitive,
-  SheetHeader as SheetHeaderPrimitive,
-  SheetFooter as SheetFooterPrimitive,
-  SheetTitle as SheetTitlePrimitive,
-  SheetDescription as SheetDescriptionPrimitive,
-  type SheetProps as SheetPrimitiveProps,
-  type SheetTriggerProps as SheetTriggerPrimitiveProps,
-  type SheetOverlayProps as SheetOverlayPrimitiveProps,
   type SheetCloseProps as SheetClosePrimitiveProps,
+  SheetContent as SheetContentPrimitive,
   type SheetContentProps as SheetContentPrimitiveProps,
-  type SheetHeaderProps as SheetHeaderPrimitiveProps,
-  type SheetFooterProps as SheetFooterPrimitiveProps,
-  type SheetTitleProps as SheetTitlePrimitiveProps,
+  SheetDescription as SheetDescriptionPrimitive,
   type SheetDescriptionProps as SheetDescriptionPrimitiveProps,
+  SheetFooter as SheetFooterPrimitive,
+  type SheetFooterProps as SheetFooterPrimitiveProps,
+  SheetHeader as SheetHeaderPrimitive,
+  type SheetHeaderProps as SheetHeaderPrimitiveProps,
+  SheetOverlay as SheetOverlayPrimitive,
+  type SheetOverlayProps as SheetOverlayPrimitiveProps,
+  SheetPortal as SheetPortalPrimitive,
+  type SheetProps as SheetPrimitiveProps,
+  SheetTitle as SheetTitlePrimitive,
+  type SheetTitleProps as SheetTitlePrimitiveProps,
+  SheetTrigger as SheetTriggerPrimitive,
+  type SheetTriggerProps as SheetTriggerPrimitiveProps,
 } from '@/components/animate-ui/primitives/radix/sheet';
 import { cn } from '@/lib/utils';
-import { XIcon } from 'lucide-react';
 
 type SheetProps = SheetPrimitiveProps;
 
@@ -137,19 +137,19 @@ function SheetDescription({ className, ...props }: SheetDescriptionProps) {
 
 export {
   Sheet,
-  SheetTrigger,
   SheetClose,
-  SheetContent,
-  SheetHeader,
-  SheetFooter,
-  SheetTitle,
-  SheetDescription,
-  type SheetProps,
-  type SheetTriggerProps,
   type SheetCloseProps,
+  SheetContent,
   type SheetContentProps,
-  type SheetHeaderProps,
-  type SheetFooterProps,
-  type SheetTitleProps,
+  SheetDescription,
   type SheetDescriptionProps,
+  SheetFooter,
+  type SheetFooterProps,
+  SheetHeader,
+  type SheetHeaderProps,
+  type SheetProps,
+  SheetTitle,
+  type SheetTitleProps,
+  SheetTrigger,
+  type SheetTriggerProps,
 };

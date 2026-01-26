@@ -1,8 +1,9 @@
 "use client"
 
-import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, Cell } from "recharts"
-import { Card, CardContent } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
+import { Cell,ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
+
+import { Card, CardContent } from "@/components/ui/card"
 import { DataPoint } from "@/types/explorer"
 
 export function ExplorerChart({ data }: { data: DataPoint[] }) {

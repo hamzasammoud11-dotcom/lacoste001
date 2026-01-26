@@ -1,5 +1,5 @@
-import { ExplorerResponse } from "@/types/explorer";
 import { ExplorerRequestSchema } from "@/schemas/explorer";
+import { DataPoint, ExplorerResponse } from "@/types/explorer";
 
 export async function getExplorerPoints(
   dataset?: string,
