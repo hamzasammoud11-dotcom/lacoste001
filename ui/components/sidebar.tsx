@@ -5,10 +5,12 @@ import {
   BadgeCheck,
   BarChart2,
   Bell,
+  Box,
   ChevronRight,
   ChevronsUpDown,
   CreditCard,
   Dna,
+  FlaskConical,
   Home,
   LogOut,
   Microscope,
@@ -51,72 +53,92 @@ import {
   CollapsibleTrigger,
 } from '@/components/animate-ui/primitives/radix/collapsible';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const navMain = [
   {
     title: 'Home',
-    url: '/',
+    url: '/dashboard',
     icon: Home,
     isActive: true,
   },
   {
+    title: 'Visualization',
+    url: '/dashboard/molecules-2d',
+    icon: FlaskConical,
+    items: [
+      {
+        title: 'Molecules 2D',
+        url: '/dashboard/molecules-2d',
+      },
+      {
+        title: 'Molecules 3D',
+        url: '/dashboard/molecules-3d',
+      },
+      {
+        title: 'Proteins 3D',
+        url: '/dashboard/proteins-3d',
+      },
+    ],
+  },
+  {
     title: 'Discovery',
-    url: '/discovery',
+    url: '/dashboard/discovery',
     icon: Microscope,
     items: [
       {
         title: 'Drug Discovery',
-        url: '/discovery',
+        url: '/dashboard/discovery',
       },
       {
         title: 'Molecule Search',
-        url: '/discovery#search',
+        url: '/dashboard/discovery#search',
       },
     ],
   },
   {
     title: 'Explorer',
-    url: '/explorer',
+    url: '/dashboard/explorer',
     icon: Dna,
     items: [
       {
         title: 'Embeddings',
-        url: '/explorer',
+        url: '/dashboard/explorer',
       },
       {
         title: 'Predictions',
-        url: '/explorer#predictions',
+        url: '/dashboard/explorer#predictions',
       },
     ],
   },
   {
     title: 'Data',
-    url: '/data',
+    url: '/dashboard/data',
     icon: BarChart2,
     items: [
       {
         title: 'Datasets',
-        url: '/data',
+        url: '/dashboard/data',
       },
       {
         title: 'Analytics',
-        url: '/data#analytics',
+        url: '/dashboard/data#analytics',
       },
     ],
   },
   {
     title: 'Settings',
-    url: '/settings',
+    url: '/dashboard/settings',
     icon: Settings,
     items: [
       {
         title: 'General',
-        url: '/settings',
+        url: '/dashboard/settings',
       },
       {
         title: 'Models',
-        url: '/settings#models',
+        url: '/dashboard/settings#models',
       },
     ],
   },
@@ -139,7 +161,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/">
+              <Link href="/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <Dna className="size-4" />
                 </div>
@@ -151,6 +173,10 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        {/* Theme Toggle */}
+        <div className="group-data-[collapsible=icon]:hidden px-2">
+          <ThemeToggle />
+        </div>
         {/* App Header */}
       </SidebarHeader>
 
