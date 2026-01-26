@@ -70,7 +70,7 @@ export function ProteinViewer({
         setError(null);
         const pdbUrl = getProteinPdbUrl(pdbId);
         const response = await fetch(pdbUrl);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch PDB: ${response.statusText}`);
         }
@@ -96,9 +96,9 @@ export function ProteinViewer({
         case 'ball-and-stick':
           return { stick: { radius: 0.15 }, sphere: { scale: 0.25 } };
         case 'surface':
-          return { surface: { opacity: 0.8, color: 'white' } };
+          return { surface: {} }; // Surface handled via addSurface
         case 'ribbon':
-          return { cartoon: { style: 'ribbon', color: 'spectrum' } };
+          return { cartoon: { style: 'trace', color: 'spectrum' } };
         default:
           return { cartoon: { color: 'spectrum' } };
       }
@@ -120,13 +120,23 @@ export function ProteinViewer({
 
       // Create viewer
       const viewer = $3Dmol.createViewer(containerRef.current, {
-        backgroundColor: 'white',
+        backgroundColor: '#0a0a0a',
       });
       viewerRef.current = viewer;
 
       // Add protein structure
       viewer.addModel(pdbData, 'pdb');
-      viewer.setStyle({}, getStyleForRepresentation(representation));
+
+      if (representation === 'surface') {
+        viewer.setStyle({}, { cartoon: { color: 'spectrum' } }); // Base style
+        viewer.addSurface($3Dmol.SurfaceType.VDW, {
+          opacity: 0.85,
+          color: 'spectrum',
+        }, {}, {});
+      } else {
+        viewer.setStyle({}, getStyleForRepresentation(representation));
+      }
+
       viewer.zoomTo();
       viewer.render();
 
@@ -148,14 +158,25 @@ export function ProteinViewer({
 
   // Update representation
   useEffect(() => {
-    if (!viewerRef.current || !pdbData) return;
+    if (!viewerRef.current || !pdbData || !$3Dmol) return;
     try {
-      viewerRef.current.setStyle({}, getStyleForRepresentation(representation));
+      viewerRef.current.removeAllSurfaces();
+
+      if (representation === 'surface') {
+        viewerRef.current.setStyle({}, { cartoon: { color: 'spectrum', opacity: 0.5 } });
+        viewerRef.current.addSurface($3Dmol.SurfaceType.VDW, {
+          opacity: 0.85,
+          color: 'spectrum',
+        }, {}, {});
+      } else {
+        viewerRef.current.setStyle({}, getStyleForRepresentation(representation));
+      }
+
       viewerRef.current.render();
     } catch (err) {
       console.error('Style update error:', err);
     }
-  }, [representation, getStyleForRepresentation, pdbData]);
+  }, [representation, getStyleForRepresentation, pdbData, $3Dmol]);
 
   const handleResetCamera = useCallback(() => {
     if (!viewerRef.current) return;
