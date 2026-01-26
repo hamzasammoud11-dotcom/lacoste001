@@ -5,8 +5,7 @@ import time
 import argparse
 from datetime import datetime
 import matplotlib.pyplot as plt
-from datetime import datetime
-
+import torch
 
 import numpy as np
 import pandas as pd
@@ -121,16 +120,11 @@ def detect_cols(df):
     return drug_col, target_col, y_col
 
 def label_transform(y, mode, dataset_name):
-    """
-    mode:
-      - none
-      - paffinity_nm : suppose y en nM -> p = 9 - log10(nM)
-      - auto : BindingDB_* -> paffinity_nm, sinon none
-    """
     y = np.asarray(y, dtype=float)
 
+    # Force auto to paffinity_nm for standard datasets
     if mode == "auto":
-        if dataset_name.startswith("BindingDB_"):
+        if dataset_name.lower() in ["davis", "kiba"] or dataset_name.startswith("BindingDB"):
             mode = "paffinity_nm"
         else:
             mode = "none"
@@ -139,7 +133,11 @@ def label_transform(y, mode, dataset_name):
         return y, "none"
 
     if mode == "paffinity_nm":
-        y = np.where(y <= 0, np.nan, y)
+        # SAFETY CHECK: Clip values to avoid log(0) or log(negative)
+        y = np.where(y < 1e-9, 1e-9, y) 
+        # Convert nM to pM ( -log10( Molar ) )
+        # Value 100 nM = 100e-9 M = 1e-7 M -> -log10(1e-7) = 7.0
+        # Formula: 9 - log10(nM)
         y = 9.0 - np.log10(y)
         return y, "paffinity_nm"
 
@@ -152,8 +150,24 @@ def make_run_dir(base_dir, dataset):
     os.makedirs(run_dir, exist_ok=True)
     return run_id, run_dir
 
+def check_gpu():
+    """Check GPU availability and return CUDA ID for DeepPurpose."""
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+        print(f"\n[SYSTEM] ✅ CUDA GPU Detected: {device_name}")
+        print(f"[SYSTEM]    Memory: {gpu_memory:.1f} GB")
+        print(f"[SYSTEM]    CUDA Version: {torch.version.cuda}")
+        return 0  # Use GPU 0
+    else:
+        print("\n[SYSTEM] ⚠️ No GPU detected. Running on CPU (will be slow).")
+        return -1  # Use CPU
+
 
 def main():
+    # --- GPU DETECTION FIRST ---
+    use_cuda = check_gpu()
+    
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", default="DAVIS", help="DAVIS | KIBA | BindingDB_Kd | BindingDB_Ki | BindingDB_IC50")
     ap.add_argument("--drug_enc", default="Morgan")
@@ -166,11 +180,17 @@ def main():
     ap.add_argument("--frac_train", type=float, default=0.8)
     ap.add_argument("--frac_val", type=float, default=0.1)
     ap.add_argument("--frac_test", type=float, default=0.1)
-    ap.add_argument("--label_transform", default="auto", help="auto | none | paffinity_nm")
+    ap.add_argument("--label_transform", default="paffinity_nm", help="Force log transform! (auto | none | paffinity_nm)")
     ap.add_argument("--harmonize", default="none", help="none | mean | max_affinity (utile surtout BindingDB_*)")
     ap.add_argument("--runs_dir", default="runs")
     ap.add_argument("--dry_run", action="store_true", help="Charge dataset + prints info, sans training")
+    ap.add_argument("--gpu", type=int, default=None, help="Override GPU ID (default: auto-detect)")
     args = ap.parse_args()
+
+    # Override GPU if specified
+    if args.gpu is not None:
+        use_cuda = args.gpu
+        print(f"[SYSTEM] Using specified GPU: {use_cuda}")
 
     np.random.seed(args.seed)
 
@@ -271,7 +291,7 @@ def main():
     print(f"[ENC] drug_encoding={args.drug_enc} | target_encoding={args.target_enc}")
 
     # -------------------------
-    # 4) MODEL INIT + TRAIN
+    # 4) MODEL INIT + TRAIN (WITH GPU CONFIG)
     # -------------------------
     log_section("[4] MODEL INIT + TRAIN")
     config = utils.generate_config(
@@ -281,14 +301,21 @@ def main():
         train_epoch=args.epochs,
         batch_size=args.batch,
         LR=args.lr,
-        result_folder=run_dir
+        result_folder=run_dir,
+        cuda_id=use_cuda  # <<< GPU CONFIG HERE
     )
 
     print("[MODEL] config:")
     print(f"  epochs={args.epochs} | batch={args.batch} | lr={args.lr}")
     print(f"  hidden=[1024,1024,512] | result_dir={run_dir}")
+    print(f"  cuda_id={use_cuda} {'(GPU)' if use_cuda >= 0 else '(CPU)'}")
 
     model = dp_models.model_initialize(**config)
+    
+    # Verify device placement
+    if use_cuda >= 0:
+        device = next(model.model.parameters()).device
+        print(f"[MODEL] ✓ Model loaded on device: {device}")
 
     t_train0 = time.time()
     try:
@@ -303,8 +330,19 @@ def main():
     # -------------------------
     log_section("[5] EVAL + EXPORT")
     print("[PREDICT] predicting on test...")
+    
+    # [FIX] Reset index to ensure alignment between DataFrame and Model Output
+    test = test.reset_index(drop=True)
+    
     y_true = np.asarray(test.Label.values, dtype=float).reshape(-1)
-    y_pred = np.asarray(model.predict(test), dtype=float).reshape(-1)
+    
+    # [DEBUG] Check what the model is actually predicting
+    raw_pred = model.predict(test)
+    y_pred = np.asarray(raw_pred, dtype=float).reshape(-1)
+
+    # [DEBUG] Print first 5 comparisons to verify scaling matches
+    print(f"[DEBUG] First 5 True: {y_true[:5]}")
+    print(f"[DEBUG] First 5 Pred: {y_pred[:5]}")
 
     m_mse = mse(y_true, y_pred)
     m_rmse = float(math.sqrt(m_mse))
@@ -339,6 +377,9 @@ def main():
         "label_transform": used_transform,
         "harmonize": args.harmonize,
         "n_rows_after_clean": int(len(df)),
+        "cuda_id": use_cuda,
+        "gpu_used": use_cuda >= 0,
+        "gpu_name": torch.cuda.get_device_name(0) if use_cuda >= 0 else "CPU",
         "metrics_test": {
             "mse": m_mse,
             "rmse": m_rmse,
@@ -359,74 +400,56 @@ def main():
         json.dump(summary, f, indent=2)
     print(f"[FILE] saved summary: {summary_path}")
 
+    # -------------------------
+    # 6) VISUALISATION
+    # -------------------------
+    log_section("[6] VISUALISATION")
+    
+    # Scatter plot
+    scatter_png = os.path.join(run_dir, "scatter.png")
+    plt.figure(figsize=(8, 6))
+    plt.scatter(y_true, y_pred, s=8, alpha=0.5)
+    plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', label='Perfect fit')
+    plt.xlabel("y_true")
+    plt.ylabel("y_pred")
+    plt.title("Test: y_true vs y_pred")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(scatter_png, dpi=200)
+    plt.close()
+    print(f"[PLOT] saved: {scatter_png}")
+
+    # Sorted curves
+    curves_png = os.path.join(run_dir, "curves_sorted.png")
+    order = np.argsort(y_true)
+    plt.figure(figsize=(10, 6))
+    plt.plot(y_true[order], label="y_true", alpha=0.7)
+    plt.plot(y_pred[order], label="y_pred", alpha=0.7)
+    plt.xlabel("samples (sorted by y_true)")
+    plt.ylabel("value")
+    plt.title("Test: curves (sorted)")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(curves_png, dpi=200)
+    plt.close()
+    print(f"[PLOT] saved: {curves_png}")
+
+    # Residuals
+    res_png = os.path.join(run_dir, "residuals.png")
+    res = y_pred - y_true
+    plt.figure(figsize=(8, 6))
+    plt.scatter(y_true, res, s=8, alpha=0.5)
+    plt.axhline(0, color='r', linestyle='--')
+    plt.xlabel("y_true")
+    plt.ylabel("y_pred - y_true")
+    plt.title("Test: residuals")
+    plt.tight_layout()
+    plt.savefig(res_png, dpi=200)
+    plt.close()
+    print(f"[PLOT] saved: {res_png}")
+
     print("\n[DONE]")
 
 
 if __name__ == "__main__":
     main()
-# =========================
-# VISUALISATION + EXPORTS
-# =========================
-
-# 0) Dossier de sortie (stable)
-BASE_DIR = os.path.dirname(__file__)
-RUNS_DIR = os.path.join(BASE_DIR, "runs")
-os.makedirs(RUNS_DIR, exist_ok=True)
-
-# si tu as déjà un run_dir dans ton code, il sera utilisé; sinon on en crée un
-try:
-    run_dir
-except NameError:
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(RUNS_DIR, run_id)
-    os.makedirs(run_dir, exist_ok=True)
-
-# 1) Récupère y_true / y_pred (sans retraining)
-y_true = np.asarray(test.Label.values, dtype=float).reshape(-1)
-y_pred = np.asarray(model.predict(test), dtype=float).reshape(-1)
-
-# 2) Sauvegarde CSV predictions
-pred_csv = os.path.join(run_dir, "predictions_test.csv")
-pd.DataFrame({"y_true": y_true, "y_pred": y_pred}).to_csv(pred_csv, index=False)
-print("[FILE] saved predictions:", pred_csv)
-
-# 3) Scatter: y_true vs y_pred
-scatter_png = os.path.join(run_dir, "scatter.png")
-plt.figure()
-plt.scatter(y_true, y_pred, s=8)
-plt.xlabel("y_true")
-plt.ylabel("y_pred")
-plt.title("Test: y_true vs y_pred")
-plt.tight_layout()
-plt.savefig(scatter_png, dpi=200)
-plt.close()
-print("[PLOT] saved:", scatter_png)
-
-# 4) Courbes triées: y_true et y_pred (tri par y_true)
-curves_png = os.path.join(run_dir, "curves_sorted.png")
-order = np.argsort(y_true)
-plt.figure()
-plt.plot(y_true[order], label="y_true")
-plt.plot(y_pred[order], label="y_pred")
-plt.xlabel("samples (sorted by y_true)")
-plt.ylabel("value")
-plt.title("Test: curves (sorted)")
-plt.legend()
-plt.tight_layout()
-plt.savefig(curves_png, dpi=200)
-plt.close()
-print("[PLOT] saved:", curves_png)
-
-# 5) Résidus: (y_pred - y_true) vs y_true
-res_png = os.path.join(run_dir, "residuals.png")
-res = y_pred - y_true
-plt.figure()
-plt.scatter(y_true, res, s=8)
-plt.axhline(0)
-plt.xlabel("y_true")
-plt.ylabel("y_pred - y_true")
-plt.title("Test: residuals")
-plt.tight_layout()
-plt.savefig(res_png, dpi=200)
-plt.close()
-print("[PLOT] saved:", res_png)

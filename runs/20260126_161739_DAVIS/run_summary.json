@@ -1,0 +1,37 @@
+{
+  "run_id": "20260126_161739_DAVIS",
+  "dataset": "DAVIS",
+  "drug_encoding": "Morgan",
+  "target_encoding": "CNN",
+  "epochs": 10,
+  "batch": 256,
+  "lr": 0.0001,
+  "seed": 1,
+  "split_method": "random",
+  "frac": [
+    0.8,
+    0.1,
+    0.1
+  ],
+  "label_transform": "paffinity_nm",
+  "harmonize": "none",
+  "n_rows_after_clean": 25772,
+  "cuda_id": 0,
+  "gpu_used": true,
+  "gpu_name": "NVIDIA GeForce RTX 3070 Laptop GPU",
+  "metrics_test": {
+    "mse": 0.46840563033228455,
+    "rmse": 0.6844016586276546,
+    "mae": 0.4135942073549742,
+    "pearson": 0.544594927541983,
+    "spearman": 0.5194291749084063,
+    "ci_approx": 0.7863682932361785
+  },
+  "files": {
+    "predictions_test_csv": "runs\\20260126_161739_DAVIS\\predictions_test.csv"
+  },
+  "timing": {
+    "load_seconds": 568.5627524852753,
+    "train_seconds": 560.3927385807037
+  }
+}
