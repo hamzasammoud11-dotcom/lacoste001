@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowUp, Database, FileText, Search, Sparkles,Zap } from "lucide-react"
+import { ArrowUp, Database, FileText, Search, Sparkles, Zap, Beaker, Dna, BookOpen } from "lucide-react"
 import Link from "next/link"
 
 import { SectionHeader } from "@/components/page-header"
@@ -85,10 +85,10 @@ export default function Home() {
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-            { label: "Molecules", value: "12.5M", icon: "🧪", change: "+2.3%", color: "text-blue-500" },
-            { label: "Proteins", value: "847K", icon: "🧬", change: "+1.8%", color: "text-cyan-500" },
-            { label: "Papers", value: "1.2M", icon: "📚", change: "+5.2%", color: "text-emerald-500" },
-            { label: "Discoveries", value: "156", icon: "✨", change: "+12%", color: "text-amber-500" }
+            { label: "Molecules", value: "12.5M", icon: <Beaker className="h-5 w-5 text-blue-500" />, change: "+2.3%" },
+            { label: "Proteins", value: "847K", icon: <Dna className="h-5 w-5 text-cyan-500" />, change: "+1.8%" },
+            { label: "Papers", value: "1.2M", icon: <BookOpen className="h-5 w-5 text-emerald-500" />, change: "+5.2%" },
+            { label: "Discoveries", value: "156", icon: <Sparkles className="h-5 w-5 text-amber-500" />, change: "+12%" }
         ].map((metric, i) => (
             <Card key={i}>
                 <CardContent className="p-6">

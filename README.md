@@ -1,4 +1,4 @@
-# 🧬 BioFlow Orchestrator
+# BioFlow Orchestrator
 
 > **Multimodal Biological Design & Discovery Intelligence Engine**  
 > A low-code workflow platform for unified biological discovery pipelines
@@ -12,7 +12,7 @@
 
 ---
 
-## 🎯 Problem Statement
+## Problem Statement
 
 Biological R&D knowledge is fragmented across disconnected silos:
 - **Textual literature** (papers, lab notes)
@@ -21,7 +21,7 @@ Biological R&D knowledge is fragmented across disconnected silos:
 
 Researchers must manually navigate incompatible formats, creating bottlenecks and "blind spots" where critical connections are missed.
 
-## 💡 Our Solution
+## Our Solution
 
 **BioFlow Orchestrator** is a visual workflow engine that unifies biological discovery pipelines. Rather than a single "black box" model, we function as an **intelligent orchestrator** — allowing researchers to chain state-of-the-art open-source biological models into coherent discovery workflows.
 
@@ -29,15 +29,15 @@ Researchers must manually navigate incompatible formats, creating bottlenecks an
 
 | Feature | Description |
 |---------|-------------|
-| 🔗 **Visual Pipeline Builder** | Drag-and-drop node editor for constructing discovery workflows |
-| 🧠 **DeepPurpose Integration** | Drug-Target Interaction prediction with Morgan + CNN encoding |
-| 🔍 **Qdrant Vector Search** | High-dimensional similarity search across 23,531+ compounds |
-| 🎨 **3D Embedding Explorer** | Real PCA projections of drug-target chemical space |
-| ✅ **Validator Agents** | Automated toxicity and novelty checking |
+| **Visual Pipeline Builder** | Drag-and-drop node editor for constructing discovery workflows |
+| **DeepPurpose Integration** | Drug-Target Interaction prediction with Morgan + CNN encoding |
+| **Qdrant Vector Search** | High-dimensional similarity search across 23,531+ compounds |
+| **3D Embedding Explorer** | Real PCA projections of drug-target chemical space |
+| **Validator Agents** | Automated toxicity and novelty checking |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
                          ┌──────────────────────────────────────────┐
@@ -76,7 +76,7 @@ Researchers must manually navigate incompatible formats, creating bottlenecks an
 
 ---
 
-## 📊 Model Performance
+## Model Performance
 
 | Dataset | Concordance Index | Pearson | MSE |
 |---------|-------------------|---------|-----|
@@ -86,7 +86,7 @@ Researchers must manually navigate incompatible formats, creating bottlenecks an
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.10+
@@ -133,6 +133,10 @@ pnpm dev
 
 ### 6. Start Langflow (Visual Workflow Builder)
 ```bash
+# You can use the provided script
+./run_langflow.bat
+
+# Or manually:
 pip install langflow
 langflow run --host 0.0.0.0 --port 7860
 # Access via http://localhost:3000/workflow (embedded)
@@ -141,7 +145,7 @@ langflow run --host 0.0.0.0 --port 7860
 
 ---
 
-## 🎨 Visual Workflow Builder (Langflow Integration)
+## Visual Workflow Builder (Langflow Integration)
 
 BioFlow integrates **Langflow** as the visual workflow engine, providing a full-screen drag-and-drop pipeline builder accessible from `/workflow`.
 
@@ -162,7 +166,7 @@ BioFlow integrates **Langflow** as the visual workflow engine, providing a full-
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ├── config.py              # Shared configuration
@@ -176,7 +180,7 @@ BioFlow integrates **Langflow** as the visual workflow engine, providing a full-
 │       └── config.pkl     # Model configuration
 ├── ui/
 │   ├── app/
-│   │   ├── workflow/      # 🆕 Visual Pipeline Builder
+│   │   ├── workflow/      # Visual Pipeline Builder
 │   │   ├── explorer/      # 3D Embedding Visualization
 │   │   ├── discovery/     # Drug Discovery Interface
 │   │   └── data/          # Data Browser
@@ -187,7 +191,7 @@ BioFlow integrates **Langflow** as the visual workflow engine, providing a full-
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -204,7 +208,7 @@ curl -X POST "http://localhost:8001/api/search" \
 
 ---
 
-## 🛠️ Qdrant Integration Strategy
+## Qdrant Integration Strategy
 
 ### 1. Multimodal Bridge
 Using OpenBioMed for joint embeddings across proteins, molecules, and text — enabling **cross-modal retrieval**.
@@ -215,18 +219,9 @@ Pipeline nodes store intermediate results in Qdrant collections, enabling agent-
 ### 3. High-Dimensional Scalability
 HNSW indexing handles bio-embeddings at scale, keeping similarity searches interactive and real-time.
 
----
 
-## 👥 Team Lacoste
 
-| Name | Role |
-|------|------|
-| **Hamza Sammoud** | ML Pipeline & Backend |
-| **Rami Troudi** | Frontend UI |
-
----
-
-## 📚 Resources
+## Resources
 
 - [DeepPurpose](https://github.com/kexinhuang12345/DeepPurpose) — DTI Prediction Toolkit
 - [OpenBioMed](https://github.com/PharMolix/OpenBioMed) — Multimodal AI Framework
@@ -235,6 +230,6 @@ HNSW indexing handles bio-embeddings at scale, keeping similarity searches inter
 
 ---
 
-## 📄 License
+## License
 
 MIT License - See [LICENSE](LICENSE) for details.
