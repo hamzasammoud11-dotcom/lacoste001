@@ -131,11 +131,6 @@ python deeppurpose002.py
 python ingest_qdrant.py
 ```
 
-## 👥 Contributors
-
-- **Hamza Sammoud** — ML Pipeline & Backend
-- **Rami Troudi** — Frontend UI
-
 ## 📄 License
 
 MIT License - See [LICENSE](LICENSE) for details.
