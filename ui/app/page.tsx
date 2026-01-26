@@ -27,12 +27,12 @@ export default function Home() {
           </div>
           
           <div className="flex gap-4">
-            <Link href="/discovery">
+            <Link href="/dashboard/discovery">
                 <Button size="lg" className="font-semibold">
                     Start Discovery
                 </Button>
             </Link>
-            <Link href="/explorer">
+            <Link href="/dashboard/explorer">
                 <Button size="lg" variant="outline">
                     Explore Data
                 </Button>
