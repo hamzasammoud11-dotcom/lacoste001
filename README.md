@@ -238,7 +238,3 @@ HNSW indexing handles bio-embeddings at scale, keeping similarity searches inter
 ## 📄 License
 
 MIT License - See [LICENSE](LICENSE) for details.
-
----
-
-*Built for Hackathon 2026* 🏆
