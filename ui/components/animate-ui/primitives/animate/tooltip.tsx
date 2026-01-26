@@ -1,27 +1,28 @@
 'use client';
 
-import * as React from 'react';
+/* eslint-disable react-hooks/refs */
 import {
-  motion,
-  AnimatePresence,
-  LayoutGroup,
-  type Transition,
-  type HTMLMotionProps,
-} from 'motion/react';
-import {
-  useFloating,
-  autoUpdate,
-  offset as floatingOffset,
-  flip,
-  shift,
   arrow as floatingArrow,
-  FloatingPortal,
+  autoUpdate,
+  flip,
   FloatingArrow,
+  FloatingPortal,
+  offset as floatingOffset,
+  shift,
+  useFloating,
   type UseFloatingReturn,
 } from '@floating-ui/react';
+import {
+  AnimatePresence,
+  type HTMLMotionProps,
+  LayoutGroup,
+  motion,
+  type Transition,
+} from 'motion/react';
+import * as React from 'react';
 
-import { getStrictContext } from '@/lib/get-strict-context';
 import { Slot, type WithAsChild } from '@/components/animate-ui/primitives/animate/slot';
+import { getStrictContext } from '@/lib/get-strict-context';
 
 type Side = 'top' | 'bottom' | 'left' | 'right';
 type Align = 'start' | 'center' | 'end';
@@ -554,19 +555,19 @@ function TooltipTrigger({
 }
 
 export {
-  TooltipProvider,
+  type GlobalTooltipContextType,
   Tooltip,
-  TooltipContent,
-  TooltipTrigger,
   TooltipArrow,
+  type TooltipArrowProps,
+  TooltipContent,
+  type TooltipContentProps,
+  type TooltipContextType,
+  type TooltipPosition,
+  type TooltipProps,
+  TooltipProvider,
+  type TooltipProviderProps,
+  TooltipTrigger,
+  type TooltipTriggerProps,
   useGlobalTooltip,
   useTooltip,
-  type TooltipProviderProps,
-  type TooltipProps,
-  type TooltipContentProps,
-  type TooltipTriggerProps,
-  type TooltipArrowProps,
-  type TooltipPosition,
-  type GlobalTooltipContextType,
-  type TooltipContextType,
 };

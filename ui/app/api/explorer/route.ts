@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { getExplorerPoints } from "@/lib/explorer-service";
 
 export async function GET(request: Request) {

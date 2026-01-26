@@ -1,8 +1,10 @@
-import { Suspense } from 'react'
-import { getData } from "@/lib/data-service"
-import { DataView } from "./data-view"
-import { PageHeader } from "@/components/page-header"
 import { Database, Loader2 } from "lucide-react"
+import { Suspense } from 'react'
+
+import { PageHeader } from "@/components/page-header"
+import { getData } from "@/lib/data-service"
+
+import { DataView } from "./data-view"
 
 export default async function DataPage() {
     const { datasets, stats } = await getData()

@@ -1,8 +1,10 @@
-import { Suspense } from "react"
-import { getExplorerPoints } from "@/lib/explorer-service"
-import { ExplorerControls } from "./components"
-import { ExplorerChart } from "./chart"
 import { Loader2 } from "lucide-react"
+import { Suspense } from "react"
+
+import { getExplorerPoints } from "@/lib/explorer-service"
+
+import { ExplorerChart } from "./chart"
+import { ExplorerControls } from "./components"
 
 interface ExplorerPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>

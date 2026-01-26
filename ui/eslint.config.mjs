@@ -2,11 +2,9 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
-
 import reactHooks from "eslint-plugin-react-hooks";
-import unusedImports from "eslint-plugin-unused-imports";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
-import tailwindcss from "eslint-plugin-tailwindcss";
+import unusedImports from "eslint-plugin-unused-imports";
 
 export default defineConfig([
   ...nextVitals,
@@ -17,16 +15,6 @@ export default defineConfig([
       "react-hooks": reactHooks,
       "unused-imports": unusedImports,
       "simple-import-sort": simpleImportSort,
-      tailwindcss,
-    },
-
-    settings: {
-      // Helps eslint-plugin-tailwindcss understand cn()/cva() patterns (common with shadcn)
-      tailwindcss: {
-        callees: ["cn", "cva"],
-        // If you still have a config file, keep it here; otherwise it’s harmless.
-        config: "./tailwind.config.ts",
-      },
     },
 
     rules: {
@@ -55,11 +43,7 @@ export default defineConfig([
       "simple-import-sort/imports": "warn",
       "simple-import-sort/exports": "warn",
 
-      // Tailwind + shadcn friendly defaults
-      "tailwindcss/classnames-order": "warn",
-      "tailwindcss/no-contradicting-classname": "error",
-      // shadcn often uses design-token classes (e.g. bg-background, text-foreground)
-      "tailwindcss/no-custom-classname": "off",
+      // NOTE: Tailwind rules disabled - plugin not compatible with Tailwind v4
     },
   },
 

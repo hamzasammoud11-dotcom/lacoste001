@@ -1,6 +1,4 @@
-import { cn } from "@/lib/utils"
 import { SidebarTrigger } from "@/components/animate-ui/components/radix/sidebar"
-import { Separator } from "@/components/ui/separator"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,6 +7,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
 
 interface PageHeaderProps {
   title: string

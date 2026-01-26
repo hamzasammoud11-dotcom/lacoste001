@@ -1,11 +1,13 @@
+import "./globals.css";
+
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { AppSidebar } from "@/components/sidebar";
+
 import {
-  SidebarProvider,
   SidebarInset,
+  SidebarProvider,
 } from "@/components/animate-ui/components/radix/sidebar";
+import { AppSidebar } from "@/components/sidebar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

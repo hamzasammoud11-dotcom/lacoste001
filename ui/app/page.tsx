@@ -1,12 +1,13 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
+import { ArrowUp, Database, FileText, Search, Sparkles,Zap } from "lucide-react"
+import Link from "next/link"
+
+import { SectionHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { SectionHeader } from "@/components/page-header"
-import { ArrowUp, Zap, Search, Database, FileText, Sparkles } from "lucide-react"
-import Link from "next/link"
 
 export default function Home() {
   return (
