@@ -1,1 +1,27 @@
-.venv
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs & cache
+*.log
+.cache/
+runs/*/events.out.tfevents.*
+
+# Model artifacts (large files)
+*.pt
+*.npy
+
+# OS
+.DS_Store
+Thumbs.db

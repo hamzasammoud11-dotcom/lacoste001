@@ -1,52 +1,80 @@
-import { ExplorerResponse, DataPoint } from "@/types/explorer";
+import { ExplorerResponse } from "@/types/explorer";
 import { ExplorerRequestSchema } from "@/schemas/explorer";
-
-const clusters = [
-  { cx: 2, cy: 3, color: "var(--color-chart-1)" },
-  { cx: -2, cy: -1, color: "var(--color-chart-2)" },
-  { cx: 4, cy: -2, color: "var(--color-chart-3)" },
-  { cx: -1, cy: 4, color: "var(--color-chart-4)" },
-];
 
 export async function getExplorerPoints(
   dataset?: string,
   view?: string,
   colorBy?: string
 ): Promise<ExplorerResponse> {
-  // Validate params using the schema to ensure defaults are applied if needed, even for internal calls
-  // Note: safeParse is synchronous, but we can treat this as an async service
-  const result = ExplorerRequestSchema.safeParse({
-    dataset,
-    view,
-    colorBy,
-  });
+  const result = ExplorerRequestSchema.safeParse({ dataset, view, colorBy });
 
   if (!result.success) {
-    // Return empty/default response or throw type-safe error
-    // For now, adhering to existing behavior, we can just throw or fallback
     throw new Error("Invalid parameters");
   }
 
+  // Map view param to API view type
+  const apiView = view === "UMAP" ? "combined" : view === "PCA-Drug" ? "drug" : view === "PCA-Target" ? "target" : "combined";
 
-  // TODO: replace mock generation with backend embeddings
-  const points: DataPoint[] = [];
-  for (let i = 0; i < 200; i++) {
-    const cluster = clusters[Math.floor(i / 50)];
-    points.push({
-      x: cluster.cx + (Math.random() - 0.5) * 2,
-      y: cluster.cy + (Math.random() - 0.5) * 2,
-      z: Math.random() * 100,
-      color: cluster.color,
-      name: `Mol_${i}`,
-      affinity: Math.random() * 100,
+  // Phase 3: Fetch from Python API with pre-computed PCA
+  try {
+    const res = await fetch(`http://127.0.0.1:8001/api/points?limit=500&view=${apiView}`, {
+        next: { revalidate: 0 },
+        signal: AbortSignal.timeout(5000)
     });
+
+    if (res.ok) {
+        const data = await res.json();
+        
+        // Map API response to UI schema - now using real PCA coordinates!
+        const realPoints = data.points.map((p: any) => ({
+             x: p.x,
+             y: p.y,
+             z: p.z,
+             color: p.color || "#64748b",
+             name: p.name || "Unknown",
+             affinity: p.affinity || 0,
+        }));
+
+        return {
+            points: realPoints,
+            metrics: data.metrics || {
+                activeMolecules: realPoints.length,
+                clusters: 3,
+                avgConfidence: 0.80
+            }
+        };
+    }
+  } catch (e) {
+      console.warn("Python backend unreachable, using mock data:", e);
   }
 
-  const metrics = {
-    activeMolecules: 12450,
-    clusters: 4,
-    avgConfidence: 0.89,
-  };
+  // --- FALLBACK MOCK DATA ---
+  const clusters = [
+    { cx: 2, cy: 3, cz: 1, color: "var(--color-chart-1)" },
+    { cx: -2, cy: -1, cz: -1, color: "var(--color-chart-2)" },
+    { cx: 4, cy: -2, cz: 2, color: "var(--color-chart-3)" },
+    { cx: -1, cy: 4, cz: 0, color: "var(--color-chart-4)" },
+  ];
 
-  return Promise.resolve({ points, metrics });
+  const points = Array.from({ length: 500 }).map((_, i) => {
+    const cluster = clusters[Math.floor(Math.random() * clusters.length)];
+    const spread = 1.5;
+    return {
+      x: cluster.cx + (Math.random() - 0.5) * spread,
+      y: cluster.cy + (Math.random() - 0.5) * spread,
+      z: cluster.cz + (Math.random() - 0.5) * spread,
+      color: cluster.color,
+      name: `MOL-${1000 + i}`,
+      affinity: Math.random(),
+    };
+  });
+
+  return Promise.resolve({
+    points,
+    metrics: {
+      activeMolecules: 12450,
+      clusters: 4,
+      avgConfidence: 0.85,
+    },
+  });
 }
