@@ -12,11 +12,6 @@ import { API_CONFIG } from "@/config/api.config";
 
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/animate-ui/components/radix/sidebar";
-import { AppSidebar } from "@/components/sidebar";
 
 const INTER = Inter({
   subsets: ["latin"],
@@ -98,18 +93,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
-            storageKey="bioflow-theme"
+            storageKey="bisoness-theme"
           >
-            <SidebarProvider>
-              <AppSidebar />
-              <SidebarInset>
-                <main className="flex-1 overflow-y-auto bg-background p-8">
-                  <div className="mx-auto max-w-7xl">
-                    {children}
-                  </div>
-                </main>
-              </SidebarInset>
-            </SidebarProvider>
+            {children}
             <Toaster />
           </ThemeProvider>
         </ProjectStateProvider>
