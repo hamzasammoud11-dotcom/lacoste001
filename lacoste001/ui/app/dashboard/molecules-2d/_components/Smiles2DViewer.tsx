@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertCircle } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import SmilesDrawer from 'smiles-drawer';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,6 +21,7 @@ export function Smiles2DViewer({
   className,
 }: Smiles2DViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasId = useId();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -52,18 +53,19 @@ export function Smiles2DViewer({
         padding: 20,
       });
 
-      await new Promise<void>((resolve, reject) => {
-        SmilesDrawer.parse(smiles, (tree: unknown) => {
-          try {
-            drawer.draw(tree, canvasRef.current, 'light');
-            resolve();
-          } catch (drawError) {
-            reject(drawError);
-          }
-        }, (parseError: Error) => {
-          reject(parseError);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          (drawer as any).draw(
+            smiles,
+            `[id="${canvasId}"]`,
+            'light',
+            () => resolve(),
+            (drawError: Error) => reject(drawError)
+          );
         });
-      });
+      } catch (drawError) {
+        throw drawError;
+      }
 
       setIsLoading(false);
     } catch (err) {
@@ -107,6 +109,7 @@ export function Smiles2DViewer({
       )}
       <canvas
         ref={canvasRef}
+        id={canvasId}
         width={width}
         height={height}
         className={`bg-background rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
