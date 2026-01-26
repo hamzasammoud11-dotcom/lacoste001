@@ -11,7 +11,7 @@ export async function GET(request: Request) {
       searchParams.get("colorBy") || undefined
     );
     return NextResponse.json(data);
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
   }
 }

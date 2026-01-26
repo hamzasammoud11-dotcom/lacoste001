@@ -4,7 +4,7 @@ export async function POST(request: Request) {
   const body = await request.json();
   const { query } = body;
 
-  console.log("Starting discovery for:", query);
+  console.info("Starting discovery for:", query);
 
   // Here you would typically call your Python backend
   // e.g., await fetch('http://localhost:8000/api/discovery', { ... })
