@@ -90,7 +90,7 @@ export function Molecule3DViewer({
 
       // Create viewer
       const viewer = $3Dmol.createViewer(containerRef.current, {
-        backgroundColor: 'transparent',
+        backgroundColor: 'white',
       });
       viewerRef.current = viewer;
 
