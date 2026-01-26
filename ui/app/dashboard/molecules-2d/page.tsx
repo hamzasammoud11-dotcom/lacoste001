@@ -95,7 +95,7 @@ export default function Molecules2DPage() {
   }
 
   return (
-    <div className="flex h-full gap-6 p-6">
+    <div className="flex h-full gap-4 p-4">
       {/* Left Panel - Molecule List */}
       <Card className="w-80 shrink-0">
         <CardHeader className="pb-3">

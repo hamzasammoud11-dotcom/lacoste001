@@ -172,11 +172,6 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        {/* Theme Toggle */}
-        <div className="group-data-[collapsible=icon]:hidden px-2">
-          <ThemeToggle />
-        </div>
-        {/* App Header */}
       </SidebarHeader>
 
       <SidebarContent>
@@ -241,9 +236,12 @@ export function AppSidebar() {
           <SidebarGroupLabel>System Status</SidebarGroupLabel>
           <div className="px-3 py-2">
             <div className="rounded-lg border bg-muted/50 p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Terminal className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium">Status</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Terminal className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium">Status</span>
+                </div>
+                <ThemeToggle />
               </div>
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
