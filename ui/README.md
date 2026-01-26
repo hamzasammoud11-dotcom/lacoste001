@@ -1,22 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BioFlow UI (Next.js)
+
+This project is a migration of the Streamlit "old_ui" to Next.js 16, Shadcn UI, Framer Motion, and Tailwind CSS v4.
 
 ## Getting Started
 
-First, run the development server:
+1.  **Install dependencies:**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+    ```bash
+    cd ui
+    pnpm install
+    # or
+    npm install
+    ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2.  **Run the development server:**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+    ```bash
+    pnpm dev
+    # or
+    npm run dev
+    ```
+
+3.  Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Structure
+
+-   `app/`: App Router pages and layout.
+    -   `page.tsx`: Home Dashboard.
+    -   `discovery/`: Drug Discovery Pipeline interface.
+    -   `explorer/`: Data Explorer with Charts.
+    -   `data/`: Data Management.
+    -   `settings/`: Configuration.
+    -   `api/`: API Route handlers.
+-   `components/`: Reusable UI components.
+    -   `ui/`: Shadcn-like primitive components (Button, Card, etc.).
+    -   `sidebar.tsx`: Main Navigation.
+    -   `page-header.tsx`: Standard page headers.
+
+## Tech Stack
+
+-   **Framework:** Next.js 16 (App Router)
+-   **Styling:** Tailwind CSS v4
+-   **UI Library:** Custom components inspired by Shadcn UI
+-   **Icons:** Lucide React
+-   **Charts:** Recharts
+-   **Animations:** Framer Motion (basic animations included, Framer Motion ready)
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
