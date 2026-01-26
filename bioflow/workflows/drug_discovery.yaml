@@ -1,0 +1,54 @@
+# =============================================================================
+# BioFlow Workflow Example: Drug Discovery Pipeline
+# =============================================================================
+# This YAML defines a simple drug discovery workflow that:
+# 1. Encodes a query molecule
+# 2. Retrieves similar compounds from memory
+# 3. Predicts binding affinity for top candidates
+# =============================================================================
+
+name: drug_discovery_basic
+description: >
+  Basic drug discovery pipeline: encode query -> retrieve analogs -> predict DTI
+
+# Define the nodes in execution order
+nodes:
+  - id: encode_query
+    type: encode
+    tool: obm                    # Uses OBM multimodal encoder
+    inputs: [input]              # Takes pipeline input
+    params:
+      modality: smiles
+
+  - id: find_analogs
+    type: retrieve
+    tool: qdrant                 # Uses Qdrant vector search
+    inputs: [encode_query]       # Takes encoded vector
+    params:
+      limit: 10
+      modality: smiles
+      collection: molecules
+
+  - id: predict_binding
+    type: predict
+    tool: deeppurpose            # Uses DeepPurpose DTI predictor
+    inputs: [find_analogs]       # Takes retrieved molecules
+    params:
+      target: "MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG"
+
+  - id: filter_hits
+    type: filter
+    tool: builtin                # Built-in filter
+    inputs: [predict_binding]
+    params:
+      threshold: 0.7
+      key: score
+
+# Final output comes from this node
+output_node: filter_hits
+
+# Optional metadata
+metadata:
+  version: "1.0"
+  author: "BioFlow Team"
+  tags: [drug-discovery, dti, molecules]

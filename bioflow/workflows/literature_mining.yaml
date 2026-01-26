@@ -1,0 +1,41 @@
+# =============================================================================
+# BioFlow Workflow Example: Literature Mining Pipeline
+# =============================================================================
+# This workflow searches scientific literature for relevant papers
+# based on a text, molecule, or protein query.
+# =============================================================================
+
+name: literature_mining
+description: >
+  Cross-modal literature search: encode any modality -> retrieve papers -> rank by relevance
+
+nodes:
+  - id: encode_query
+    type: encode
+    tool: obm
+    inputs: [input]
+    params:
+      modality: text             # Can be: text, smiles, protein
+
+  - id: search_papers
+    type: retrieve
+    tool: qdrant
+    inputs: [encode_query]
+    params:
+      limit: 20
+      collection: pubmed_abstracts
+      modality: text
+
+  - id: rank_results
+    type: custom
+    tool: mmr_rerank             # Maximum Marginal Relevance
+    inputs: [search_papers]
+    params:
+      diversity: 0.3
+      top_k: 10
+
+output_node: rank_results
+
+metadata:
+  version: "1.0"
+  tags: [literature, search, text-mining]
