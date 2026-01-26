@@ -52,6 +52,7 @@ export function getMoleculeSdfUrl(id: string): string {
   return `${API_BASE}/molecules/${id}/sdf`;
 }
 
-export function getProteinPdbUrl(id: string): string {
-  return `${API_BASE}/proteins/${id}/pdb`;
+export function getProteinPdbUrl(pdbId: string): string {
+  // Fetch directly from RCSB PDB for now
+  return `https://files.rcsb.org/download/${pdbId.toUpperCase()}.pdb`;
 }
