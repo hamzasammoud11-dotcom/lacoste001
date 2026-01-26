@@ -1,6 +1,7 @@
 "use client"
 
-import { CloudUpload, Database, Download, Eye, FileText, Folder, HardDrive, Trash2,Upload } from "lucide-react"
+import { CloudUpload, Database, Download, Eye, FileText, Folder, HardDrive, Trash2, Upload, ExternalLink } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 import { SectionHeader } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
@@ -16,12 +17,24 @@ interface DataViewProps {
 }
 
 export function DataView({ datasets, stats }: DataViewProps) {
+    const router = useRouter()
+    
     const statCards = [
         { label: "Datasets", value: stats?.datasets?.toString() ?? "—", icon: Folder, color: "text-blue-500" },
         { label: "Molecules", value: stats?.molecules ?? "—", icon: FileText, color: "text-cyan-500" },
         { label: "Proteins", value: stats?.proteins ?? "—", icon: Database, color: "text-emerald-500" },
         { label: "Storage Used", value: stats?.storage ?? "—", icon: HardDrive, color: "text-amber-500" },
     ]
+
+    const handleView = (dataset: Dataset) => {
+        // Navigate to explorer with this dataset's data
+        router.push(`/explorer?dataset=${encodeURIComponent(dataset.name)}`)
+    }
+
+    const handleDownload = (dataset: Dataset) => {
+        // For KIBA/DAVIS, these are from TDC - provide info
+        alert(`Dataset: ${dataset.name}\n\nThis dataset is loaded from Therapeutics Data Commons (TDC).\n\nTo download raw data, visit: https://tdcommons.ai/\n\nOr access via Python:\nfrom tdc.multi_pred import DTI\ndata = DTI(name='${dataset.name.includes('KIBA') ? 'KIBA' : 'DAVIS'}')`)
+    }
 
     return (
         <div className="space-y-8">
@@ -70,7 +83,7 @@ export function DataView({ datasets, stats }: DataViewProps) {
                                         <TableCell className="font-medium">{ds.name}</TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
-                                                <Badge variant={ds.type === 'Molecules' ? 'default' : 'secondary'}>{ds.type}</Badge>
+                                                <Badge variant={ds.type === 'Drug-Target' ? 'default' : 'secondary'}>{ds.type}</Badge>
                                             </div>
                                         </TableCell>
                                         <TableCell>{ds.count}</TableCell>
@@ -78,9 +91,38 @@ export function DataView({ datasets, stats }: DataViewProps) {
                                         <TableCell>{ds.updated}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8"><Eye className="h-4 w-4" /></Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8"><Download className="h-4 w-4" /></Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                                <Button 
+                                                    size="icon" 
+                                                    variant="ghost" 
+                                                    className="h-8 w-8"
+                                                    onClick={() => handleView(ds)}
+                                                    title="View in Explorer"
+                                                >
+                                                    <Eye className="h-4 w-4" />
+                                                </Button>
+                                                <Button 
+                                                    size="icon" 
+                                                    variant="ghost" 
+                                                    className="h-8 w-8"
+                                                    onClick={() => handleDownload(ds)}
+                                                    title="Download Info"
+                                                >
+                                                    <Download className="h-4 w-4" />
+                                                </Button>
+                                                <a 
+                                                    href="https://tdcommons.ai/" 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <Button 
+                                                        size="icon" 
+                                                        variant="ghost" 
+                                                        className="h-8 w-8"
+                                                        title="View on TDC"
+                                                    >
+                                                        <ExternalLink className="h-4 w-4" />
+                                                    </Button>
+                                                </a>
                                             </div>
                                         </TableCell>
                                     </TableRow>

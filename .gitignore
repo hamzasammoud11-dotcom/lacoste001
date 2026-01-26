@@ -1,5 +1,6 @@
 # Python
 .venv/
+langflow_venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -22,6 +23,17 @@ runs/*/events.out.tfevents.*
 *.pt
 *.npy
 
+# Data files
+data/
+predictions_test.csv
+
+# Langflow local db
+.langflow/
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Next.js
+ui/.next/
+ui/node_modules/

@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowRight,CheckCircle2, Circle, Loader2, Microscope, Search } from "lucide-react"
+import { ArrowRight,CheckCircle2, Circle, Loader2, Microscope, Search, AlertCircle } from "lucide-react"
 import * as React from "react"
 
 import { PageHeader, SectionHeader } from "@/components/page-header"
@@ -11,22 +11,89 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent,TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 
+const API_BASE = "http://localhost:8001";
+
+interface SearchResult {
+  id: string;
+  score: number;
+  smiles: string;
+  target_seq: string;
+  label: number;
+  affinity_class: string;
+}
+
 export default function DiscoveryPage() {
   const [query, setQuery] = React.useState("")
+  const [searchType, setSearchType] = React.useState("Similarity")
   const [isSearching, setIsSearching] = React.useState(false)
   const [step, setStep] = React.useState(0)
+  const [results, setResults] = React.useState<SearchResult[]>([])
+  const [error, setError] = React.useState<string | null>(null)
 
-  const handleSearch = () => {
+  // Map UI search type to API type
+  const getApiType = (uiType: string, query: string): string => {
+    // If it looks like SMILES (contains chemistry chars), use drug encoding
+    const looksLikeSmiles = /^[A-Za-z0-9@+\-\[\]\(\)\\\/=#$.]+$/.test(query.trim())
+    // If it looks like protein sequence (all caps amino acids)
+    const looksLikeProtein = /^[ACDEFGHIKLMNPQRSTVWY]+$/i.test(query.trim()) && query.length > 20
+    
+    if (uiType === "Similarity" || uiType === "Binding Affinity") {
+      if (looksLikeSmiles && !looksLikeProtein) return "drug"
+      if (looksLikeProtein) return "target"
+      return "text" // Fallback to text search
+    }
+    return "text"
+  }
+
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    
     setIsSearching(true)
     setStep(1)
+    setError(null)
+    setResults([])
     
-    // Simulate pipeline
-    setTimeout(() => setStep(2), 1500)
-    setTimeout(() => setStep(3), 3000)
-    setTimeout(() => {
-        setStep(4)
-        setIsSearching(false)
-    }, 4500)
+    try {
+      // Step 1: Input received
+      setStep(1)
+      
+      // Step 2: Determine type and encode
+      await new Promise(r => setTimeout(r, 300))
+      setStep(2)
+      
+      const apiType = getApiType(searchType, query)
+      
+      // Step 3: Actually search Qdrant via our API
+      const response = await fetch(`${API_BASE}/api/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: query.trim(),
+          type: apiType,
+          limit: 10
+        })
+      });
+      
+      setStep(3)
+      
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || `API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Step 4: Process results
+      await new Promise(r => setTimeout(r, 200))
+      setStep(4)
+      setResults(data.results || [])
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
+      setStep(0)
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   const steps = [
@@ -41,7 +108,7 @@ export default function DiscoveryPage() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <PageHeader 
         title="Drug Discovery" 
-        subtitle="Search for drug candidates with AI-powered analysis" 
+        subtitle="Search for drug candidates using DeepPurpose + Qdrant" 
         icon={<Microscope className="h-8 w-8" />}
       />
 
@@ -51,7 +118,13 @@ export default function DiscoveryPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="md:col-span-3">
                     <Textarea 
-                        placeholder="Enter a natural language query, SMILES string, or FASTA sequence..."
+                        placeholder={
+                          searchType === "Similarity" 
+                            ? "Enter SMILES string (e.g., CC(=O)Nc1ccc(O)cc1 for Acetaminophen)" 
+                            : searchType === "Binding Affinity"
+                            ? "Enter protein sequence (amino acids, e.g., MKKFFD...)"
+                            : "Enter drug name or keyword to search"
+                        }
                         className="min-h-[120px] font-mono"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
@@ -60,28 +133,26 @@ export default function DiscoveryPage() {
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <Label>Search Type</Label>
-                        <Select defaultValue="Similarity">
+                        <Select value={searchType} onValueChange={setSearchType}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="Similarity">Similarity</SelectItem>
-                                <SelectItem value="Binding Affinity">Binding Affinity</SelectItem>
-                                <SelectItem value="Properties">Properties</SelectItem>
+                                <SelectItem value="Similarity">Similarity (Drug SMILES)</SelectItem>
+                                <SelectItem value="Binding Affinity">Binding Affinity (Protein)</SelectItem>
+                                <SelectItem value="Properties">Properties (Text Search)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                      <div className="space-y-2">
                         <Label>Database</Label>
-                        <Select defaultValue="All">
+                        <Select defaultValue="KIBA">
                             <SelectTrigger>
                                 <SelectValue placeholder="Select database" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="All">All</SelectItem>
-                                <SelectItem value="DrugBank">DrugBank</SelectItem>
-                                <SelectItem value="ChEMBL">ChEMBL</SelectItem>
-                                <SelectItem value="ZINC">ZINC</SelectItem>
+                                <SelectItem value="KIBA">KIBA (23.5K pairs)</SelectItem>
+                                <SelectItem value="DAVIS">DAVIS Kinase</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -91,12 +162,27 @@ export default function DiscoveryPage() {
                         disabled={isSearching || !query}
                     >
                         {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                        {isSearching ? "Running..." : "Search"}
+                        {isSearching ? "Searching Qdrant..." : "Search"}
                     </Button>
                 </div>
             </div>
         </CardContent>
       </Card>
+
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="p-4 flex items-center gap-3 text-destructive">
+            <AlertCircle className="h-5 w-5" />
+            <div>
+              <div className="font-medium">Search Failed</div>
+              <div className="text-sm">{error}</div>
+              <div className="text-xs mt-1 text-muted-foreground">
+                Make sure the API server is running: python -m uvicorn server.api:app --port 8001
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="space-y-4">
          <SectionHeader title="Pipeline Status" icon={<ArrowRight className="h-5 w-5 text-muted-foreground" />} />
@@ -121,62 +207,60 @@ export default function DiscoveryPage() {
          </div>
       </div>
 
-      {step === 4 && (
+      {step === 4 && results.length > 0 && (
         <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
-             <SectionHeader title="Results" icon={<CheckCircle2 className="h-5 w-5 text-green-500" />} />
+             <SectionHeader title={`Results (${results.length} from Qdrant)`} icon={<CheckCircle2 className="h-5 w-5 text-green-500" />} />
              
              <Tabs defaultValue="candidates">
                 <TabsList>
                     <TabsTrigger value="candidates">Top Candidates</TabsTrigger>
-                    <TabsTrigger value="analysis">Property Analysis</TabsTrigger>
-                    <TabsTrigger value="evidence">Evidence</TabsTrigger>
+                    <TabsTrigger value="details">Raw Data</TabsTrigger>
                 </TabsList>
                 <TabsContent value="candidates" className="space-y-4">
-                    {[
-                        { name: "Candidate A", score: 0.95, mw: "342.4", logp: "2.1" },
-                        { name: "Candidate B", score: 0.89, mw: "298.3", logp: "1.8" },
-                        { name: "Candidate C", score: 0.82, mw: "415.5", logp: "3.2" },
-                        { name: "Candidate D", score: 0.76, mw: "267.3", logp: "1.5" },
-                        { name: "Candidate E", score: 0.71, mw: "389.4", logp: "2.8" },
-                    ].map((candidate, i) => (
-                        <Card key={i}>
+                    {results.map((result, i) => (
+                        <Card key={result.id}>
                             <CardContent className="p-4 flex items-center justify-between">
-                                <div>
-                                    <div className="font-bold text-lg">{candidate.name}</div>
-                                    <div className="flex gap-4 text-sm text-muted-foreground">
-                                        <span>MW: {candidate.mw}</span>
-                                        <span>LogP: {candidate.logp}</span>
+                                <div className="flex-1">
+                                    <div className="font-mono text-sm font-medium">
+                                      {result.smiles?.slice(0, 50)}{result.smiles?.length > 50 ? '...' : ''}
+                                    </div>
+                                    <div className="flex gap-4 text-sm text-muted-foreground mt-1">
+                                        <span>Affinity: {result.affinity_class}</span>
+                                        <span>Label: {result.label?.toFixed(2)}</span>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-sm text-muted-foreground">Score</div>
+                                    <div className="text-sm text-muted-foreground">Similarity</div>
                                     <div className={`text-xl font-bold ${
-                                        candidate.score >= 0.9 ? 'text-green-600' : 
-                                        candidate.score >= 0.8 ? 'text-green-500' : 'text-amber-500'
+                                        result.score >= 0.9 ? 'text-green-600' : 
+                                        result.score >= 0.7 ? 'text-green-500' : 'text-amber-500'
                                     }`}>
-                                        {candidate.score}
+                                        {result.score.toFixed(3)}
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                     ))}
                 </TabsContent>
-                <TabsContent value="analysis">
+                <TabsContent value="details">
                     <Card>
-                        <CardContent className="p-12 text-center text-muted-foreground">
-                            Chart visualization would go here (using Recharts).
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-                <TabsContent value="evidence">
-                     <Card>
-                        <CardContent className="p-12 text-center text-muted-foreground">
-                            Evidence graph visualization would go here.
+                        <CardContent className="p-4">
+                            <pre className="text-xs overflow-auto max-h-[400px] bg-muted p-4 rounded">
+                              {JSON.stringify(results, null, 2)}
+                            </pre>
                         </CardContent>
                     </Card>
                 </TabsContent>
              </Tabs>
         </div>
+      )}
+      
+      {step === 4 && results.length === 0 && !error && (
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            No similar compounds found in Qdrant.
+          </CardContent>
+        </Card>
       )}
     </div>
   )

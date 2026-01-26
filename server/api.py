@@ -50,7 +50,7 @@ _device = None
 
 class SearchRequest(BaseModel):
     query: str
-    type: str  # "drug" (SMILES) or "target" (Sequence)
+    type: str  # "drug" (SMILES) or "target" (Sequence) or "text" (plain text search)
     limit: int = 20
 
 class PointsRequest(BaseModel):
@@ -89,9 +89,16 @@ async def load_resources():
     else:
         print(f"[WARNING] No model.pt found at {model_path}")
     
-    # Use CPU for inference (avoids VRAM contention)
-    _device = torch.device('cpu')
-    _model.model.to(_device)
+    # CRITICAL FIX: Override DeepPurpose's global device variable
+    # The encoders.py uses a module-level `device = torch.device('cuda' if...)` 
+    # and the MLP forward does `v = v.float().to(device)` using that global!
+    import DeepPurpose.encoders as dp_encoders
+    _device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    dp_encoders.device = _device  # Override the global
+    print(f"[STARTUP] Using device: {_device}")
+    
+    # Ensure model is on the correct device
+    _model.model = _model.model.to(_device)
     _model.model.eval()
     
     print("[STARTUP] Connecting to Qdrant...")
@@ -106,47 +113,61 @@ async def load_resources():
     print("[STARTUP] Ready!")
 
 def encode_query(query: str, query_type: str) -> List[float]:
-    """Encode a single drug/target query into a vector."""
+    """Encode a single drug/target query into a vector using direct encoding."""
     if not _model:
         raise HTTPException(status_code=503, detail="Model not initialized")
     
     try:
         if query_type == "drug":
-            # Use valid dummy target for data_process
-            data = utils.data_process(
-                [query], [VALID_DUMMY_TARGET], [0],
-                _model.config['drug_encoding'],
-                _model.config['target_encoding'],
-                split_method='random', frac=[0,0,1], random_seed=1
-            )[2]
+            # Direct Morgan fingerprint encoding (avoid data_process)
+            from DeepPurpose.utils import smiles2morgan
+            from rdkit import Chem
+            import numpy as np
             
-            loader = torch.utils.data.DataLoader(data, batch_size=1, shuffle=False)
-            v_d, _, _ = next(iter(loader))
+            # Validate SMILES
+            mol = Chem.MolFromSmiles(query)
+            if mol is None:
+                raise ValueError(f"Invalid SMILES: {query}")
+            
+            # Get Morgan fingerprint
+            morgan_fp = smiles2morgan(query, radius=2, nBits=1024)
+            if morgan_fp is None:
+                raise ValueError(f"Failed to compute Morgan fingerprint for: {query}")
+            
+            # Convert to tensor and encode through model's drug encoder
+            v_d = torch.tensor(np.array([morgan_fp]), dtype=torch.float32)
             
             with torch.no_grad():
-                v_d = v_d.to(_device)
                 vector = _model.model.model_drug(v_d).cpu().numpy()[0].tolist()
             return vector
             
         elif query_type == "target":
-            # Use valid dummy drug for data_process
-            data = utils.data_process(
-                [VALID_DUMMY_DRUG], [query], [0],
-                _model.config['drug_encoding'],
-                _model.config['target_encoding'],
-                split_method='random', frac=[0,0,1], random_seed=1
-            )[2]
+            # Direct CNN target encoding
+            from DeepPurpose.utils import trans_protein
+            import numpy as np
             
-            loader = torch.utils.data.DataLoader(data, batch_size=1, shuffle=False)
-            _, v_p, _ = next(iter(loader))
+            # Encode protein sequence
+            target_encoding = trans_protein(query)
+            if target_encoding is None:
+                raise ValueError(f"Failed to encode protein sequence")
+            
+            # CNN expects [batch, seq_len] input, max_len=1000 in default config
+            MAX_SEQ_LEN = 1000
+            if len(target_encoding) > MAX_SEQ_LEN:
+                target_encoding = target_encoding[:MAX_SEQ_LEN]
+            else:
+                target_encoding = target_encoding + [0] * (MAX_SEQ_LEN - len(target_encoding))
+            
+            v_p = torch.tensor(np.array([target_encoding]), dtype=torch.long)
             
             with torch.no_grad():
-                v_p = v_p.to(_device)
                 vector = _model.model.model_protein(v_p).cpu().numpy()[0].tolist()
             return vector
         else:
             raise HTTPException(status_code=400, detail="type must be 'drug' or 'target'")
             
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -158,7 +179,17 @@ async def search_vectors(req: SearchRequest):
     if not _qdrant:
         raise HTTPException(status_code=503, detail="Qdrant not connected")
     
-    vector = encode_query(req.query, req.type)
+    # Text search - just filter by payload, no encoding needed
+    if req.type == "text":
+        return await text_search(req.query, req.limit)
+    
+    # Vector search - encode and search
+    try:
+        vector = encode_query(req.query, req.type)
+    except Exception as e:
+        # Fallback to text search if encoding fails
+        print(f"Encoding failed ({e}), falling back to text search")
+        return await text_search(req.query, req.limit)
     
     try:
         hits = _qdrant.search(
@@ -181,6 +212,40 @@ async def search_vectors(req: SearchRequest):
         })
     
     return {"results": results, "query_type": req.type, "count": len(results)}
+
+
+async def text_search(query: str, limit: int = 20):
+    """Text-based search through payloads (fallback when encoding fails)."""
+    try:
+        # Scroll through and filter by SMILES containing the query
+        res, _ = _qdrant.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=500,  # Get more to filter through
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        # Filter results that match query in SMILES or other fields
+        query_lower = query.lower()
+        results = []
+        for point in res:
+            smiles = point.payload.get("smiles", "").lower()
+            # Match if query is substring of SMILES or SMILES contains query
+            if query_lower in smiles:
+                results.append({
+                    "id": point.id,
+                    "score": 0.95 if query_lower == smiles else 0.8,  # Higher score for exact match
+                    "smiles": point.payload.get("smiles"),
+                    "target_seq": point.payload.get("target_seq", "")[:100] + "...",
+                    "label": point.payload.get("label_true"),
+                    "affinity_class": point.payload.get("affinity_class"),
+                })
+                if len(results) >= limit:
+                    break
+        
+        return {"results": results, "query_type": "text", "count": len(results)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Text search failed: {str(e)}")
 
 @app.get("/api/points")
 async def get_visualization_points(limit: int = 500, view: str = "combined"):
@@ -245,6 +310,44 @@ def health():
         "qdrant_connected": _qdrant is not None,
         "metrics": METRICS,
     }
+
+@app.get("/api/stats")
+async def get_collection_stats():
+    """Get real statistics from Qdrant collection for the data page."""
+    if not _qdrant:
+        raise HTTPException(status_code=503, detail="Qdrant not connected")
+    
+    try:
+        collection_info = _qdrant.get_collection(collection_name=COLLECTION_NAME)
+        total_vectors = collection_info.vectors_count
+        
+        # Sample to count affinity classes
+        sample, _ = _qdrant.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=1000,
+            with_payload=["affinity_class", "smiles", "target_id"],
+            with_vectors=False
+        )
+        
+        unique_drugs = len(set(p.payload.get("smiles", "") for p in sample if p.payload.get("smiles")))
+        unique_targets = len(set(p.payload.get("target_id", "") for p in sample if p.payload.get("target_id")))
+        
+        affinity_counts = {}
+        for p in sample:
+            aff = p.payload.get("affinity_class", "unknown")
+            affinity_counts[aff] = affinity_counts.get(aff, 0) + 1
+        
+        return {
+            "total_vectors": total_vectors,
+            "sample_size": len(sample),
+            "unique_drugs_sampled": unique_drugs,
+            "unique_targets_sampled": unique_targets,
+            "affinity_distribution": affinity_counts,
+            "collection_name": COLLECTION_NAME,
+            "status": collection_info.status.value if hasattr(collection_info.status, 'value') else str(collection_info.status),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Stats fetch failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
