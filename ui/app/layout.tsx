@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/sidebar";
@@ -13,9 +13,24 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "white" },
+    { media: "(prefers-color-scheme: dark)", color: "#0C0E14" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: "BioFlow",
-  description: "AI-Powered Drug Discovery Platform",
+  title: {
+    default: "BioFlow",
+    template: "%s | BioFlow",
+  },
+  description: "AI-Powered Drug Discovery Platform for molecular embedding and binding prediction.",
+  keywords: ["Drug Discovery", "AI", "Bioinformatics", "Machine Learning", "Molecular Dynamics"],
+  authors: [{ name: "BioFlow Team" }],
+  creator: "BioFlow",
 };
 
 export default function RootLayout({

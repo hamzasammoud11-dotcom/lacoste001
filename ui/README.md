@@ -4,7 +4,7 @@ This project is a migration of the Streamlit "old_ui" to Next.js 16, Shadcn UI, 
 
 ## Getting Started
 
-1.  **Install dependencies:**
+1. **Install dependencies:**
 
     ```bash
     cd ui
@@ -13,7 +13,7 @@ This project is a migration of the Streamlit "old_ui" to Next.js 16, Shadcn UI, 
     npm install
     ```
 
-2.  **Run the development server:**
+2. **Run the development server:**
 
     ```bash
     pnpm dev
@@ -21,30 +21,30 @@ This project is a migration of the Streamlit "old_ui" to Next.js 16, Shadcn UI, 
     npm run dev
     ```
 
-3.  Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## Structure
 
--   `app/`: App Router pages and layout.
-    -   `page.tsx`: Home Dashboard.
-    -   `discovery/`: Drug Discovery Pipeline interface.
-    -   `explorer/`: Data Explorer with Charts.
-    -   `data/`: Data Management.
-    -   `settings/`: Configuration.
-    -   `api/`: API Route handlers.
--   `components/`: Reusable UI components.
-    -   `ui/`: Shadcn-like primitive components (Button, Card, etc.).
-    -   `sidebar.tsx`: Main Navigation.
-    -   `page-header.tsx`: Standard page headers.
+- `app/`: App Router pages and layout.
+  - `page.tsx`: Home Dashboard.
+  - `discovery/`: Drug Discovery Pipeline interface.
+  - `explorer/`: Data Explorer with Charts.
+  - `data/`: Data Management.
+  - `settings/`: Configuration.
+  - `api/`: API Route handlers.
+- `components/`: Reusable UI components.
+  - `ui/`: Shadcn-like primitive components (Button, Card, etc.).
+  - `sidebar.tsx`: Main Navigation.
+  - `page-header.tsx`: Standard page headers.
 
 ## Tech Stack
 
--   **Framework:** Next.js 16 (App Router)
--   **Styling:** Tailwind CSS v4
--   **UI Library:** Custom components inspired by Shadcn UI
--   **Icons:** Lucide React
--   **Charts:** Recharts
--   **Animations:** Framer Motion (basic animations included, Framer Motion ready)
+- **Framework:** Next.js 16 (App Router)
+- **Styling:** Tailwind CSS v4
+- **UI Library:** Custom components inspired by Shadcn UI
+- **Icons:** Lucide React
+- **Charts:** Recharts
+- **Animations:** Framer Motion (basic animations included, Framer Motion ready)
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
