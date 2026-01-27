@@ -1,2 +1,8 @@
 packages:
   - .
+
+onlyBuiltDependencies:
+  - '@scarf/scarf'
+  - msw
+  - sharp
+  - unrs-resolver

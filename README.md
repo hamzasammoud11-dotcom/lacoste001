@@ -1,4 +1,4 @@
-# BioFlow Orchestrator
+# BioFlow
 
 > **Multimodal Biological Design & Discovery Intelligence Engine**  
 > A low-code workflow platform for unified biological discovery pipelines
@@ -7,7 +7,6 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-red)
 ![CUDA](https://img.shields.io/badge/CUDA-11.8-green)
-![Langflow](https://img.shields.io/badge/Langflow-1.7-orange)
 ![Team](https://img.shields.io/badge/Team-Lacoste-purple)
 
 ---
@@ -23,7 +22,7 @@ Researchers must manually navigate incompatible formats, creating bottlenecks an
 
 ## Our Solution
 
-**BioFlow Orchestrator** is a visual workflow engine that unifies biological discovery pipelines. Rather than a single "black box" model, we function as an **intelligent orchestrator** — allowing researchers to chain state-of-the-art open-source biological models into coherent discovery workflows.
+**BioFlow** is a visual workflow engine that unifies biological discovery pipelines. Rather than a single "black box" model, we function as an **intelligent platform** — allowing researchers to chain state-of-the-art open-source biological models into coherent discovery workflows.
 
 ### Key Features
 
@@ -31,6 +30,7 @@ Researchers must manually navigate incompatible formats, creating bottlenecks an
 |---------|-------------|
 | **Visual Pipeline Builder** | Drag-and-drop node editor for constructing discovery workflows |
 | **DeepPurpose Integration** | Drug-Target Interaction prediction with Morgan + CNN encoding |
+| **Molecule & Protein Visualization** | Interactive 2D SMILES and 3D PDB structure viewing (powered by 3Dmol.js and SmilesDrawer) |
 | **Qdrant Vector Search** | High-dimensional similarity search across 23,531+ compounds |
 | **3D Embedding Explorer** | Real PCA projections of drug-target chemical space |
 | **Validator Agents** | Automated toxicity and novelty checking |
@@ -41,7 +41,7 @@ Researchers must manually navigate incompatible formats, creating bottlenecks an
 
 ```
                          ┌──────────────────────────────────────────┐
-                         │         BioFlow Orchestrator             │
+                         │                 BioFlow                  │
                          │      Visual Pipeline Builder (UI)        │
                          └─────────────────┬────────────────────────┘
                                            │
@@ -120,7 +120,7 @@ python ingest_qdrant.py
 
 ### 4. Start Backend API
 ```bash
-python -m uvicorn server.api:app --host 0.0.0.0 --port 8001
+python -m uvicorn bioflow.api.server:app --host 0.0.0.0 --port 8001
 ```
 
 ### 5. Start Frontend
@@ -172,8 +172,9 @@ BioFlow integrates **Langflow** as the visual workflow engine, providing a full-
 ├── config.py              # Shared configuration
 ├── ingest_qdrant.py       # ETL: TDC → DeepPurpose → Qdrant
 ├── deeppurpose002.py      # Model training script
-├── server/
-│   └── api.py             # FastAPI backend
+├── bioflow/
+│   └── api/
+│       └── server.py      # FastAPI backend
 ├── runs/
 │   └── 20260125_104915_KIBA/
 │       ├── model.pt       # Trained model weights

@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   BarChart2,
   Bell,
+  Box,
   ChevronRight,
   ChevronsUpDown,
   CreditCard,
@@ -58,101 +59,105 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const navMain = [
   {
     title: 'Home',
-    url: '/',
+    url: '/dashboard',
     icon: Home,
     isActive: true,
   },
   {
     title: 'Visualization',
-    url: '/molecules-2d',
+    url: '/dashboard/molecules-2d',
     icon: FlaskConical,
     items: [
       {
         title: 'Molecules 2D',
-        url: '/molecules-2d',
+        url: '/dashboard/molecules-2d',
       },
       {
         title: 'Molecules 3D',
-        url: '/molecules-3d',
+        url: '/dashboard/molecules-3d',
       },
       {
         title: 'Proteins 3D',
-        url: '/proteins-3d',
+        url: '/dashboard/proteins-3d',
       },
     ],
   },
   {
     title: 'Discovery',
-    url: '/discovery',
+    url: '/dashboard/discovery',
     icon: Microscope,
     items: [
       {
         title: 'Drug Discovery',
-        url: '/discovery',
+        url: '/dashboard/discovery',
       },
       {
         title: 'Molecule Search',
-        url: '/discovery#search',
+        url: '/dashboard/discovery#search',
       },
     ],
   },
   {
     title: 'Explorer',
-    url: '/explorer',
+    url: '/dashboard/explorer',
     icon: Dna,
     items: [
       {
         title: 'Embeddings',
-        url: '/explorer',
+        url: '/dashboard/explorer',
+      },
+      {
+        title: '3D Visualization',
+        url: '/dashboard/visualization',
       },
       {
         title: 'Predictions',
-        url: '/explorer#predictions',
+        url: '/dashboard/explorer#predictions',
+      },
+    ],
+  },
+  {
+    title: 'Workflows',
+    url: '/dashboard/workflow',
+    icon: Sparkles,
+    items: [
+      {
+        title: 'Builder',
+        url: '/dashboard/workflow',
+      },
+      {
+        title: 'Templates',
+        url: '/dashboard/workflow#templates',
       },
     ],
   },
   {
     title: 'Data',
-    url: '/data',
+    url: '/dashboard/data',
     icon: BarChart2,
     items: [
       {
         title: 'Datasets',
-        url: '/data',
+        url: '/dashboard/data',
       },
       {
         title: 'Analytics',
-        url: '/data#analytics',
-      },
-    ],
-  },
-  {
-    title: 'Workflow',
-    url: '/workflow',
-    icon: Sparkles,
-    items: [
-      {
-        title: 'Langflow Pipeline',
-        url: '/workflow',
-      },
-      {
-        title: 'Open Langflow',
-        url: 'http://localhost:7860',
+        url: '/dashboard/data#analytics',
       },
     ],
   },
   {
     title: 'Settings',
-    url: '/settings',
+    url: '/dashboard/settings',
     icon: Settings,
     items: [
       {
         title: 'General',
-        url: '/settings',
+        url: '/dashboard/settings',
       },
       {
         title: 'Models',
-        url: '/settings#models',
+        url: '/dashboard/settings#models',
       },
     ],
   },
@@ -175,7 +180,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/">
+              <Link href="/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <Dna className="size-4" />
                 </div>
@@ -196,7 +201,7 @@ export function AppSidebar() {
           <SidebarMenu>
             {navMain.map((item) => {
               const isActive = pathname === item.url || pathname?.startsWith(item.url + '/');
-
+              
               if (!item.items || item.items.length === 0) {
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -248,15 +253,15 @@ export function AppSidebar() {
 
         {/* Status Section */}
         <SidebarGroup className="group-data-[collapsible=icon]:hidden mt-auto">
-          <SidebarGroupLabel>System Status</SidebarGroupLabel>
+          <SidebarGroupLabel className="flex items-center justify-between">
+            <span>System Status</span>
+            <ThemeToggle />
+          </SidebarGroupLabel>
           <div className="px-3 py-2">
             <div className="rounded-lg border bg-muted/50 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Terminal className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs font-medium">Status</span>
-                </div>
-                <ThemeToggle />
+              <div className="flex items-center gap-2 mb-2">
+                <Terminal className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium">Status</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
