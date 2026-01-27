@@ -22,7 +22,7 @@ start "BioFlow API" cmd /k "cd /d %~dp0 && python -m uvicorn bioflow.api.server:
 
 echo [2/2] Starting Next.js Frontend on port 3000...
 timeout /t 3 /nobreak > nul
-start "BioFlow UI" cmd /k "cd /d %~dp0\lacoste001\ui && pnpm dev"
+start "BioFlow UI" cmd /k "cd /d %~dp0\ui && pnpm dev"
 
 echo.
 echo ============================================

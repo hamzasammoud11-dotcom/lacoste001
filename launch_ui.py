@@ -2,11 +2,11 @@
 BioFlow UI Launch Script
 =========================
 
-Quick launcher for the BioFlow Streamlit application.
+Quick launcher for the BioFlow Next.js application.
 
 Usage:
     python launch_ui.py
-    python launch_ui.py --port 8502
+    python launch_ui.py --port 3001
     python launch_ui.py --debug
 """
 
@@ -18,16 +18,15 @@ from pathlib import Path
 
 def main():
     """Launch the BioFlow UI."""
-    # Get the app path
     script_dir = Path(__file__).parent
-    app_path = script_dir / "bioflow" / "ui" / "app.py"
-    
-    if not app_path.exists():
-        print(f"❌ Error: App not found at {app_path}")
+    ui_dir = script_dir / "ui"
+
+    if not (ui_dir / "package.json").exists():
+        print(f"❌ Error: Next.js UI not found at {ui_dir}")
         sys.exit(1)
     
     # Parse arguments
-    port = 8501
+    port = 3000
     debug = False
     
     for i, arg in enumerate(sys.argv[1:]):
@@ -36,17 +35,10 @@ def main():
         elif arg == "--debug":
             debug = True
     
-    # Build command
-    cmd = [
-        sys.executable, "-m", "streamlit", "run",
-        str(app_path),
-        "--server.port", str(port),
-        "--server.headless", "false",
-        "--browser.gatherUsageStats", "false",
-    ]
-    
+    env = os.environ.copy()
+    env["PORT"] = str(port)
     if debug:
-        cmd.extend(["--logger.level", "debug"])
+        env["NODE_OPTIONS"] = env.get("NODE_OPTIONS", "") + " --trace-warnings"
     
     print(f"""
     ╔══════════════════════════════════════════════════════════╗
@@ -59,7 +51,7 @@ def main():
     """)
     
     try:
-        subprocess.run(cmd, cwd=str(script_dir))
+        subprocess.run(["pnpm", "dev"], cwd=str(ui_dir), env=env, check=False)
     except KeyboardInterrupt:
         print("\n\n👋 BioFlow server stopped.")
     except Exception as e:

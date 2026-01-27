@@ -112,7 +112,7 @@ export default function DiscoveryPage() {
         icon={<Microscope className="h-8 w-8" />}
       />
 
-      <Card>
+      <Card id="search">
         <div className="p-4 border-b font-semibold">Search Query</div>
         <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

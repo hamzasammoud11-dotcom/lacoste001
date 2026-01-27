@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server"
+<<<<<<< HEAD
+import { NextResponse } from "next/server"
 import { API_CONFIG } from "@/config/api.config"
 
 // Mock workflow results for when backend is unavailable
@@ -9,7 +10,7 @@ function generateMockWorkflowResult(query: string, numCandidates: number) {
       rank: i + 1,
       smiles: ["CCO", "CC(=O)O", "c1ccccc1", "CC(C)CC", "CCCCCC"][i % 5],
       name: `Candidate-${i + 1}`,
-      score: Math.random() * 0.4 + 0.6, // 0.6-1.0
+      score: Math.random() * 0.4 + 0.6,
       validation: {
         is_valid: Math.random() > 0.2,
         checks: {
@@ -43,35 +44,67 @@ function generateMockWorkflowResult(query: string, numCandidates: number) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => ({}))
+  const { query, num_candidates = 5, top_k = 5 } = body
+
   try {
-    const body = await request.json()
-    const { query, num_candidates = 5, top_k = 5 } = body
+    const response = await fetch(`${API_CONFIG.baseUrl}/api/agents/workflow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, num_candidates, top_k }),
+      cache: "no-store",
+    })
 
-    // Try to call the backend workflow API
-    try {
-      const response = await fetch(`${API_CONFIG.baseUrl}/api/agents/workflow`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, num_candidates, top_k }),
-      })
+    if (response.ok) {
+      const data = await response.json()
+      return NextResponse.json(data)
+    }
+  } catch (error) {
+    console.warn("Workflow API error, using mock response:", error)
+  }
 
-      if (response.ok) {
-        const data = await response.json()
-        return NextResponse.json(data)
-      }
-    } catch (backendError) {
-      console.log("Backend workflow API unavailable, using mock data")
+  const mockResult = generateMockWorkflowResult(query, num_candidates)
+  return NextResponse.json(mockResult)
+}
+=======
+import { NextResponse } from "next/server"
+
+import { API_CONFIG } from "@/config/api.config"
+
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => ({}))
+
+  try {
+    const response = await fetch(`${API_CONFIG.baseUrl}/api/agents/workflow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    })
+
+    const data = await response.json().catch(() => null)
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: data?.detail || data?.error || `Backend returned ${response.status}` },
+        { status: response.status }
+      )
     }
 
-    // Return mock data if backend is unavailable
-    const mockResult = generateMockWorkflowResult(query, num_candidates)
-    return NextResponse.json(mockResult)
+    return NextResponse.json(data)
   } catch (error) {
-    console.error("Workflow API error:", error)
-    return NextResponse.json(
-      { error: "Failed to run workflow", detail: String(error) },
-      { status: 500 }
-    )
+    console.warn("Workflow API error, using mock response:", error)
+    return NextResponse.json({
+      success: true,
+      status: "mock",
+      steps_completed: 0,
+      total_steps: 0,
+      execution_time_ms: 0,
+      top_candidates: [],
+      all_outputs: {},
+      errors: ["Backend unavailable"],
+    })
   }
 }
+
+>>>>>>> Rami

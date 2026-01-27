@@ -38,6 +38,7 @@ class SearchResult:
     content: str
     modality: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+    vector: Optional[List[float]] = None
 
 
 @dataclass
@@ -106,6 +107,13 @@ class QdrantService:
         self.url = url or os.getenv("QDRANT_URL")
         self.path = path or os.getenv("QDRANT_PATH", "./qdrant_data")
         self.vector_dim = vector_dim
+        self.hnsw_m = int(os.getenv("QDRANT_HNSW_M", "16"))
+        self.hnsw_ef_construct = int(os.getenv("QDRANT_HNSW_EF_CONSTRUCT", "128"))
+        self.hnsw_ef = int(os.getenv("QDRANT_HNSW_EF", "128"))
+        self.optimizers_memmap_threshold = int(os.getenv("QDRANT_OPTIMIZERS_MEMMAP_THRESHOLD", "20000"))
+        self.optimizers_indexing_threshold = int(os.getenv("QDRANT_OPTIMIZERS_INDEXING_THRESHOLD", "20000"))
+        self.optimizers_flush_interval_sec = int(os.getenv("QDRANT_OPTIMIZERS_FLUSH_INTERVAL", "5"))
+        self.on_disk_payload = os.getenv("QDRANT_ON_DISK_PAYLOAD", "false").lower() in ("1", "true", "yes")
         
         self._client = None
         self._initialized_collections: set = set()
@@ -140,6 +148,13 @@ class QdrantService:
             else:
                 self._client = QdrantClient(path=self.path)
                 logger.info(f"Using local Qdrant at {self.path}")
+
+            # Populate known collections so searches work after process restart.
+            try:
+                collections = self._client.get_collections().collections
+                self._initialized_collections = {c.name for c in collections}
+            except Exception as e:
+                logger.warning(f"Failed to pre-load collections list: {e}")
             
             return self._client
         except Exception as e:
@@ -148,6 +163,7 @@ class QdrantService:
     def _ensure_collection(self, collection: str):
         """Ensure collection exists."""
         if collection in self._initialized_collections:
+            self._ensure_payload_indexes(collection)
             return
         
         client = self._get_client()
@@ -159,18 +175,83 @@ class QdrantService:
             exists = any(c.name == collection for c in collections)
             
             if not exists:
-                client.create_collection(
-                    collection_name=collection,
-                    vectors_config=VectorParams(
-                        size=self.vector_dim,
-                        distance=Distance.COSINE
+                hnsw_config = None
+                optimizers_config = None
+                try:
+                    from qdrant_client.models import HnswConfigDiff, OptimizersConfigDiff
+                    hnsw_config = HnswConfigDiff(
+                        m=self.hnsw_m,
+                        ef_construct=self.hnsw_ef_construct,
                     )
-                )
+                    optimizers_config = OptimizersConfigDiff(
+                        memmap_threshold=self.optimizers_memmap_threshold,
+                        indexing_threshold=self.optimizers_indexing_threshold,
+                        flush_interval_sec=self.optimizers_flush_interval_sec,
+                    )
+                except Exception as e:
+                    logger.warning(f"Qdrant advanced configs unavailable: {e}")
+
+                create_kwargs = {
+                    "collection_name": collection,
+                    "vectors_config": VectorParams(
+                        size=self.vector_dim,
+                        distance=Distance.COSINE,
+                    ),
+                }
+                if hnsw_config is not None:
+                    create_kwargs["hnsw_config"] = hnsw_config
+                if optimizers_config is not None:
+                    create_kwargs["optimizers_config"] = optimizers_config
+                if self.on_disk_payload:
+                    create_kwargs["on_disk_payload"] = True
+
+                try:
+                    client.create_collection(**create_kwargs)
+                except TypeError:
+                    client.create_collection(
+                        collection_name=collection,
+                        vectors_config=VectorParams(
+                            size=self.vector_dim,
+                            distance=Distance.COSINE,
+                        ),
+                    )
                 logger.info(f"Created collection: {collection}")
+            self._ensure_payload_indexes(collection)
         except Exception as e:
             raise QdrantServiceError(f"Failed to ensure collection {collection}: {e}")
         
         self._initialized_collections.add(collection)
+
+    def _ensure_payload_indexes(self, collection: str) -> None:
+        """Ensure payload indexes exist for common filter fields."""
+        client = self._get_client()
+
+        try:
+            from qdrant_client.models import PayloadSchemaType
+        except Exception as e:
+            logger.warning(f"Payload indexes unavailable: {e}")
+            return
+
+        index_specs = [
+            ("source", PayloadSchemaType.KEYWORD),
+            ("modality", PayloadSchemaType.KEYWORD),
+            ("organism", PayloadSchemaType.KEYWORD),
+            ("organism_id", PayloadSchemaType.KEYWORD),
+            ("year", PayloadSchemaType.INTEGER),
+            ("pmid", PayloadSchemaType.KEYWORD),
+            ("chembl_id", PayloadSchemaType.KEYWORD),
+            ("accession", PayloadSchemaType.KEYWORD),
+        ]
+
+        for field_name, field_schema in index_specs:
+            try:
+                client.create_payload_index(
+                    collection_name=collection,
+                    field_name=field_name,
+                    field_schema=field_schema,
+                )
+            except Exception as e:
+                logger.debug(f"Payload index {field_name} not created: {e}")
     
     def _get_embedding(self, content: str, modality: str) -> List[float]:
         """Get embedding for content."""
@@ -228,14 +309,17 @@ class QdrantService:
         
         # Generate ID
         point_id = id or str(uuid.uuid4())
-        
+
         # Get embedding - will raise if fails
         vector = self._get_embedding(content, modality)
-        
+
+        # Normalize modality for downstream UI consistency
+        stored_modality = "molecule" if modality in ("smiles", "molecule") else modality
+
         # Prepare payload
         payload = {
             "content": content,
-            "modality": modality,
+            "modality": stored_modality,
             **(metadata or {})
         }
         
@@ -299,7 +383,8 @@ class QdrantService:
         modality: str = "text",
         collection: str = None,
         limit: int = 10,
-        filter_modality: str = None
+        filter_modality: str = None,
+        with_vectors: bool = False,
     ) -> List[SearchResult]:
         """
         Semantic search across vectors.
@@ -324,14 +409,26 @@ class QdrantService:
         if collection:
             collections = [collection]
         else:
-            collections = [c.value for c in CollectionType]
+            # Search across all existing collections (not just the enum defaults).
+            try:
+                collections = self.list_collections()
+            except Exception:
+                collections = [c.value for c in CollectionType]
         
         client = self._get_client()
         all_results = []
+        search_params = None
+        try:
+            from qdrant_client.models import SearchParams
+            search_params = SearchParams(hnsw_ef=self.hnsw_ef)
+        except Exception:
+            search_params = None
         
         for coll in collections:
             try:
+                # Skip collections that don't exist (or are not accessible)
                 if coll not in self._initialized_collections:
+                    # If we populated from list_collections() this won't happen, but keep safe.
                     continue
                 
                 filter_conditions = None
@@ -345,20 +442,41 @@ class QdrantService:
                     )
                 
                 # Use query_points for newer qdrant-client versions
-                results = client.query_points(
-                    collection_name=coll,
-                    query=query_vector,
-                    limit=limit,
-                    query_filter=filter_conditions
-                ).points
+                try:
+                    results = client.query_points(
+                        collection_name=coll,
+                        query=query_vector,
+                        limit=limit,
+                        query_filter=filter_conditions,
+                        search_params=search_params,
+                        with_payload=True,
+                        with_vectors=with_vectors,
+                    ).points
+                except TypeError:
+                    results = client.query_points(
+                        collection_name=coll,
+                        query=query_vector,
+                        limit=limit,
+                        query_filter=filter_conditions,
+                        with_payload=True,
+                        with_vectors=with_vectors,
+                    ).points
                 
                 for r in results:
+                    raw_modality = r.payload.get("modality", "unknown")
+                    normalized_modality = "molecule" if raw_modality == "smiles" else raw_modality
+                    vec = None
+                    if with_vectors:
+                        vec = r.vector
+                        if isinstance(vec, dict):
+                            vec = list(vec.values())[0] if vec else None
                     all_results.append(SearchResult(
                         id=str(r.id),
                         score=r.score,
                         content=r.payload.get("content", ""),
-                        modality=r.payload.get("modality", "unknown"),
-                        metadata=r.payload
+                        modality=normalized_modality,
+                        metadata=r.payload,
+                        vector=vec,
                     ))
             except Exception as e:
                 raise QdrantServiceError(f"Search in {coll} failed: {e}")
@@ -377,9 +495,86 @@ class QdrantService:
         
         try:
             collections = client.get_collections().collections
-            return [c.name for c in collections]
+            names = [c.name for c in collections]
+            self._initialized_collections = set(names)
+            return names
         except Exception as e:
             raise QdrantServiceError(f"Failed to list collections: {e}")
+
+    def list_items(
+        self,
+        collection: str,
+        limit: int = 20,
+        offset: int = 0,
+        filter_modality: Optional[str] = None,
+    ) -> List[SearchResult]:
+        """
+        List items from a collection.
+
+        Note: Qdrant pagination uses a point-id offset rather than numeric offsets.
+        For UI compatibility, we over-fetch `offset + limit` and slice.
+        """
+        client = self._get_client()
+
+        try:
+            existing = set(self.list_collections())
+            if collection not in existing:
+                return []
+
+            scroll_limit = max(1, offset + limit)
+
+            scroll_filter = None
+            if filter_modality:
+                from qdrant_client.models import Filter, FieldCondition, MatchValue
+                if filter_modality == "molecule":
+                    # Support legacy stored value "smiles"
+                    scroll_filter = Filter(
+                        should=[
+                            FieldCondition(key="modality", match=MatchValue(value="molecule")),
+                            FieldCondition(key="modality", match=MatchValue(value="smiles")),
+                        ]
+                    )
+                else:
+                    scroll_filter = Filter(
+                        must=[FieldCondition(key="modality", match=MatchValue(value=filter_modality))]
+                    )
+
+            # qdrant-client API has used both `scroll_filter=` and `filter=` across versions.
+            try:
+                points, _next = client.scroll(
+                    collection_name=collection,
+                    scroll_filter=scroll_filter,
+                    limit=scroll_limit,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+            except TypeError:
+                points, _next = client.scroll(
+                    collection_name=collection,
+                    filter=scroll_filter,
+                    limit=scroll_limit,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+
+            sliced = points[offset:offset + limit]
+            results: List[SearchResult] = []
+            for p in sliced:
+                payload = p.payload or {}
+                raw_modality = payload.get("modality", "unknown")
+                normalized_modality = "molecule" if raw_modality == "smiles" else raw_modality
+                results.append(
+                    SearchResult(
+                        id=str(p.id),
+                        score=0.0,
+                        content=payload.get("content", ""),
+                        modality=normalized_modality,
+                        metadata=payload,
+                    )
+                )
+            return results
+        except Exception as e:
+            raise QdrantServiceError(f"Failed to list items in {collection}: {e}")
     
     def get_collection_stats(self, collection: str) -> Dict[str, Any]:
         """Get statistics for a collection."""

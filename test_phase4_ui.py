@@ -27,7 +27,7 @@ def test_visualization_api():
         
         if response.status_code == 200:
             data = response.json()
-            print(f"✅ Search API works: {len(data.get('results', []))} results")
+            print(f"[OK] Search API works: {len(data.get('results', []))} results")
             
             # Check result structure
             if data.get('results'):
@@ -35,17 +35,17 @@ def test_visualization_api():
                 required_fields = ['content', 'score', 'modality']
                 for field in required_fields:
                     if field in result:
-                        print(f"   ✓ Has '{field}' field")
+                        print(f"   [OK] Has '{field}' field")
                     else:
                         print(f"   ✗ Missing '{field}' field")
             return True
         else:
-            print(f"❌ Search API failed: {response.status_code}")
+            print(f"[FAIL] Search API failed: {response.status_code}")
             print(f"   Response: {response.text[:200]}")
             return False
             
     except Exception as e:
-        print(f"❌ Search API error: {e}")
+        print(f"[ERROR] Search API error: {e}")
         return False
 
 
@@ -72,14 +72,15 @@ def test_workflow_api():
         
         if response.status_code == 200:
             data = response.json()
-            print(f"✅ Workflow API works")
+            print(f"[OK] Workflow API works")
             print(f"   Steps completed: {data.get('steps_completed', 0)}")
             print(f"   Total time: {data.get('total_time_ms', 0):.1f}ms")
-            print(f"   Candidates: {len(data.get('candidates', []))}")
+            candidates = data.get("top_candidates") or data.get("candidates", [])
+            print(f"   Candidates: {len(candidates)}")
             
             # Check candidate structure
-            if data.get('candidates'):
-                candidate = data['candidates'][0]
+            if candidates:
+                candidate = candidates[0]
                 print(f"\n   Sample candidate:")
                 print(f"   - Name: {candidate.get('name', 'N/A')}")
                 print(f"   - SMILES: {candidate.get('smiles', 'N/A')[:30]}...")
@@ -89,12 +90,12 @@ def test_workflow_api():
                 print(f"   - Valid: {validation.get('is_valid', False)}")
             return True
         else:
-            print(f"❌ Workflow API failed: {response.status_code}")
+            print(f"[FAIL] Workflow API failed: {response.status_code}")
             print(f"   Response: {response.text[:200]}")
             return False
             
     except Exception as e:
-        print(f"❌ Workflow API error: {e}")
+        print(f"[ERROR] Workflow API error: {e}")
         return False
 
 
@@ -120,7 +121,7 @@ def test_generate_api():
         if response.status_code == 200:
             data = response.json()
             molecules = data.get('molecules', [])
-            print(f"✅ Generate API works: {len(molecules)} molecules")
+            print(f"[OK] Generate API works: {len(molecules)} molecules")
             for mol in molecules[:2]:
                 if isinstance(mol, dict):
                     print(f"   - {mol.get('name', 'N/A')}: {mol.get('smiles', '')[:40]}...")
@@ -128,12 +129,12 @@ def test_generate_api():
                     print(f"   - {str(mol)[:50]}...")
             return True
         else:
-            print(f"❌ Generate API failed: {response.status_code}")
+            print(f"[FAIL] Generate API failed: {response.status_code}")
             print(f"   Response: {response.text[:200]}")
             return False
             
     except Exception as e:
-        print(f"❌ Generate API error: {e}")
+        print(f"[ERROR] Generate API error: {e}")
         return False
 
 
@@ -163,7 +164,7 @@ def test_validate_api():
         if response.status_code == 200:
             data = response.json()
             results = data.get('validations', [])
-            print(f"✅ Validate API works: {len(results)} results")
+            print(f"[OK] Validate API works: {len(results)} results")
             for i, result in enumerate(results):
                 if isinstance(result, dict):
                     print(f"   - SMILES {i+1}: Valid={result.get('is_valid', False)}")
@@ -171,12 +172,12 @@ def test_validate_api():
                     print(f"   - SMILES {i+1}: {result}")
             return True
         else:
-            print(f"❌ Validate API failed: {response.status_code}")
+            print(f"[FAIL] Validate API failed: {response.status_code}")
             print(f"   Response: {response.text[:200]}")
             return False
             
     except Exception as e:
-        print(f"❌ Validate API error: {e}")
+        print(f"[ERROR] Validate API error: {e}")
         return False
 
 
@@ -205,16 +206,16 @@ def test_rank_api():
         if response.status_code == 200:
             data = response.json()
             ranked = data.get('ranked', [])
-            print(f"✅ Rank API works: {len(ranked)} ranked")
+            print(f"[OK] Rank API works: {len(ranked)} ranked")
             for item in ranked:
                 print(f"   - {item.get('name', 'N/A')}: Score={item.get('score', 0):.3f}")
             return True
         else:
-            print(f"❌ Rank API failed: {response.status_code}")
+            print(f"[FAIL] Rank API failed: {response.status_code}")
             return False
             
     except Exception as e:
-        print(f"❌ Rank API error: {e}")
+        print(f"[ERROR] Rank API error: {e}")
         return False
 
 
@@ -258,16 +259,16 @@ def test_export_functions():
                 r.get('citation', '')
             ])
         csv_content = ",".join(headers) + "\n" + "\n".join([",".join(row) for row in rows])
-        print(f"✅ CSV export works: {len(csv_content)} chars")
+        print(f"[OK] CSV export works: {len(csv_content)} chars")
     except Exception as e:
-        print(f"❌ CSV export error: {e}")
+        print(f"[ERROR] CSV export error: {e}")
     
     # Test JSON export logic
     try:
         json_content = json.dumps(sample_results, indent=2)
-        print(f"✅ JSON export works: {len(json_content)} chars")
+        print(f"[OK] JSON export works: {len(json_content)} chars")
     except Exception as e:
-        print(f"❌ JSON export error: {e}")
+        print(f"[ERROR] JSON export error: {e}")
     
     # Test FASTA export logic
     try:
@@ -277,11 +278,11 @@ def test_export_functions():
                 fasta_lines.append(f">{r['id']}\n{r['content']}")
         fasta_content = "\n\n".join(fasta_lines)
         if fasta_content:
-            print(f"✅ FASTA export works: {len(fasta_content)} chars")
+            print(f"[OK] FASTA export works: {len(fasta_content)} chars")
         else:
             print(f"ℹ️ FASTA export: No protein sequences to export")
     except Exception as e:
-        print(f"❌ FASTA export error: {e}")
+        print(f"[ERROR] FASTA export error: {e}")
     
     return True
 
@@ -289,7 +290,7 @@ def test_export_functions():
 def run_all_tests():
     """Run all Phase 4 tests"""
     print("\n" + "=" * 60)
-    print("🧪 PHASE 4 UI FEATURE TESTS")
+    print("[TEST] PHASE 4 UI FEATURE TESTS")
     print("=" * 60)
     
     results = []
@@ -304,22 +305,22 @@ def run_all_tests():
     
     # Summary
     print("\n" + "=" * 60)
-    print("📊 TEST SUMMARY")
+    print("TEST SUMMARY")
     print("=" * 60)
     
     passed = sum(1 for _, result in results if result)
     total = len(results)
     
     for name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "[PASS]" if result else "[FAIL]"
         print(f"  {status}: {name}")
     
     print(f"\n  Total: {passed}/{total} tests passed")
     
     if passed == total:
-        print("\n  🎉 All Phase 4 features working correctly!")
+        print("\n  All Phase 4 features working correctly!")
     else:
-        print(f"\n  ⚠️ {total - passed} test(s) failed")
+        print(f"\n  [WARN] {total - passed} test(s) failed")
     
     return passed == total
 

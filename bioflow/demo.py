@@ -221,7 +221,9 @@ def demo_visualization():
         print("   - plot_embeddings_3d(embeddings, labels)")
         print("   - plot_similarity_matrix(embeddings, labels)")
         print("   - create_dashboard(results, embeddings)")
-        print("\n   Run the Streamlit app to see interactive visualizations!")
+        print("\n   Use the Next.js UI for interactive visualizations:")
+        print("     - Start backend: python -m uvicorn bioflow.api.server:app --host 0.0.0.0 --port 8000")
+        print("     - Start UI:      cd ui && pnpm dev")
         
     except ImportError as e:
         print(f"⚠️ Some visualization dependencies missing: {e}")
@@ -245,8 +247,9 @@ def main():
     
     print_header("✅ Demo Complete!")
     print("Next steps:")
-    print("  1. Run the Streamlit interface:")
-    print("     streamlit run bioflow/app.py")
+    print("  1. Run the full stack:")
+    print("     - Backend: python -m uvicorn bioflow.api.server:app --host 0.0.0.0 --port 8000")
+    print("     - UI:      cd ui && pnpm dev")
     print("")
     print("  2. Ensure OBM model is configured:")
     print("     - BioMedGPT checkpoints are downloaded")

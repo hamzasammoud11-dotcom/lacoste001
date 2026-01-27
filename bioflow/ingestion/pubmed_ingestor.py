@@ -15,6 +15,7 @@ Usage:
 import logging
 import requests
 import xml.etree.ElementTree as ET
+import re
 from typing import Dict, Any, Optional, Generator
 from datetime import datetime
 
@@ -134,6 +135,7 @@ class PubMedIngestor(BaseIngestor):
                     # Extract publication date
                     pub_date = ""
                     date_elem = article.find(".//PubDate")
+                    year_value = None
                     if date_elem is not None:
                         year = date_elem.find("Year")
                         month = date_elem.find("Month")
@@ -141,6 +143,14 @@ class PubMedIngestor(BaseIngestor):
                             pub_date = year.text
                             if month is not None:
                                 pub_date = f"{year.text}-{month.text}"
+                            try:
+                                year_value = int(year.text)
+                            except (TypeError, ValueError):
+                                year_value = None
+                    if year_value is None and pub_date:
+                        match = re.match(r"(\\d{4})", pub_date)
+                        if match:
+                            year_value = int(match.group(1))
                     
                     # Extract authors
                     authors = []
@@ -170,6 +180,7 @@ class PubMedIngestor(BaseIngestor):
                         "authors": authors,
                         "journal": journal,
                         "pub_date": pub_date,
+                        "year": year_value,
                         "mesh_terms": mesh_terms,
                     }
                     
@@ -246,6 +257,7 @@ class PubMedIngestor(BaseIngestor):
                 "authors": raw_data.get("authors", []),
                 "journal": raw_data.get("journal", ""),
                 "pub_date": raw_data.get("pub_date", ""),
+                "year": raw_data.get("year"),
                 "mesh_terms": raw_data.get("mesh_terms", []),
                 "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
             }

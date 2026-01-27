@@ -482,12 +482,65 @@ class DiscoveryWorkflow:
         enriched = []
         for r in ranked[:self.top_k]:
             smiles = r.get("smiles")
+            candidate_ctx = next(
+                (c for c in result.context.candidates if c.get("smiles") == smiles),
+                {}
+            )
+
+            validation_ui = self._validation_to_ui(candidate_ctx.get("validation", {}))
+            name = (
+                candidate_ctx.get("name")
+                or candidate_ctx.get("title")
+                or candidate_ctx.get("label")
+                or r.get("name")
+                or f"Candidate {r.get('rank') or 0}"
+            )
+            score = r.get("final_score", r.get("score", 0.0))
             enriched.append({
                 **r,
-                "generation": next(
-                    (c for c in result.context.candidates if c.get("smiles") == smiles),
-                    {}
-                ),
+                # UI-friendly fields
+                "name": name,
+                "score": score,
+                "validation": validation_ui,
+                # Keep full context for debugging / extended UI panels
+                "generation": candidate_ctx,
             })
         
         return enriched
+
+    def _validation_to_ui(self, validation: Any) -> Dict[str, Any]:
+        """
+        Normalize validator output to the UI-friendly shape:
+        { is_valid: bool, checks: {name: bool}, properties: {name: number} }.
+        """
+        if not isinstance(validation, dict):
+            return {"is_valid": True, "checks": {}, "properties": {}}
+
+        # Determine validity
+        if "is_valid" in validation:
+            is_valid = bool(validation.get("is_valid"))
+        else:
+            status = str(validation.get("status", "passed")).lower()
+            is_valid = status in ("passed", "ok", "success", "true")
+
+        checks: Dict[str, bool] = {}
+        properties: Dict[str, float] = {}
+
+        props = validation.get("properties", [])
+        if isinstance(props, list):
+            for p in props:
+                if not isinstance(p, dict):
+                    continue
+                name = str(p.get("name") or "").strip()
+                if not name:
+                    continue
+                checks[name] = bool(p.get("passed", True))
+                value = p.get("value")
+                if isinstance(value, (int, float)):
+                    properties[name] = float(value)
+
+        alerts = validation.get("alerts", [])
+        if isinstance(alerts, list):
+            checks["no_alerts"] = len(alerts) == 0
+
+        return {"is_valid": is_valid, "checks": checks, "properties": properties}

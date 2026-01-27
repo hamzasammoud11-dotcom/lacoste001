@@ -25,8 +25,12 @@ import logging
 from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass, field
 from datetime import datetime
+import re
+import threading
+from collections import OrderedDict
 
 from bioflow.search.mmr import MMRReranker, MMRResult
+from bioflow.search.mmr import mmr_rerank
 from bioflow.search.evidence import EvidenceLinker, EnrichedResult, EvidenceLink
 
 logger = logging.getLogger(__name__)
@@ -80,6 +84,8 @@ class EnhancedSearchResult:
                 }
                 for l in self.evidence_links
             ],
+            # UI expects `source`; keep `source_type` for backward compatibility.
+            "source": self.source_type,
             "source_type": self.source_type,
             "citation": self.citation,
             "rank": self.rank,
@@ -123,6 +129,8 @@ class EnhancedSearchService:
         obm_encoder,
         default_lambda: float = 0.7,
         default_top_k: int = 20,
+        query_cache_max_size: int = 256,
+        query_cache_ttl_s: float = 300.0,
     ):
         """
         Initialize enhanced search service.
@@ -138,6 +146,12 @@ class EnhancedSearchService:
         self.mmr_reranker = MMRReranker(lambda_param=default_lambda)
         self.evidence_linker = EvidenceLinker()
         self.default_top_k = default_top_k
+
+        # Simple in-memory cache for query embeddings (reduces repeated encoding latency).
+        self._query_cache_max_size = int(query_cache_max_size)
+        self._query_cache_ttl_s = float(query_cache_ttl_s)
+        self._query_cache: "OrderedDict[tuple[str, str], tuple[float, List[float]]]" = OrderedDict()
+        self._query_cache_lock = threading.Lock()
     
     def search(
         self,
@@ -177,33 +191,54 @@ class EnhancedSearchService:
         elif filters is None:
             filters = SearchFilters()
         
-        # Get query embedding
+        # Normalize / auto-detect modality for encoding.
+        requested_modality = (modality or "text").lower()
+        if requested_modality == "auto":
+            requested_modality = self._detect_modality(query)
+
+        # Get query embedding (cached)
         from bioflow.core.base import Modality
-        modality_enum = self._get_modality_enum(modality)
-        query_result = self.encoder.encode(query, modality_enum)
-        query_embedding = query_result.vector
+        modality_enum = self._get_modality_enum(requested_modality)
+        query_embedding = self._get_query_embedding_cached(query, modality_enum)
+        query_dim = len(query_embedding)
         
         # Execute vector search
         # Fetch more results if using MMR (for better diversity)
         fetch_limit = top_k * 3 if use_mmr else top_k
+        need_vectors = bool(use_mmr or include_embeddings)
         
         raw_results = self._execute_search(
             query_embedding=query_embedding,
             collection=collection,
             limit=fetch_limit,
             filters=filters,
+            with_vectors=need_vectors,
         )
+
+        # Post-filters that are difficult to express robustly in Qdrant filters.
+        raw_results = self._apply_post_filters(raw_results, filters)
         
         total_found = len(raw_results)
         
         # Apply MMR if requested
         if use_mmr and len(raw_results) > 1:
             # Get embeddings for MMR
-            embeddings = self._get_result_embeddings(raw_results) if include_embeddings or use_mmr else None
+            embeddings = (
+                self._get_result_embeddings(raw_results, expected_dim=query_dim)
+                if include_embeddings or use_mmr
+                else None
+            )
+
+            effective_lambda = (
+                float(lambda_param)
+                if lambda_param is not None
+                else float(self.mmr_reranker.lambda_param)
+            )
             
-            mmr_results = self.mmr_reranker.rerank(
+            mmr_results = mmr_rerank(
                 results=raw_results,
                 query_embedding=query_embedding,
+                lambda_param=effective_lambda,
                 embeddings=embeddings,
                 top_k=top_k,
             )
@@ -226,7 +261,7 @@ class EnhancedSearchService:
         return SearchResponse(
             results=enhanced_results,
             query=query,
-            modality=modality,
+            modality=requested_modality,
             total_found=total_found,
             returned=len(enhanced_results),
             diversity_score=diversity_score,
@@ -314,38 +349,56 @@ class EnhancedSearchService:
         collection: str,
         limit: int,
         filters: SearchFilters,
+        with_vectors: bool,
     ) -> List[Dict[str, Any]]:
         """Execute search against Qdrant."""
-        from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
         
         # Build filter conditions
-        conditions = []
+        must_conditions = []
         
         if filters.modality:
-            conditions.append(FieldCondition(
-                key="modality",
-                match=MatchValue(value=filters.modality)
-            ))
+            requested = str(filters.modality).lower()
+            if requested in ("molecule", "smiles"):
+                # Historical payloads may use "smiles". Treat both as molecule.
+                must_conditions.append(Filter(should=[
+                    FieldCondition(key="modality", match=MatchValue(value="molecule")),
+                    FieldCondition(key="modality", match=MatchValue(value="smiles")),
+                ]))
+            else:
+                must_conditions.append(FieldCondition(
+                    key="modality",
+                    match=MatchValue(value=requested)
+                ))
         
         if filters.source:
-            conditions.append(FieldCondition(
+            must_conditions.append(FieldCondition(
                 key="source",
                 match=MatchValue(value=filters.source)
             ))
         
         if filters.sources:
-            # Multiple sources - need OR logic
-            # Qdrant supports this via should conditions
-            pass  # TODO: Implement OR logic
+            must_conditions.append(Filter(should=[
+                FieldCondition(key="source", match=MatchValue(value=s))
+                for s in filters.sources
+            ]))
         
         if filters.organism:
-            conditions.append(FieldCondition(
+            must_conditions.append(FieldCondition(
                 key="organism",
                 match=MatchValue(value=filters.organism)
             ))
+
+        if filters.organism_id is not None:
+            must_conditions.append(FieldCondition(
+                key="organism_id",
+                match=MatchValue(value=filters.organism_id)
+            ))
         
         # Build filter
-        query_filter = Filter(must=conditions) if conditions else None
+        query_filter = None
+        if must_conditions:
+            query_filter = Filter(must=must_conditions)
         
         # Get client and search
         client = self.qdrant._get_client()
@@ -366,17 +419,20 @@ class EnhancedSearchService:
                     limit=limit,
                     query_filter=query_filter,
                     with_payload=True,
-                    with_vectors=True,  # Need vectors for MMR
+                    with_vectors=with_vectors,
                 ).points
                 
                 for r in results:
+                    payload_modality = r.payload.get('modality', 'unknown')
+                    # Normalize legacy modality value for UI consistency.
+                    normalized_modality = "molecule" if payload_modality == "smiles" else payload_modality
                     all_results.append({
                         'id': str(r.id),
                         'score': r.score,
                         'content': r.payload.get('content', ''),
-                        'modality': r.payload.get('modality', 'unknown'),
+                        'modality': normalized_modality,
                         'metadata': r.payload,
-                        'vector': r.vector,
+                        'vector': r.vector if with_vectors else None,
                     })
             except Exception as e:
                 logger.warning(f"Search in {coll} failed: {e}")
@@ -385,7 +441,11 @@ class EnhancedSearchService:
         all_results.sort(key=lambda x: x['score'], reverse=True)
         return all_results[:limit]
     
-    def _get_result_embeddings(self, results: List[Dict]) -> List[List[float]]:
+    def _get_result_embeddings(
+        self,
+        results: List[Dict],
+        expected_dim: int,
+    ) -> List[List[float]]:
         """Extract embeddings from results."""
         embeddings = []
         for r in results:
@@ -397,8 +457,53 @@ class EnhancedSearchService:
                 embeddings.append(vec)
             else:
                 # Missing vector - use zeros (will have low similarity)
-                embeddings.append([0.0] * 768)
+                embeddings.append([0.0] * expected_dim)
         return embeddings
+    
+    def _extract_source(self, metadata: Dict[str, Any]) -> str:
+        """
+        Extract source from metadata with fallback chain.
+        
+        Tries multiple field names and patterns to ensure traceability.
+        """
+        if not metadata:
+            return "unknown"
+        
+        # Direct source fields (priority order)
+        for field in ["source", "database", "origin", "db", "data_source"]:
+            val = metadata.get(field)
+            if val and isinstance(val, str):
+                return val.lower()
+        
+        # Check for known identifiers that imply source
+        if metadata.get("pmid") or metadata.get("pubmed_id"):
+            return "pubmed"
+        if metadata.get("uniprot_id") or metadata.get("accession"):
+            return "uniprot"
+        if metadata.get("chembl_id"):
+            return "chembl"
+        if metadata.get("drugbank_id"):
+            return "drugbank"
+        if metadata.get("pdb_id"):
+            return "pdb"
+        
+        # Check for URL patterns
+        url = metadata.get("url", "")
+        if "pubmed" in url.lower() or "ncbi.nlm.nih.gov" in url.lower():
+            return "pubmed"
+        if "uniprot" in url.lower():
+            return "uniprot"
+        if "chembl" in url.lower():
+            return "chembl"
+        
+        # Check modality hints
+        modality = metadata.get("modality", "")
+        if modality in ("protein", "sequence"):
+            return "protein_db"
+        if modality in ("molecule", "smiles", "compound"):
+            return "molecule_db"
+        
+        return "unknown"
     
     def _mmr_to_enhanced(
         self,
@@ -417,7 +522,7 @@ class EnhancedSearchService:
                 modality=r.modality,
                 metadata=r.metadata,
                 evidence_links=[],  # Added later
-                source_type=r.metadata.get('source', 'unknown'),
+                source_type=self._extract_source(r.metadata),
                 citation=None,  # Added later
                 rank=i + 1,
             ))
@@ -427,6 +532,7 @@ class EnhancedSearchService:
         """Convert raw results to enhanced results."""
         enhanced = []
         for i, r in enumerate(results):
+            metadata = r.get('metadata', {})
             enhanced.append(EnhancedSearchResult(
                 id=r.get('id', ''),
                 score=r.get('score', 0),
@@ -434,9 +540,9 @@ class EnhancedSearchService:
                 diversity_penalty=None,
                 content=r.get('content', ''),
                 modality=r.get('modality', 'unknown'),
-                metadata=r.get('metadata', {}),
+                metadata=metadata,
                 evidence_links=[],
-                source_type=r.get('metadata', {}).get('source', 'unknown'),
+                source_type=self._extract_source(metadata),
                 citation=None,
                 rank=i + 1,
             ))
@@ -469,6 +575,107 @@ class EnhancedSearchService:
             "protein": Modality.PROTEIN,
         }
         return mapping.get(modality.lower(), Modality.TEXT)
+
+    def _get_query_embedding_cached(self, query: str, modality_enum) -> List[float]:
+        import time
+
+        key = (getattr(modality_enum, "value", str(modality_enum)), str(query))
+        now = time.time()
+
+        with self._query_cache_lock:
+            cached = self._query_cache.get(key)
+            if cached is not None:
+                ts, vec = cached
+                if (now - ts) <= self._query_cache_ttl_s:
+                    self._query_cache.move_to_end(key)
+                    return vec
+                self._query_cache.pop(key, None)
+
+        query_result = self.encoder.encode(query, modality_enum)
+        vec = query_result.vector.tolist() if hasattr(query_result.vector, "tolist") else list(query_result.vector)
+
+        with self._query_cache_lock:
+            self._query_cache[key] = (now, vec)
+            self._query_cache.move_to_end(key)
+            while len(self._query_cache) > self._query_cache_max_size:
+                self._query_cache.popitem(last=False)
+
+        return vec
+
+    def _detect_modality(self, query: str) -> str:
+        """
+        Heuristically detect modality from raw query.
+
+        Notes:
+        - "protein": long sequences of amino-acid letters
+        - "molecule": SMILES-like strings (bond symbols, brackets, digits, etc.)
+        - otherwise: "text"
+        """
+        q = (query or "").strip()
+        if not q:
+            return "text"
+
+        # Protein FASTA / sequence heuristic (AAs + length)
+        seq = q.replace("\n", "").replace(" ", "")
+        if len(seq) >= 25 and re.fullmatch(r"[ACDEFGHIKLMNPQRSTVWYBXZJUO]+", seq, flags=re.IGNORECASE):
+            return "protein"
+
+        # SMILES heuristic: contains typical SMILES tokens and at least one letter/digit.
+        if re.search(r"[\[\]=#@\\/()%0-9]", q) and re.search(r"[A-Za-z]", q):
+            return "molecule"
+
+        return "text"
+
+    def _apply_post_filters(
+        self,
+        results: List[Dict[str, Any]],
+        filters: SearchFilters,
+    ) -> List[Dict[str, Any]]:
+        """Apply filters that are not reliably expressed in Qdrant payload filters."""
+        if not results:
+            return results
+
+        year_min = filters.year_min
+        year_max = filters.year_max
+        keywords = filters.keywords or []
+
+        def extract_year(payload: Dict[str, Any]) -> Optional[int]:
+            for key in ("year", "publication_year", "pub_year", "date"):
+                v = payload.get(key)
+                if v is None:
+                    continue
+                if isinstance(v, int):
+                    return v
+                if isinstance(v, str):
+                    m = re.search(r"(19\d{2}|20\d{2})", v)
+                    if m:
+                        try:
+                            return int(m.group(1))
+                        except Exception:
+                            return None
+            return None
+
+        filtered: List[Dict[str, Any]] = []
+        for r in results:
+            payload = r.get("metadata", {}) or {}
+
+            if year_min is not None or year_max is not None:
+                y = extract_year(payload)
+                if y is None:
+                    continue
+                if year_min is not None and y < year_min:
+                    continue
+                if year_max is not None and y > year_max:
+                    continue
+
+            if keywords:
+                hay = (r.get("content", "") or "").lower() + " " + str(payload).lower()
+                if not all(str(kw).lower() in hay for kw in keywords):
+                    continue
+
+            filtered.append(r)
+
+        return filtered
     
     def _filters_to_dict(self, filters: SearchFilters) -> Dict[str, Any]:
         """Convert filters to dictionary."""

@@ -196,6 +196,12 @@ Each phase builds on the previous one, with clear deliverables and success crite
 - [ ] Search latency < 500ms for 10k vectors
 - [ ] System handles 10 concurrent users
 
+### Implementation Notes (added 2026-01-27)
+
+- `bioflow/evaluation/metrics.py` provides Recall@k, MRR@k, nDCG@k, and a cosine intra-list diversity metric.
+- `scripts/evaluate_retrieval.py` evaluates `/api/search` against a user-provided benchmark JSON.
+- `scripts/benchmark_search_api.py` benchmarks `/api/search` latency with configurable concurrency.
+
 ---
 
 ## Phase 6: Advanced Features (Future)
