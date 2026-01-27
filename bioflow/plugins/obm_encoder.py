@@ -118,9 +118,25 @@ class OBMEncoder(BioEncoder):
         """Get or create molecule encoder."""
         if self._molecule_encoder is None:
             from bioflow.plugins.encoders.molecule_encoder import MoleculeEncoder
+            
+            # Determine if molecule_model is a backend name or a model path
+            known_backends = ["chemberta", "chemberta-77m", "rdkit_morgan", "rdkit_maccs"]
+            is_known_backend = self.molecule_model.lower() in known_backends
+            
+            if self.molecule_model.lower().startswith("rdkit"):
+                backend = self.molecule_model
+                model_name = None
+            elif is_known_backend:
+                backend = "chemberta"
+                model_name = None  # Use default mapping
+            else:
+                # Assume it's a HuggingFace model path
+                backend = "chemberta"
+                model_name = self.molecule_model
+            
             self._molecule_encoder = MoleculeEncoder(
-                backend=self.molecule_model if self.molecule_model.startswith("rdkit") else "chemberta",
-                model_name=None if self.molecule_model.startswith("rdkit") else self.molecule_model,
+                backend=backend,
+                model_name=model_name,
                 device=self.device
             )
         return self._molecule_encoder

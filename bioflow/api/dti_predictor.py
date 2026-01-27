@@ -189,14 +189,13 @@ class DeepPurposePredictor:
             self._loaded = True
             return True
             
-        except ImportError:
-            logger.warning("DeepPurpose not installed. Using mock predictions.")
-            self._loaded = False
-            return False
+        except ImportError as e:
+            raise ImportError(
+                f"DeepPurpose is required but not installed: {e}. "
+                "Install with: pip install DeepPurpose"
+            )
         except Exception as e:
-            logger.error(f"Failed to load model: {e}")
-            self._loaded = False
-            return False
+            raise RuntimeError(f"Failed to load DeepPurpose model: {e}")
     
     def predict(self, drug_smiles: str, target_sequence: str) -> DTIPrediction:
         """
@@ -245,34 +244,9 @@ class DeepPurposePredictor:
                 )
                 
             except Exception as e:
-                logger.error(f"Prediction failed: {e}")
+                raise RuntimeError(f"DTI prediction failed: {e}")
         
-        # Fallback: Mock prediction
-        return self._mock_predict(drug_smiles, target_sequence)
-    
-    def _mock_predict(self, drug_smiles: str, target_sequence: str) -> DTIPrediction:
-        """Generate a mock prediction when model is unavailable."""
-        import hashlib
-        
-        # Deterministic "prediction" based on input hash
-        hash_input = f"{drug_smiles}:{target_sequence}"
-        hash_val = int(hashlib.md5(hash_input.encode()).hexdigest()[:8], 16)
-        
-        # Generate realistic-looking pKd value (typically 4-10)
-        affinity = 4.0 + (hash_val % 6000) / 1000.0
-        confidence = 0.7 + (hash_val % 300) / 1000.0
-        
-        return DTIPrediction(
-            drug_smiles=drug_smiles,
-            target_sequence=target_sequence,
-            binding_affinity=round(affinity, 3),
-            confidence=round(confidence, 3),
-            model_name="Mock-Predictor",
-            metadata={
-                "timestamp": datetime.utcnow().isoformat(),
-                "note": "Mock prediction - DeepPurpose not loaded",
-            }
-        )
+        raise RuntimeError("DeepPurpose model not loaded")
     
     def batch_predict(
         self,

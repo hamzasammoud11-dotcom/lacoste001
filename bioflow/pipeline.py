@@ -62,7 +62,7 @@ class BaseAgent:
         self.obm = obm
         self.qdrant = qdrant
     
-    def process(self, input_data: Any, context: Dict[str, Any] = None) -> AgentMessage:
+    def process(self, input_data: Any, context: Optional[Dict[str, Any]] = None) -> AgentMessage:
         """Process input and return output message."""
         raise NotImplementedError
 
@@ -74,14 +74,14 @@ class MinerAgent(BaseAgent):
     Retrieves relevant scientific articles/abstracts based on query.
     """
     
-    def __init__(self, obm: OBMWrapper, qdrant: QdrantManager, collection: str = None):
+    def __init__(self, obm: OBMWrapper, qdrant: QdrantManager, collection: Optional[str] = None):
         super().__init__("LiteratureMiner", AgentType.MINER, obm, qdrant)
         self.collection = collection
     
     def process(
         self, 
         input_data: str, 
-        context: Dict[str, Any] = None
+        context: Optional[Dict[str, Any]] = None
     ) -> AgentMessage:
         """
         Search for relevant literature.
@@ -121,14 +121,14 @@ class ValidatorAgent(BaseAgent):
     Checks molecules against known toxicity, drug-likeness, etc.
     """
     
-    def __init__(self, obm: OBMWrapper, qdrant: QdrantManager, collection: str = None):
+    def __init__(self, obm: OBMWrapper, qdrant: QdrantManager, collection: Optional[str] = None):
         super().__init__("Validator", AgentType.VALIDATOR, obm, qdrant)
         self.collection = collection
     
     def process(
         self,
         input_data: str,
-        context: Dict[str, Any] = None
+        context: Optional[Dict[str, Any]] = None
     ) -> AgentMessage:
         """
         Validate a molecule.
@@ -194,7 +194,7 @@ class RankerAgent(BaseAgent):
     def process(
         self,
         input_data: List[Dict[str, Any]],
-        context: Dict[str, Any] = None
+        context: Optional[Dict[str, Any]] = None
     ) -> AgentMessage:
         """
         Rank a list of candidates.
@@ -254,7 +254,7 @@ class BioFlowPipeline:
     def run(
         self,
         initial_input: Any,
-        initial_context: Dict[str, Any] = None
+        initial_context: Optional[Dict[str, Any]] = None
     ) -> PipelineResult:
         """
         Execute the pipeline.

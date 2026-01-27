@@ -5,7 +5,7 @@ DeepPurpose Predictor - DTI Prediction
 Implements BioPredictor interface for drug-target interaction prediction.
 
 Note: DeepPurpose is an open-source toolkit for DTI/DDI prediction.
-If DeepPurpose is not available, falls back to a simple baseline.
+DeepPurpose must be installed for this module to work.
 """
 
 import logging
@@ -34,10 +34,10 @@ def _check_deeppurpose():
             }
             _deeppurpose_available = True
             logger.info("DeepPurpose is available")
-        except ImportError:
+        except ImportError as e:
             _deeppurpose_available = False
-            logger.warning(
-                "DeepPurpose not available. Using fallback predictor. "
+            raise ImportError(
+                f"DeepPurpose is required but not installed: {e}. "
                 "Install with: pip install DeepPurpose"
             )
     
@@ -99,36 +99,12 @@ class DeepPurposePredictor(BioPredictor):
     def _load_pretrained(self, path: str):
         """Load pretrained DeepPurpose model."""
         available, dp = _check_deeppurpose()
-        if not available:
-            return
         
         try:
             self._model = dp["DTI"].load_pretrained_model(path)
             logger.info(f"Loaded pretrained model from {path}")
         except Exception as e:
-            logger.error(f"Failed to load pretrained model: {e}")
-    
-    def _fallback_predict(self, drug: str, target: str) -> Tuple[float, float]:
-        """
-        Fallback prediction when DeepPurpose is not available.
-        
-        Uses simple heuristics based on molecular properties.
-        This is NOT accurate - just a placeholder.
-        """
-        # Simple heuristics based on sequence/molecule properties
-        drug_score = min(len(drug) / 50.0, 1.0)  # Longer SMILES = higher complexity
-        target_score = min(len(target) / 500.0, 1.0)  # Longer protein = more binding sites
-        
-        # Combine with some randomness
-        import random
-        random.seed(hash(drug + target) % 2**32)
-        base_score = (drug_score + target_score) / 2
-        noise = random.uniform(-0.1, 0.1)
-        
-        score = max(0, min(1, base_score + noise))
-        confidence = 0.3  # Low confidence for fallback
-        
-        return score, confidence
+            raise RuntimeError(f"Failed to load pretrained model: {e}")
     
     def predict(self, drug: str, target: str) -> PredictionResult:
         """
@@ -140,20 +116,12 @@ class DeepPurposePredictor(BioPredictor):
             
         Returns:
             PredictionResult with binding affinity score
+            
+        Raises:
+            ImportError: If DeepPurpose is not available
+            RuntimeError: If prediction fails
         """
-        if self._use_deeppurpose:
-            return self._predict_deeppurpose(drug, target)
-        else:
-            score, confidence = self._fallback_predict(drug, target)
-            return PredictionResult(
-                score=score,
-                confidence=confidence,
-                label="binding" if score > 0.5 else "non-binding",
-                metadata={
-                    "method": "fallback_heuristic",
-                    "warning": "DeepPurpose not available, using simple heuristics"
-                }
-            )
+        return self._predict_deeppurpose(drug, target)
     
     def _predict_deeppurpose(self, drug: str, target: str) -> PredictionResult:
         """Predict using DeepPurpose."""
@@ -168,9 +136,7 @@ class DeepPurposePredictor(BioPredictor):
             if self._model:
                 y_pred = self._model.predict(drug_encoding, target_encoding)
             else:
-                # Train a quick model or use default
-                warnings.warn("No pretrained model loaded, predictions may be unreliable")
-                y_pred = [0.5]  # Default
+                raise RuntimeError("No pretrained model loaded")
             
             score = float(y_pred[0]) if hasattr(y_pred, '__iter__') else float(y_pred)
             
@@ -187,15 +153,7 @@ class DeepPurposePredictor(BioPredictor):
             )
             
         except Exception as e:
-            logger.error(f"DeepPurpose prediction failed: {e}")
-            # Fallback
-            score, confidence = self._fallback_predict(drug, target)
-            return PredictionResult(
-                score=score,
-                confidence=confidence,
-                label="binding" if score > 0.5 else "non-binding",
-                metadata={"method": "fallback", "error": str(e)}
-            )
+            raise RuntimeError(f"DeepPurpose prediction failed: {e}")
     
     def batch_predict(self, pairs: List[Tuple[str, str]]) -> List[PredictionResult]:
         """

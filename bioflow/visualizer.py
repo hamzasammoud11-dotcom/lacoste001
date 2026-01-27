@@ -65,10 +65,10 @@ class EmbeddingVisualizer:
     @staticmethod
     def plot_embeddings_2d(
         embeddings: np.ndarray,
-        labels: List[str] = None,
-        colors: List[str] = None,
+        labels: Optional[List[str]] = None,
+        colors: Optional[List[str]] = None,
         title: str = "Embedding Space",
-        hover_data: List[Dict] = None
+        hover_data: Optional[List[Dict]] = None
     ):
         """
         Create 2D scatter plot of embeddings.
@@ -123,8 +123,8 @@ class EmbeddingVisualizer:
     @staticmethod
     def plot_embeddings_3d(
         embeddings: np.ndarray,
-        labels: List[str] = None,
-        colors: List[str] = None,
+        labels: Optional[List[str]] = None,
+        colors: Optional[List[str]] = None,
         title: str = "3D Embedding Space"
     ):
         """Create 3D scatter plot of embeddings."""
@@ -164,7 +164,7 @@ class EmbeddingVisualizer:
     @staticmethod
     def plot_similarity_matrix(
         embeddings: np.ndarray,
-        labels: List[str] = None,
+        labels: Optional[List[str]] = None,
         title: str = "Similarity Matrix"
     ):
         """Plot pairwise similarity matrix."""
@@ -228,7 +228,7 @@ class MoleculeVisualizer:
     @staticmethod
     def plot_molecule_grid(
         smiles_list: List[str],
-        labels: List[str] = None,
+        labels: Optional[List[str]] = None,
         mols_per_row: int = 4,
         size: Tuple[int, int] = (200, 200)
     ):
@@ -318,8 +318,8 @@ class ResultsVisualizer:
     @staticmethod
     def create_dashboard(
         search_results: List[Dict],
-        embeddings: np.ndarray = None,
-        labels: List[str] = None
+        embeddings: Optional[np.ndarray] = None,
+        labels: Optional[List[str]] = None
     ):
         """Create a multi-panel dashboard."""
         if not PLOTLY_AVAILABLE:

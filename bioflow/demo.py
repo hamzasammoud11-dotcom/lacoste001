@@ -31,9 +31,9 @@ def demo_obm_encoding():
     
     from bioflow.obm_wrapper import OBMWrapper, ModalityType
     
-    # Initialize with mock mode (no GPU needed)
-    obm = OBMWrapper(use_mock=True)
-    print(f"✅ OBM initialized in Mock mode")
+    # Initialize OBMWrapper (model must be properly configured)
+    obm = OBMWrapper()
+    print(f"✅ OBM initialized")
     print(f"   Vector dimension: {obm.vector_dim}")
     print(f"   Device: {obm.device}")
     
@@ -234,8 +234,8 @@ def main():
     print("   BIOFLOW + OBM DEMO")
     print("🧬" * 20)
     
-    print("\nThis demo runs in MOCK mode (no GPU/model required).")
-    print("Embeddings are deterministic random vectors for testing.\n")
+    print("\nThis demo requires the OBM model to be properly configured.")
+    print("Ensure checkpoints are downloaded and GPU is available.\n")
     
     # Run demos
     obm = demo_obm_encoding()
@@ -248,7 +248,7 @@ def main():
     print("  1. Run the Streamlit interface:")
     print("     streamlit run bioflow/app.py")
     print("")
-    print("  2. For real embeddings, set use_mock=False and ensure:")
+    print("  2. Ensure OBM model is configured:")
     print("     - BioMedGPT checkpoints are downloaded")
     print("     - GPU is available")
     print("")

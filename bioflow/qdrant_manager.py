@@ -58,8 +58,8 @@ class QdrantManager:
     def __init__(
         self,
         obm: OBMWrapper,
-        qdrant_url: str = None,
-        qdrant_path: str = None,
+        qdrant_url: Optional[str] = None,
+        qdrant_path: Optional[str] = None,
         default_collection: str = "bioflow_memory"
     ):
         """
@@ -89,7 +89,7 @@ class QdrantManager:
     
     def create_collection(
         self, 
-        name: str = None,
+        name: Optional[str] = None,
         recreate: bool = False
     ) -> bool:
         """

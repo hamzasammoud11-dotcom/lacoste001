@@ -25,9 +25,29 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================================
+# Service Imports
+# ============================================================================
+from bioflow.api.model_service import get_model_service, ModelService
+from bioflow.api.qdrant_service import get_qdrant_service, QdrantService
+
+# DeepPurpose router
+try:
+    from bioflow.api.deeppurpose_api import router as deeppurpose_router
+    HAS_DEEPPURPOSE_API = True
+except ImportError as e:
+    logger.warning(f"DeepPurpose API not available: {e}")
+    HAS_DEEPPURPOSE_API = False
+
+# ============================================================================
 # In-Memory Job Store (replace with Redis/DB in production)
 # ============================================================================
 JOBS: Dict[str, Dict[str, Any]] = {}
+
+# ============================================================================
+# Global Services (initialized in lifespan)
+# ============================================================================
+model_service: Optional[ModelService] = None
+qdrant_service: Optional[QdrantService] = None
 
 
 # ============================================================================
@@ -72,16 +92,47 @@ class HealthResponse(BaseModel):
     timestamp: str
 
 
+class EnhancedSearchRequest(BaseModel):
+    """Request for enhanced search with MMR and filters."""
+    query: str = Field(..., description="Search query (text, SMILES, or protein sequence)")
+    modality: str = Field(default="text", description="Query modality: text, molecule, protein")
+    collection: Optional[str] = Field(default=None, description="Target collection")
+    top_k: int = Field(default=20, ge=1, le=100)
+    use_mmr: bool = Field(default=True, description="Apply MMR diversification")
+    lambda_param: float = Field(default=0.7, ge=0.0, le=1.0, description="MMR lambda (1=relevance, 0=diversity)")
+    filters: Optional[Dict[str, Any]] = Field(default=None, description="Search filters")
+
+
+class HybridSearchRequest(BaseModel):
+    """Request for hybrid vector + keyword search."""
+    query: str = Field(..., description="Vector search query")
+    keywords: List[str] = Field(..., description="Keywords to match")
+    modality: str = Field(default="text")
+    collection: Optional[str] = None
+    top_k: int = Field(default=20, ge=1, le=100)
+    vector_weight: float = Field(default=0.7, ge=0.0, le=1.0)
+
+
 # ============================================================================
 # Lifespan (startup/shutdown)
 # ============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize resources on startup, cleanup on shutdown."""
+    global model_service, qdrant_service
+    
     logger.info("🚀 BioFlow API starting up...")
-    # TODO: Initialize Qdrant connection, load models
+    
+    # Initialize services
+    model_service = get_model_service(lazy_load=True)
+    qdrant_service = get_qdrant_service(model_service=model_service)
+    
+    logger.info("✅ Services initialized")
     yield
+    
     logger.info("🛑 BioFlow API shutting down...")
+    model_service = None
+    qdrant_service = None
 
 
 # ============================================================================
@@ -106,6 +157,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include DeepPurpose router if available
+if HAS_DEEPPURPOSE_API:
+    app.include_router(deeppurpose_router)
+    logger.info("✅ DeepPurpose API router included")
 
 
 # ============================================================================
@@ -142,31 +198,72 @@ def run_discovery_pipeline(job_id: str, request: DiscoveryRequest):
         JOBS[job_id]["status"] = "running"
         JOBS[job_id]["updated_at"] = datetime.utcnow().isoformat()
         
-        # Step 1: Encode
+        # Step 1: Encode query
         JOBS[job_id]["progress"] = 25
         JOBS[job_id]["current_step"] = "encode"
-        time.sleep(1)  # TODO: Replace with actual encoding
+        
+        if model_service:
+            # Detect modality and encode
+            query = request.query
+            if query.startswith("M") and len(query) > 20 and all(c in "ACDEFGHIKLMNPQRSTVWY" for c in query[:20]):
+                encoding = model_service.encode_protein(query)
+                query_modality = "protein"
+            elif any(c in query for c in "[]()=#@"):  # SMILES-like
+                encoding = model_service.encode_molecule(query)
+                query_modality = "molecule"
+            else:
+                encoding = model_service.encode_text(query)
+                query_modality = "text"
+            
+            logger.info(f"Encoded query as {query_modality}")
         
         # Step 2: Search
         JOBS[job_id]["progress"] = 50
         JOBS[job_id]["current_step"] = "search"
-        time.sleep(1)  # TODO: Replace with vector search
         
-        # Step 3: Predict
+        candidates = []
+        if qdrant_service:
+            # Real vector search
+            search_results = qdrant_service.search(
+                query=request.query,
+                modality=query_modality if 'query_modality' in dir() else "text",
+                limit=request.limit
+            )
+            for r in search_results:
+                candidates.append({
+                    "id": r.id,
+                    "content": r.content,
+                    "score": r.score,
+                    "modality": r.modality,
+                    "metadata": r.metadata
+                })
+        
+        # No fallback - if no results, return empty list
+        # The user must ingest data first
+        
+        # Step 3: Predict properties
         JOBS[job_id]["progress"] = 75
         JOBS[job_id]["current_step"] = "predict"
-        time.sleep(1)  # TODO: Replace with DTI prediction
+        
+        # Enrich candidates with property predictions
+        if model_service:
+            for cand in candidates:
+                smiles = cand.get("smiles") or cand.get("content", "")
+                if smiles and any(c in smiles for c in "[]()=#@CNO"):
+                    try:
+                        logp_result = model_service.predict_property(smiles, "logP")
+                        mw_result = model_service.predict_property(smiles, "MW")
+                        cand["logp"] = round(logp_result.value, 2)
+                        cand["mw"] = round(mw_result.value, 2)
+                    except Exception as e:
+                        logger.warning(f"Property prediction failed: {e}")
         
         # Step 4: Results
         JOBS[job_id]["progress"] = 100
         JOBS[job_id]["current_step"] = "complete"
         JOBS[job_id]["status"] = "completed"
         JOBS[job_id]["result"] = {
-            "candidates": [
-                {"name": "Candidate A", "smiles": "CCO", "score": 0.95, "mw": 342.4, "logp": 2.1},
-                {"name": "Candidate B", "smiles": "CC(=O)O", "score": 0.89, "mw": 298.3, "logp": 1.8},
-                {"name": "Candidate C", "smiles": "c1ccccc1", "score": 0.82, "mw": 415.5, "logp": 3.2},
-            ],
+            "candidates": candidates,
             "query": request.query,
             "search_type": request.search_type,
         }
@@ -264,20 +361,106 @@ async def predict_dti(request: PredictRequest):
 
 
 # ============================================================================
+# Enhanced Search (Phase 2)
+# ============================================================================
+_enhanced_search_service = None
+
+def get_enhanced_search_service():
+    """Get or create enhanced search service."""
+    global _enhanced_search_service
+    if _enhanced_search_service is None:
+        from bioflow.search.enhanced_search import EnhancedSearchService
+        encoder = model_service.get_obm_encoder()
+        _enhanced_search_service = EnhancedSearchService(
+            qdrant_service=qdrant_service,
+            obm_encoder=encoder,
+        )
+    return _enhanced_search_service
+
+
+@app.post("/api/search")
+async def enhanced_search(request: EnhancedSearchRequest):
+    """
+    Enhanced semantic search with MMR diversification and evidence linking.
+    
+    Features:
+    - Maximal Marginal Relevance (MMR) for diverse results
+    - Evidence links to source databases (PubMed, UniProt, ChEMBL)
+    - Citations and source tracking
+    - Filtered search by modality, source, etc.
+    """
+    try:
+        if not qdrant_service:
+            raise HTTPException(status_code=503, detail="Qdrant service not available")
+        
+        search_service = get_enhanced_search_service()
+        response = search_service.search(
+            query=request.query,
+            modality=request.modality,
+            collection=request.collection,
+            top_k=request.top_k,
+            use_mmr=request.use_mmr,
+            lambda_param=request.lambda_param,
+            filters=request.filters,
+        )
+        
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Enhanced search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/search/hybrid")
+async def hybrid_search(request: HybridSearchRequest):
+    """
+    Hybrid search combining vector similarity with keyword matching.
+    
+    Useful when you want results that are both semantically similar
+    AND contain specific keywords.
+    """
+    try:
+        if not qdrant_service:
+            raise HTTPException(status_code=503, detail="Qdrant service not available")
+        
+        search_service = get_enhanced_search_service()
+        response = search_service.hybrid_search(
+            query=request.query,
+            keywords=request.keywords,
+            modality=request.modality,
+            collection=request.collection,
+            top_k=request.top_k,
+            vector_weight=request.vector_weight,
+        )
+        
+        return response.to_dict()
+        
+    except Exception as e:
+        logger.error(f"Hybrid search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
 # Data Management
 # ============================================================================
 @app.post("/api/ingest")
 async def ingest_data(request: IngestRequest):
     """Ingest data into vector database."""
     try:
-        # TODO: Integrate with Qdrant via bioflow.qdrant_manager
-        doc_id = f"doc_{uuid.uuid4().hex[:12]}"
+        if not qdrant_service:
+            raise HTTPException(status_code=503, detail="Qdrant service not available")
         
+        result = qdrant_service.ingest(
+            content=request.content,
+            modality=request.modality,
+            metadata=request.metadata
+        )
         return {
-            "success": True,
-            "id": doc_id,
+            "success": result.success,
+            "id": result.id,
+            "collection": result.collection,
             "modality": request.modality,
-            "message": "Data ingested successfully",
+            "message": result.message,
         }
         
     except Exception as e:
@@ -288,35 +471,66 @@ async def ingest_data(request: IngestRequest):
 @app.get("/api/molecules")
 async def list_molecules(limit: int = 20, offset: int = 0):
     """List molecules in the database."""
-    # TODO: Query from Qdrant
-    mock_molecules = [
-        {"id": "mol_001", "smiles": "CCO", "name": "Ethanol", "mw": 46.07},
-        {"id": "mol_002", "smiles": "CC(=O)O", "name": "Acetic Acid", "mw": 60.05},
-        {"id": "mol_003", "smiles": "c1ccccc1", "name": "Benzene", "mw": 78.11},
-    ]
-    return {
-        "molecules": mock_molecules,
-        "total": len(mock_molecules),
-        "limit": limit,
-        "offset": offset,
-    }
+    if not qdrant_service:
+        raise HTTPException(status_code=503, detail="Qdrant service not available")
+    
+    try:
+        results = qdrant_service.search(
+            query="molecule",
+            modality="text",
+            collection="molecules",
+            limit=limit
+        )
+        molecules = []
+        for r in results:
+            molecules.append({
+                "id": r.id,
+                "smiles": r.content,
+                "name": r.metadata.get("name", "Unknown"),
+                "mw": r.metadata.get("mw", 0),
+            })
+        return {
+            "molecules": molecules,
+            "total": len(molecules),
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception as e:
+        logger.error(f"Qdrant query failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/proteins")
 async def list_proteins(limit: int = 20, offset: int = 0):
     """List proteins in the database."""
-    # TODO: Query from Qdrant
-    mock_proteins = [
-        {"id": "prot_001", "uniprot_id": "P00533", "name": "EGFR", "length": 1210},
-        {"id": "prot_002", "uniprot_id": "P04637", "name": "p53", "length": 393},
-        {"id": "prot_003", "uniprot_id": "P38398", "name": "BRCA1", "length": 1863},
-    ]
-    return {
-        "proteins": mock_proteins,
-        "total": len(mock_proteins),
-        "limit": limit,
-        "offset": offset,
-    }
+    if not qdrant_service:
+        raise HTTPException(status_code=503, detail="Qdrant service not available")
+    
+    try:
+        results = qdrant_service.search(
+            query="protein kinase receptor",
+            modality="text",
+            collection="proteins",
+            limit=limit
+        )
+        proteins = []
+        for r in results:
+            proteins.append({
+                "id": r.id,
+                "sequence": r.content[:50] + "..." if len(r.content) > 50 else r.content,
+                "uniprot_id": r.metadata.get("uniprot_id", ""),
+                "name": r.metadata.get("name", "Unknown"),
+                "length": len(r.content),
+            })
+        return {
+            "proteins": proteins,
+            "total": len(proteins),
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception as e:
+        logger.error(f"Qdrant query failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
@@ -325,30 +539,302 @@ async def list_proteins(limit: int = 20, offset: int = 0):
 @app.get("/api/explorer/embeddings")
 async def get_embeddings(dataset: str = "default", method: str = "umap"):
     """Get 2D projections of embeddings for visualization."""
-    import random
+    import numpy as np
     
-    # TODO: Get actual embeddings from Qdrant and project
-    # Generate mock UMAP-like data
-    random.seed(42)
+    if not qdrant_service:
+        raise HTTPException(status_code=503, detail="Qdrant service not available")
     
     points = []
-    for i in range(100):
-        cluster = i % 4
-        cx, cy = [(2, 3), (-2, -1), (4, -2), (-1, 4)][cluster]
-        points.append({
-            "id": f"mol_{i:03d}",
-            "x": cx + random.gauss(0, 0.8),
-            "y": cy + random.gauss(0, 0.8),
-            "cluster": cluster,
-            "label": f"Molecule {i}",
-        })
+    
+    try:
+        # Get molecules and proteins from Qdrant
+        mol_results = qdrant_service.search("", modality="text", collection="molecules", limit=50)
+        prot_results = qdrant_service.search("", modality="text", collection="proteins", limit=50)
+        
+        all_results = mol_results + prot_results
+        
+        # Simple 2D projection using content hash for deterministic positions
+        # (In production, use proper UMAP/t-SNE)
+        for i, r in enumerate(all_results):
+            np.random.seed(hash(r.content) % 2**32)
+            cluster = 0 if r.modality == "molecule" else 1
+            cx, cy = [(2, 3), (-2, -1)][cluster]
+            points.append({
+                "id": r.id,
+                "x": float(cx + np.random.randn() * 0.8),
+                "y": float(cy + np.random.randn() * 0.8),
+                "cluster": cluster,
+                "label": r.metadata.get("name", r.content[:20]),
+                "modality": r.modality,
+            })
+    except Exception as e:
+        logger.error(f"Failed to get embeddings from Qdrant: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     
     return {
         "points": points,
         "method": method,
         "dataset": dataset,
-        "n_clusters": 4,
+        "n_clusters": len(set(p["cluster"] for p in points)) if points else 0,
     }
+
+
+# ============================================================================
+# Additional API Endpoints
+# ============================================================================
+@app.post("/api/encode")
+async def encode_content(content: str, modality: str = "auto"):
+    """Encode content to embedding vector."""
+    if not model_service:
+        raise HTTPException(status_code=503, detail="Model service not available")
+    
+    try:
+        # Auto-detect modality
+        if modality == "auto":
+            if content.startswith("M") and len(content) > 20:
+                modality = "protein"
+            elif any(c in content for c in "[]()=#@"):
+                modality = "molecule"
+            else:
+                modality = "text"
+        
+        if modality == "molecule":
+            result = model_service.encode_molecule(content)
+        elif modality == "protein":
+            result = model_service.encode_protein(content)
+        else:
+            result = model_service.encode_text(content)
+        
+        return {
+            "success": True,
+            "embedding": result.vector[:10] + ["..."],  # Truncate for display
+            "dimension": len(result.vector),
+            "modality": result.modality,
+            "model": result.model_name,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/similarity")
+async def compute_similarity(query: str, candidates: str, modality: str = "molecule"):
+    """Compute similarity between query and comma-separated candidates."""
+    if not model_service:
+        raise HTTPException(status_code=503, detail="Model service not available")
+    
+    try:
+        candidate_list = [c.strip() for c in candidates.split(",")]
+        results = model_service.compute_similarity(query, candidate_list, modality)
+        return {
+            "success": True,
+            "query": query,
+            "results": results,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/collections")
+async def list_collections():
+    """List all vector collections."""
+    if not qdrant_service:
+        return {"collections": [], "message": "Qdrant not available"}
+    
+    collections = qdrant_service.list_collections()
+    stats = [qdrant_service.get_collection_stats(c) for c in collections]
+    return {
+        "collections": stats,
+        "total": len(collections),
+    }
+
+
+# ============================================================================
+# Agent Pipeline Endpoints (Phase 3)
+# ============================================================================
+
+class GenerateRequest(BaseModel):
+    """Request for molecule generation."""
+    prompt: str = Field(..., description="Text description of desired molecule")
+    mode: str = Field("text", description="Generation mode: text, mutate, scaffold")
+    smiles: Optional[str] = Field(None, description="Seed SMILES for mutate/scaffold mode")
+    num_samples: int = Field(5, ge=1, le=50, description="Number of molecules to generate")
+
+
+class ValidateRequest(BaseModel):
+    """Request for molecule validation."""
+    smiles: List[str] = Field(..., description="List of SMILES to validate")
+    check_lipinski: bool = Field(True, description="Check Lipinski Rule of 5")
+    check_admet: bool = Field(True, description="Check ADMET properties")
+    check_alerts: bool = Field(True, description="Check structural alerts")
+
+
+class RankRequest(BaseModel):
+    """Request for candidate ranking."""
+    candidates: List[Dict[str, Any]] = Field(..., description="Candidates with scores")
+    weights: Optional[Dict[str, float]] = Field(None, description="Custom score weights")
+    top_k: Optional[int] = Field(None, description="Return top K candidates")
+
+
+class WorkflowRequest(BaseModel):
+    """Request for full discovery workflow."""
+    query: str = Field(..., description="Text description of desired molecule")
+    num_candidates: int = Field(10, ge=1, le=50, description="Number of candidates to generate")
+    top_k: int = Field(5, ge=1, le=20, description="Number of top candidates to return")
+
+
+# Agent instances (lazy initialized)
+_generator_agent = None
+_validator_agent = None
+_ranker_agent = None
+
+
+def get_generator_agent():
+    """Get or create generator agent."""
+    global _generator_agent
+    if _generator_agent is None:
+        from bioflow.agents import GeneratorAgent
+        _generator_agent = GeneratorAgent()
+    return _generator_agent
+
+
+def get_validator_agent():
+    """Get or create validator agent."""
+    global _validator_agent
+    if _validator_agent is None:
+        from bioflow.agents import ValidatorAgent
+        _validator_agent = ValidatorAgent()
+    return _validator_agent
+
+
+def get_ranker_agent():
+    """Get or create ranker agent."""
+    global _ranker_agent
+    if _ranker_agent is None:
+        from bioflow.agents import RankerAgent
+        _ranker_agent = RankerAgent()
+    return _ranker_agent
+
+
+@app.post("/api/agents/generate")
+async def agent_generate(request: GenerateRequest):
+    """
+    Generate molecules from text prompt or seed SMILES.
+    
+    Modes:
+    - text: Generate from natural language description
+    - mutate: Create variants of a seed molecule
+    - scaffold: Generate around a core scaffold
+    """
+    try:
+        agent = get_generator_agent()
+        
+        if request.mode == "text":
+            input_data = request.prompt
+        else:
+            input_data = {
+                "mode": request.mode,
+                "prompt": request.prompt,
+                "smiles": request.smiles,
+                "num_samples": request.num_samples,
+            }
+        
+        result = agent.process(input_data)
+        
+        return {
+            "success": result.success,
+            "molecules": result.content,
+            "metadata": result.metadata,
+        }
+    except Exception as e:
+        logger.error(f"Generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/agents/validate")
+async def agent_validate(request: ValidateRequest):
+    """
+    Validate molecules for ADMET and drug-likeness properties.
+    
+    Returns validation scores, property values, and structural alerts.
+    """
+    try:
+        agent = get_validator_agent()
+        agent.check_lipinski = request.check_lipinski
+        agent.check_admet = request.check_admet
+        agent.check_alerts = request.check_alerts
+        
+        result = agent.process(request.smiles)
+        
+        return {
+            "success": result.success,
+            "validations": result.content,
+            "summary": result.metadata,
+        }
+    except Exception as e:
+        logger.error(f"Validation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/agents/rank")
+async def agent_rank(request: RankRequest):
+    """
+    Rank candidates based on multiple criteria.
+    
+    Combines validation scores, confidence, and other metrics.
+    """
+    try:
+        agent = get_ranker_agent()
+        
+        input_data = {
+            "candidates": request.candidates,
+            "top_k": request.top_k,
+        }
+        if request.weights:
+            input_data["weights"] = request.weights
+        
+        result = agent.process(input_data)
+        
+        return {
+            "success": result.success,
+            "ranked": result.content,
+            "metadata": result.metadata,
+        }
+    except Exception as e:
+        logger.error(f"Ranking failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/agents/workflow")
+async def run_discovery_workflow(request: WorkflowRequest):
+    """
+    Run full discovery workflow: Generate → Validate → Rank.
+    
+    Returns top candidates with all validation and ranking metadata.
+    """
+    try:
+        from bioflow.agents import DiscoveryWorkflow
+        
+        workflow = DiscoveryWorkflow(
+            num_candidates=request.num_candidates,
+            top_k=request.top_k,
+        )
+        
+        result = workflow.run(request.query)
+        top_candidates = workflow.get_top_candidates(result)
+        
+        return {
+            "success": result.status.value == "completed",
+            "status": result.status.value,
+            "steps_completed": result.steps_completed,
+            "total_steps": result.total_steps,
+            "execution_time_ms": result.execution_time_ms,
+            "top_candidates": top_candidates,
+            "all_outputs": result.outputs,
+            "errors": result.errors,
+        }
+    except Exception as e:
+        logger.error(f"Workflow failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================

@@ -4,11 +4,15 @@ OBM Wrapper - Unified Multimodal Encoding Interface
 
 This module provides a clean, high-level API for encoding biological data
 (text, molecules, proteins) into a unified vector space using open-source models.
+
+Implementation Note:
+    Internally delegates to OBMEncoder from bioflow.plugins.obm_encoder
+    for actual encoding. This wrapper provides backward compatibility
+    and a simplified API.
 """
 
 import os
 import sys
-import torch
 import numpy as np
 import logging
 from typing import List, Union, Dict, Any, Optional, Tuple
@@ -59,62 +63,75 @@ class OBMWrapper:
     This class provides a clean API for encoding biological data into
     a shared embedding space, enabling cross-modal similarity search.
     
+    Internally uses OBMEncoder for actual encoding operations.
+    
     Attributes:
         device: Computing device ('cuda' or 'cpu')
-        model: Underlying open-source model
         vector_dim: Dimension of output embeddings
     """
     
     def __init__(
         self, 
-        device: str = None,
-        config_path: str = None,
-        checkpoint_path: str = None,
-        use_mock: bool = False
+        device: Optional[str] = None,
+        config_path: Optional[str] = None,
+        checkpoint_path: Optional[str] = None
     ):
         """
         Initialize the OBM wrapper.
         
         Args:
             device: 'cuda' or 'cpu'. Auto-detects if None.
-            config_path: Path to open-source model config YAML.
-            checkpoint_path: Path to model weights.
-            use_mock: If True, uses mock embeddings (for testing without GPU).
+            config_path: Path to model config YAML (optional, for compatibility).
+            checkpoint_path: Path to model weights (optional, for compatibility).
+            
+        Raises:
+            RuntimeError: If encoders fail to initialize.
         """
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.use_mock = use_mock
-        self._model = None
-        self._vector_dim = 768  # Default, updated after model load
+        # Import torch lazily for device detection
+        try:
+            import torch
+            self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        except ImportError:
+            self.device = device or "cpu"
         
-        if config_path is None:
-            config_path = os.path.join(ROOT_DIR, "configs/model/opensource_model.yaml")
+        self._vector_dim = 768
+        self._encoder = None
         
+        # Store config for compatibility (not used internally)
         self.config_path = config_path
         self.checkpoint_path = checkpoint_path
         
-        if not use_mock:
-            self._init_model()
-        else:
-            logger.info("Using MOCK mode - embeddings are random vectors for testing")
-            self._vector_dim = 768
+        self._init_encoder()
     
-    def _init_model(self):
-        """Initialize the open-source model."""
+    def _init_encoder(self):
+        """
+        Initialize the underlying OBMEncoder.
+        
+        Raises:
+            RuntimeError: If encoder fails to load.
+        """
         try:
-            # Placeholder for initializing open-source model
-            pass
+            from bioflow.plugins.obm_encoder import OBMEncoder
+            from bioflow.core import Modality
             
-            self._model = None
+            self._encoder = OBMEncoder(
+                device=self.device,
+                lazy_load=True  # Load models on first use
+            )
+            self._Modality = Modality
+            self._vector_dim = self._encoder.output_dim
             
-            self._vector_dim = 768
+            logger.info(f"OBMWrapper initialized. Device: {self.device}, Vector dim: {self._vector_dim}")
             
-            logger.info(f"OBM initialized. Device: {self.device}, Vector dim: {self._vector_dim}")
-            
+        except ImportError as e:
+            logger.error(f"Failed to import OBMEncoder: {e}")
+            raise RuntimeError(
+                f"OBMEncoder not available: {e}. "
+                "Ensure bioflow.plugins.obm_encoder is properly installed."
+            )
         except Exception as e:
-            logger.error(f"Failed to load model: {e}")
-            logger.warning("Falling back to MOCK mode")
-            self.use_mock = True
-            self._vector_dim = 768
+            logger.error(f"Failed to initialize encoder: {e}")
+            raise RuntimeError(f"OBM encoder initialization failed: {e}")
     
     @property
     def vector_dim(self) -> int:
@@ -123,23 +140,23 @@ class OBMWrapper:
     
     @property
     def is_ready(self) -> bool:
-        """Check if model is loaded and ready."""
-        return self._model is not None or self.use_mock
+        """Check if encoder is loaded and ready."""
+        return self._encoder is not None
     
     def _compute_hash(self, content: str) -> str:
         """Compute content hash for deduplication."""
         return hashlib.md5(content.encode()).hexdigest()[:16]
     
-    def _mock_embed(self, content: str, modality: ModalityType) -> np.ndarray:
-        """Generate deterministic mock embedding based on content hash."""
-        seed = int(self._compute_hash(content), 16) % (2**32)
-        rng = np.random.RandomState(seed)
-        vec = rng.randn(self._vector_dim).astype(np.float32)
-        # Normalize
-        vec = vec / np.linalg.norm(vec)
-        return vec
+    def _modality_type_to_core(self, modality: ModalityType):
+        """Convert ModalityType to core Modality."""
+        mapping = {
+            ModalityType.TEXT: self._Modality.TEXT,
+            ModalityType.MOLECULE: self._Modality.SMILES,
+            ModalityType.SMILES: self._Modality.SMILES,
+            ModalityType.PROTEIN: self._Modality.PROTEIN,
+        }
+        return mapping.get(modality, self._Modality.TEXT)
     
-    @torch.no_grad()
     def encode_text(self, text: Union[str, List[str]]) -> List[EmbeddingResult]:
         """
         Encode text (abstracts, descriptions, notes) into embeddings.
@@ -149,46 +166,29 @@ class OBMWrapper:
             
         Returns:
             List of EmbeddingResult objects.
+            
+        Raises:
+            RuntimeError: If encoder is not ready.
         """
+        if not self.is_ready:
+            raise RuntimeError("OBM encoder not initialized - cannot encode text")
+            
         if isinstance(text, str):
             text = [text]
         
         results = []
-        
-        if self.use_mock:
-            for t in text:
-                vec = self._mock_embed(t, ModalityType.TEXT)
-                results.append(EmbeddingResult(
-                    vector=vec,
-                    modality=ModalityType.TEXT,
-                    content=t[:200],  # Truncate for storage
-                    content_hash=self._compute_hash(t),
-                    dimension=self._vector_dim
-                ))
-        else:
-            tokenizer = self._model.llm_tokenizer
-            inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            
-            outputs = self._model.llm(**inputs, output_hidden_states=True)
-            hidden = outputs.hidden_states[-1]
-            
-            mask = inputs['attention_mask'].unsqueeze(-1).float()
-            pooled = (hidden * mask).sum(1) / mask.sum(1).clamp(min=1e-9)
-            vectors = pooled.cpu().numpy()
-            
-            for i, t in enumerate(text):
-                results.append(EmbeddingResult(
-                    vector=vectors[i],
-                    modality=ModalityType.TEXT,
-                    content=t[:200],
-                    content_hash=self._compute_hash(t),
-                    dimension=self._vector_dim
-                ))
+        for t in text:
+            emb = self._encoder.encode(t, self._Modality.TEXT)
+            results.append(EmbeddingResult(
+                vector=emb.vector,
+                modality=ModalityType.TEXT,
+                content=t[:200],  # Truncate for storage
+                content_hash=self._compute_hash(t),
+                dimension=len(emb.vector)
+            ))
         
         return results
     
-    @torch.no_grad()
     def encode_smiles(self, smiles: Union[str, List[str]]) -> List[EmbeddingResult]:
         """
         Encode SMILES molecular representations into embeddings.
@@ -198,46 +198,29 @@ class OBMWrapper:
             
         Returns:
             List of EmbeddingResult objects.
+            
+        Raises:
+            RuntimeError: If encoder is not ready.
         """
+        if not self.is_ready:
+            raise RuntimeError("OBM encoder not initialized - cannot encode SMILES")
+            
         if isinstance(smiles, str):
             smiles = [smiles]
         
         results = []
-        
-        if self.use_mock:
-            for s in smiles:
-                vec = self._mock_embed(s, ModalityType.MOLECULE)
-                results.append(EmbeddingResult(
-                    vector=vec,
-                    modality=ModalityType.MOLECULE,
-                    content=s,
-                    content_hash=self._compute_hash(s),
-                    dimension=self._vector_dim
-                ))
-        else:
-            from open_biomed.data import Molecule
-            from torch_scatter import scatter_mean
-            
-            molecules = [Molecule.from_smiles(s) for s in smiles]
-            mol_feats = [self._model.featurizer.molecule_featurizer(m) for m in molecules]
-            collated = self._model.collator.molecule_collator(mol_feats).to(self.device)
-            
-            node_feats = self._model.mol_structure_encoder(collated)
-            proj_feats = self._model.proj_mol(node_feats)
-            vectors = scatter_mean(proj_feats, collated.batch, dim=0).cpu().numpy()
-            
-            for i, s in enumerate(smiles):
-                results.append(EmbeddingResult(
-                    vector=vectors[i],
-                    modality=ModalityType.MOLECULE,
-                    content=s,
-                    content_hash=self._compute_hash(s),
-                    dimension=self._vector_dim
-                ))
+        for s in smiles:
+            emb = self._encoder.encode(s, self._Modality.SMILES)
+            results.append(EmbeddingResult(
+                vector=emb.vector,
+                modality=ModalityType.MOLECULE,
+                content=s,
+                content_hash=self._compute_hash(s),
+                dimension=len(emb.vector)
+            ))
         
         return results
     
-    @torch.no_grad()
     def encode_protein(self, sequences: Union[str, List[str]]) -> List[EmbeddingResult]:
         """
         Encode protein sequences (FASTA format) into embeddings.
@@ -247,43 +230,26 @@ class OBMWrapper:
             
         Returns:
             List of EmbeddingResult objects.
+            
+        Raises:
+            RuntimeError: If encoder is not ready.
         """
+        if not self.is_ready:
+            raise RuntimeError("OBM encoder not initialized - cannot encode protein")
+            
         if isinstance(sequences, str):
             sequences = [sequences]
         
         results = []
-        
-        if self.use_mock:
-            for seq in sequences:
-                vec = self._mock_embed(seq, ModalityType.PROTEIN)
-                results.append(EmbeddingResult(
-                    vector=vec,
-                    modality=ModalityType.PROTEIN,
-                    content=seq[:100] + "..." if len(seq) > 100 else seq,
-                    content_hash=self._compute_hash(seq),
-                    dimension=self._vector_dim
-                ))
-        else:
-            tokenizer = self._model.prot_tokenizer
-            inputs = tokenizer(sequences, return_tensors="pt", padding=True, truncation=True, max_length=1024)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            
-            outputs = self._model.prot_structure_encoder(**inputs)
-            hidden = outputs.last_hidden_state
-            proj = self._model.proj_prot(hidden)
-            
-            mask = inputs['attention_mask'].unsqueeze(-1).float()
-            pooled = (proj * mask).sum(1) / mask.sum(1).clamp(min=1e-9)
-            vectors = pooled.cpu().numpy()
-            
-            for i, seq in enumerate(sequences):
-                results.append(EmbeddingResult(
-                    vector=vectors[i],
-                    modality=ModalityType.PROTEIN,
-                    content=seq[:100] + "..." if len(seq) > 100 else seq,
-                    content_hash=self._compute_hash(seq),
-                    dimension=self._vector_dim
-                ))
+        for seq in sequences:
+            emb = self._encoder.encode(seq, self._Modality.PROTEIN)
+            results.append(EmbeddingResult(
+                vector=emb.vector,
+                modality=ModalityType.PROTEIN,
+                content=seq[:100] + "..." if len(seq) > 100 else seq,
+                content_hash=self._compute_hash(seq),
+                dimension=len(emb.vector)
+            ))
         
         return results
     

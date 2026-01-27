@@ -60,14 +60,14 @@ st.markdown("""
 
 
 @st.cache_resource
-def init_bioflow(use_mock: bool = True):
+def init_bioflow():
     """Initialize BioFlow components (cached)."""
     try:
         from bioflow.obm_wrapper import OBMWrapper
         from bioflow.qdrant_manager import QdrantManager
         from bioflow.pipeline import BioFlowPipeline, MinerAgent, ValidatorAgent
         
-        obm = OBMWrapper(use_mock=use_mock)
+        obm = OBMWrapper()
         qdrant = QdrantManager(obm, qdrant_path=None)  # In-memory
         qdrant.create_collection("bioflow_demo", recreate=True)
         
@@ -102,13 +102,12 @@ def render_sidebar():
     
     # Settings
     with st.sidebar.expander("⚙️ Settings"):
-        use_mock = st.checkbox("Use Mock Mode (no GPU needed)", value=True)
         vector_dim = st.number_input("Vector Dimension", value=768, disabled=True)
         
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Quick Stats")
     
-    return mode, use_mock
+    return mode
 
 
 def render_search_page(components):
@@ -537,10 +536,10 @@ def render_docs_page():
 
 def main():
     """Main application entry point."""
-    mode, use_mock = render_sidebar()
+    mode = render_sidebar()
     
     # Initialize components
-    components = init_bioflow(use_mock=use_mock)
+    components = init_bioflow()
     
     if not components.get("ready"):
         st.error("System not ready. Check configuration.")
