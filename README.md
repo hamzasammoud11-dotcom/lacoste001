@@ -31,6 +31,7 @@ Researchers must manually navigate incompatible formats, creating bottlenecks an
 |---------|-------------|
 | **Visual Pipeline Builder** | Drag-and-drop node editor for constructing discovery workflows |
 | **DeepPurpose Integration** | Drug-Target Interaction prediction with Morgan + CNN encoding |
+| **Molecule & Protein Visualization** | Interactive 2D SMILES and 3D PDB structure viewing (powered by 3Dmol.js and SmilesDrawer) |
 | **Qdrant Vector Search** | High-dimensional similarity search across 23,531+ compounds |
 | **3D Embedding Explorer** | Real PCA projections of drug-target chemical space |
 | **Validator Agents** | Automated toxicity and novelty checking |

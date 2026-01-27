@@ -379,7 +379,7 @@ def get_enhanced_search_service():
 
 
 @app.post("/api/search")
-async def enhanced_search(request: EnhancedSearchRequest):
+async def enhanced_search(request: dict = None):
     """
     Enhanced semantic search with MMR diversification and evidence linking.
     
@@ -388,20 +388,59 @@ async def enhanced_search(request: EnhancedSearchRequest):
     - Evidence links to source databases (PubMed, UniProt, ChEMBL)
     - Citations and source tracking
     - Filtered search by modality, source, etc.
+    
+    Accepts both old format (type, limit) and new format (modality, top_k).
     """
     try:
         if not qdrant_service:
             raise HTTPException(status_code=503, detail="Qdrant service not available")
         
+        # Handle both old and new request formats
+        query = request.get("query", "")
+        modality = request.get("modality") or request.get("type", "text")
+        top_k = request.get("top_k") or request.get("limit", 20)
+        collection = request.get("collection")
+        use_mmr = request.get("use_mmr", True)
+        lambda_param = request.get("lambda_param", 0.7)
+        filters = request.get("filters")
+        
+        # Map old type names to new modality names
+        type_to_modality = {
+            "drug": "molecule",
+            "target": "protein",
+            "text": "text",
+        }
+        modality = type_to_modality.get(modality, modality)
+        
+        # Check if any collections exist first
+        try:
+            existing_collections = qdrant_service.list_collections()
+            if not existing_collections:
+                # No data ingested yet - return empty results
+                return {
+                    "results": [],
+                    "query": query,
+                    "modality": modality,
+                    "total_found": 0,
+                    "returned": 0,
+                    "diversity_score": None,
+                    "filters_applied": {},
+                    "search_time_ms": 0,
+                    "message": "No data ingested yet. Please ingest data first."
+                }
+        except Exception as e:
+            logger.warning(f"Failed to list collections: {e}")
+            # Try to proceed anyway
+        
         search_service = get_enhanced_search_service()
         response = search_service.search(
-            query=request.query,
-            modality=request.modality,
-            collection=request.collection,
-            top_k=request.top_k,
-            use_mmr=request.use_mmr,
-            lambda_param=request.lambda_param,
-            filters=request.filters,
+            query=query,
+            modality=modality,
+            collection=collection,
+            top_k=int(top_k),
+            use_mmr=use_mmr,
+            lambda_param=lambda_param,
+            filters=filters,
         )
         
         return response.to_dict()
@@ -647,6 +686,117 @@ async def list_collections():
         "total": len(collections),
     }
 
+
+@app.get("/api/stats")
+async def get_stats():
+    """Get system statistics for the data page."""
+    total_vectors = 0
+    collections_info = []
+    
+    if qdrant_service:
+        try:
+            collections = qdrant_service.list_collections()
+            for coll in collections:
+                try:
+                    stats = qdrant_service.get_collection_stats(coll)
+                    total_vectors += stats.get("points_count", 0)
+                    collections_info.append(stats)
+                except Exception as e:
+                    logger.warning(f"Failed to get stats for {coll}: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to list collections: {e}")
+    
+    return {
+        "total_vectors": total_vectors,
+        "collections": collections_info,
+        "model_status": "loaded" if model_service else "not_loaded",
+        "qdrant_status": "connected" if qdrant_service else "disconnected",
+    }
+
+
+@app.get("/api/points")
+async def get_points(limit: int = 500, view: str = "combined"):
+    """Get points for visualization."""
+    import numpy as np
+    
+    if not qdrant_service:
+        # Return mock data if qdrant not available
+        return _get_mock_points(limit)
+    
+    points = []
+    try:
+        # Get from molecules collection
+        mol_results = qdrant_service.search("", modality="text", collection="molecules", limit=min(limit // 2, 250))
+        for i, r in enumerate(mol_results):
+            np.random.seed(hash(r.content) % 2**32)
+            points.append({
+                "id": r.id,
+                "x": float(2 + np.random.randn() * 0.8),
+                "y": float(3 + np.random.randn() * 0.8),
+                "cluster": 0,
+                "label": r.metadata.get("name", r.content[:20] if r.content else f"mol-{i}"),
+                "modality": "molecule",
+            })
+        
+        # Get from proteins collection
+        prot_results = qdrant_service.search("", modality="text", collection="proteins", limit=min(limit // 2, 250))
+        for i, r in enumerate(prot_results):
+            np.random.seed(hash(r.content) % 2**32)
+            points.append({
+                "id": r.id,
+                "x": float(-2 + np.random.randn() * 0.8),
+                "y": float(-1 + np.random.randn() * 0.8),
+                "cluster": 1,
+                "label": r.metadata.get("name", r.content[:20] if r.content else f"prot-{i}"),
+                "modality": "protein",
+            })
+    except Exception as e:
+        logger.warning(f"Failed to get points from Qdrant: {e}")
+        return _get_mock_points(limit)
+    
+    return {
+        "points": points,
+        "total": len(points),
+        "view": view,
+    }
+
+
+def _get_mock_points(limit: int):
+    """Generate mock points for visualization when Qdrant unavailable."""
+    import numpy as np
+    points = []
+    n_molecules = min(limit // 2, 50)
+    n_proteins = min(limit // 2, 50)
+    
+    # Mock molecules
+    for i in range(n_molecules):
+        np.random.seed(i)
+        points.append({
+            "id": f"mol-{i}",
+            "x": float(2 + np.random.randn() * 0.8),
+            "y": float(3 + np.random.randn() * 0.8),
+            "cluster": 0,
+            "label": f"Molecule-{i}",
+            "modality": "molecule",
+        })
+    
+    # Mock proteins
+    for i in range(n_proteins):
+        np.random.seed(i + 1000)
+        points.append({
+            "id": f"prot-{i}",
+            "x": float(-2 + np.random.randn() * 0.8),
+            "y": float(-1 + np.random.randn() * 0.8),
+            "cluster": 1,
+            "label": f"Protein-{i}",
+            "modality": "protein",
+        })
+    
+    return {
+        "points": points,
+        "total": len(points),
+        "view": "mock",
+    }
 
 # ============================================================================
 # Agent Pipeline Endpoints (Phase 3)

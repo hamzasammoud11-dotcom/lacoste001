@@ -18,7 +18,14 @@ export async function GET(request: Request) {
     }
     
     const data = await response.json();
-    return NextResponse.json(data.proteins || data);
+    const result = data.proteins || data;
+    
+    // If backend returns empty, use mock data
+    if (!result || result.length === 0) {
+      return NextResponse.json(proteins);
+    }
+    
+    return NextResponse.json(result);
   } catch (error) {
     console.warn("Proteins API error, using mock data:", error);
     // Return mock data as fallback
