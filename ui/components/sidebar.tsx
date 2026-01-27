@@ -59,105 +59,105 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const navMain = [
   {
     title: 'Home',
-    url: '/dashboard',
+    url: '/',
     icon: Home,
     isActive: true,
   },
   {
     title: 'Visualization',
-    url: '/dashboard/molecules-2d',
+    url: '/molecules-2d',
     icon: FlaskConical,
     items: [
       {
         title: 'Molecules 2D',
-        url: '/dashboard/molecules-2d',
+        url: '/molecules-2d',
       },
       {
         title: 'Molecules 3D',
-        url: '/dashboard/molecules-3d',
+        url: '/molecules-3d',
       },
       {
         title: 'Proteins 3D',
-        url: '/dashboard/proteins-3d',
+        url: '/proteins-3d',
       },
     ],
   },
   {
     title: 'Discovery',
-    url: '/dashboard/discovery',
+    url: '/discovery',
     icon: Microscope,
     items: [
       {
         title: 'Drug Discovery',
-        url: '/dashboard/discovery',
+        url: '/discovery',
       },
       {
         title: 'Molecule Search',
-        url: '/dashboard/discovery#search',
+        url: '/discovery#search',
       },
     ],
   },
   {
     title: 'Explorer',
-    url: '/dashboard/explorer',
+    url: '/explorer',
     icon: Dna,
     items: [
       {
         title: 'Embeddings',
-        url: '/dashboard/explorer',
+        url: '/explorer',
       },
       {
         title: '3D Visualization',
-        url: '/dashboard/visualization',
+        url: '/visualization',
       },
       {
         title: 'Predictions',
-        url: '/dashboard/explorer#predictions',
+        url: '/explorer#predictions',
       },
     ],
   },
   {
     title: 'Workflows',
-    url: '/dashboard/workflow',
+    url: '/workflow',
     icon: Sparkles,
     items: [
       {
         title: 'Builder',
-        url: '/dashboard/workflow',
+        url: '/workflow',
       },
       {
         title: 'Templates',
-        url: '/dashboard/workflow#templates',
+        url: '/workflow#templates',
       },
     ],
   },
   {
     title: 'Data',
-    url: '/dashboard/data',
+    url: '/data',
     icon: BarChart2,
     items: [
       {
         title: 'Datasets',
-        url: '/dashboard/data',
+        url: '/data',
       },
       {
         title: 'Analytics',
-        url: '/dashboard/data#analytics',
+        url: '/data#analytics',
       },
     ],
   },
   {
     title: 'Settings',
-    url: '/dashboard/settings',
+    url: '/settings',
     icon: Settings,
     items: [
       {
         title: 'General',
-        url: '/dashboard/settings',
+        url: '/settings',
       },
       {
         title: 'Models',
-        url: '/dashboard/settings#models',
+        url: '/settings#models',
       },
     ],
   },
@@ -180,7 +180,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard">
+              <Link href="/">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <Dna className="size-4" />
                 </div>
@@ -192,11 +192,6 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        {/* Theme Toggle */}
-        <div className="group-data-[collapsible=icon]:hidden px-2">
-          <ThemeToggle />
-        </div>
-        {/* App Header */}
       </SidebarHeader>
 
       <SidebarContent>
@@ -258,7 +253,10 @@ export function AppSidebar() {
 
         {/* Status Section */}
         <SidebarGroup className="group-data-[collapsible=icon]:hidden mt-auto">
-          <SidebarGroupLabel>System Status</SidebarGroupLabel>
+          <SidebarGroupLabel className="flex items-center justify-between">
+            <span>System Status</span>
+            <ThemeToggle />
+          </SidebarGroupLabel>
           <div className="px-3 py-2">
             <div className="rounded-lg border bg-muted/50 p-3">
               <div className="flex items-center gap-2 mb-2">
