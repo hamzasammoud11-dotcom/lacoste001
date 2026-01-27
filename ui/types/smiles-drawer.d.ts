@@ -1,12 +1,12 @@
 declare module 'smiles-drawer' {
-  interface SmiDrawerOptions {
+  export interface SmiDrawerOptions {
     width?: number;
     height?: number;
     bondThickness?: number;
     bondLength?: number;
     shortBondLength?: number;
     bondSpacing?: number;
-    atomVisualization?: 'default' | 'balls' | 'none';
+    atomVisualization?: string;
     isomeric?: boolean;
     debug?: boolean;
     terminalCarbons?: boolean;
@@ -17,17 +17,25 @@ declare module 'smiles-drawer' {
     padding?: number;
   }
 
-  class SmiDrawer {
+  export class SmiDrawer {
     constructor(options?: SmiDrawerOptions);
     draw(
-      smiles: string,
-      target: string | HTMLCanvasElement,
-      theme?: 'light' | 'dark',
-      onSuccess?: () => void,
-      onError?: (error: Error) => void
+      tree: unknown,
+      canvas: HTMLCanvasElement | null,
+      theme?: string
     ): void;
   }
 
-  export { SmiDrawer };
-  export default { SmiDrawer };
+  export function parse(
+    smiles: string,
+    successCallback: (tree: unknown) => void,
+    errorCallback: (error: Error) => void
+  ): void;
+
+  const SmilesDrawer: {
+    SmiDrawer: typeof SmiDrawer;
+    parse: typeof parse;
+  };
+
+  export default SmilesDrawer;
 }
