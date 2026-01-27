@@ -100,7 +100,7 @@ function GenerateStepConfig({
       </div>
 
       <div className="space-y-2">
-        <Label>Number to Generate: {config.num_candidates || 5}</Label>
+        <Label>Number to Generate: {Number(config.num_candidates) || 5}</Label>
         <Slider
           value={[Number(config.num_candidates) || 5]}
           onValueChange={([v]) => onChange({ ...config, num_candidates: v })}
@@ -215,7 +215,7 @@ function RankStepConfig({
       ))}
 
       <div className="space-y-2">
-        <Label>Top K: {config.top_k || 5}</Label>
+        <Label>Top K: {Number(config.top_k) || 5}</Label>
         <Slider
           value={[Number(config.top_k) || 5]}
           onValueChange={([v]) => onChange({ ...config, top_k: v })}
@@ -436,6 +436,46 @@ export default function WorkflowBuilderPage() {
   const [progress, setProgress] = React.useState(0)
   const [result, setResult] = React.useState<WorkflowResult | null>(null)
   const [workflowName, setWorkflowName] = React.useState("My Discovery Workflow")
+
+  const templates = [
+    {
+      name: "Standard Discovery",
+      description: "Generate, validate, then rank candidates.",
+      steps: [
+        { type: "generate", name: "Generate Molecules", config: { mode: "text", prompt: "", num_candidates: 8 } },
+        { type: "validate", name: "Validate Candidates", config: { checks: ["lipinski", "admet", "qed", "alerts"], strict: false } },
+        { type: "rank", name: "Rank & Select", config: { weights: { qed: 0.3, validity: 0.3, mw: 0.2, logp: 0.2 }, top_k: 5 } },
+      ],
+    },
+    {
+      name: "Scaffold Expansion",
+      description: "Generate scaffold variants and rank by QED.",
+      steps: [
+        { type: "generate", name: "Scaffold Variants", config: { mode: "scaffold", prompt: "", num_candidates: 6 } },
+        { type: "rank", name: "Rank & Select", config: { weights: { qed: 0.6, validity: 0.4 }, top_k: 5 } },
+      ],
+    },
+    {
+      name: "Fast Validation",
+      description: "Validate existing candidates quickly.",
+      steps: [
+        { type: "validate", name: "Validate Candidates", config: { checks: ["lipinski", "qed"], strict: false } },
+      ],
+    },
+  ]
+
+  const applyTemplate = (template: typeof templates[number]) => {
+    setWorkflowName(template.name)
+    setSteps(
+      template.steps.map((s, idx) => ({
+        id: `${s.type}-${idx}`,
+        type: s.type as WorkflowStep["type"],
+        name: s.name,
+        config: s.config,
+        status: "pending",
+      }))
+    )
+  }
 
   // Add a new step
   const addStep = (type: WorkflowStep["type"]) => {
@@ -660,6 +700,27 @@ export default function WorkflowBuilderPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div id="templates">
+        <Card>
+          <CardHeader>
+            <CardTitle>Templates</CardTitle>
+            <CardDescription>Load a preset workflow configuration.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {templates.map((template) => (
+              <button
+                key={template.name}
+                onClick={() => applyTemplate(template)}
+                className="rounded-lg border p-4 text-left hover:bg-accent transition-colors"
+              >
+                <div className="font-semibold">{template.name}</div>
+                <div className="text-sm text-muted-foreground">{template.description}</div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Progress */}
       {isRunning && (

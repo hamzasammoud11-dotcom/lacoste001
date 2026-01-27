@@ -19,14 +19,14 @@ def test_enhanced_search():
         "top_k": 3,
         "use_mmr": True,
     }
-    print(f"\n📡 Testing /api/search with: {data}")
+    print(f"\n[TEST] /api/search with: {data}")
     
     r = requests.post(f"{BASE_URL}/api/search", json=data)
     print(f"Status: {r.status_code}")
     
     if r.status_code == 200:
         result = r.json()
-        print(f"✅ Results: {result.get('returned')} of {result.get('total_found')}")
+        print(f"[OK] Results: {result.get('returned')} of {result.get('total_found')}")
         print(f"   Diversity: {result.get('diversity_score'):.4f}")
         print(f"   Search time: {result.get('search_time_ms'):.1f}ms")
         
@@ -35,7 +35,7 @@ def test_enhanced_search():
             print(f"   [{item.get('rank')}] score={item.get('score'):.3f} - {content}...")
         return True
     else:
-        print(f"❌ Error: {r.text}")
+        print(f"[ERROR] {r.text}")
         return False
 
 def test_hybrid_search():
@@ -45,17 +45,17 @@ def test_hybrid_search():
         "keywords": ["cancer", "therapy"],
         "top_k": 3,
     }
-    print(f"\n📡 Testing /api/search/hybrid with: {data}")
+    print(f"\n[TEST] /api/search/hybrid with: {data}")
     
     r = requests.post(f"{BASE_URL}/api/search/hybrid", json=data)
     print(f"Status: {r.status_code}")
     
     if r.status_code == 200:
         result = r.json()
-        print(f"✅ Results: {result.get('returned')} of {result.get('total_found')}")
+        print(f"[OK] Results: {result.get('returned')} of {result.get('total_found')}")
         return True
     else:
-        print(f"❌ Error: {r.text}")
+        print(f"[ERROR] {r.text}")
         return False
 
 if __name__ == "__main__":
@@ -72,7 +72,7 @@ if __name__ == "__main__":
             print(f"Waiting for server... ({i+1}/10)")
             time.sleep(1)
     else:
-        print("❌ Server not available")
+        print("[ERROR] Server not available")
         exit(1)
     
     # Run tests

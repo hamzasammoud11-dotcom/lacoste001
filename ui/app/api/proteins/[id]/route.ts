@@ -1,29 +1,24 @@
 import { NextResponse } from 'next/server';
 import { API_CONFIG } from '@/config/api.config';
+import { proteins } from '../../_mock/proteins';
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const { id } = params;
   try {
-    const response = await fetch(`${API_CONFIG.baseUrl}/api/proteins/${id}`);
-    
+    const response = await fetch(`${API_CONFIG.baseUrl}/api/proteins/${id}`, { cache: 'no-store' });
+    const data = await response.json().catch(() => null);
     if (!response.ok) {
-      if (response.status === 404) {
-        return NextResponse.json({ error: 'Protein not found' }, { status: 404 });
-      }
-      throw new Error(`Backend returned ${response.status}`);
+      return NextResponse.json(
+        { error: data?.detail || data?.error || `Backend returned ${response.status}` },
+        { status: response.status }
+      );
     }
-    
-    const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Protein fetch error:', error);
-    return NextResponse.json(
-      { error: `Failed to fetch protein: ${error instanceof Error ? error.message : 'Unknown error'}. Ensure backend is running.` },
-      { status: 503 }
-    );
+    const fallback = proteins.find((p) => String(p.id) === String(id));
+    if (fallback) {
+      return NextResponse.json(fallback);
+    }
+    return NextResponse.json({ error: 'Backend unavailable' }, { status: 503 });
   }
 }

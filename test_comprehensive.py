@@ -10,13 +10,13 @@ def test_all_features():
     import requests
     
     print("=" * 70)
-    print("🧪 COMPREHENSIVE PHASE 4 UI TEST")
+    print("[TEST] COMPREHENSIVE PHASE 4 UI TEST")
     print("=" * 70)
     
     all_passed = True
     
     # 1. Test Visualization Page API
-    print("\n📊 Testing 3D Visualization Page APIs...")
+    print("\nTesting 3D Visualization Page APIs...")
     print("-" * 50)
     
     try:
@@ -28,21 +28,21 @@ def test_all_features():
         }, timeout=30)
         if r.status_code == 200:
             results = r.json().get("results", [])
-            print(f"✅ Search: {len(results)} results with MMR diversification")
+            print(f"[OK] Search: {len(results)} results with MMR diversification")
             
             # Check evidence fields
             if results:
                 has_evidence = any('evidence_links' in r or 'source' in r for r in results)
-                print(f"✅ Evidence links: {'Present' if has_evidence else 'Not found (may need enrichment)'}")
+                print(f"[OK] Evidence links: {'Present' if has_evidence else 'Not found (may need enrichment)'}")
         else:
-            print(f"❌ Search failed: {r.status_code}")
+            print(f"[FAIL] Search failed: {r.status_code}")
             all_passed = False
     except Exception as e:
-        print(f"❌ Search error: {e}")
+        print(f"[ERROR] Search error: {e}")
         all_passed = False
     
     # 2. Test Workflow Builder APIs
-    print("\n🔧 Testing Workflow Builder APIs...")
+    print("\nTesting Workflow Builder APIs...")
     print("-" * 50)
     
     # 2.1 Generate API
@@ -54,12 +54,12 @@ def test_all_features():
         }, timeout=30)
         if r.status_code == 200:
             mols = r.json().get("molecules", [])
-            print(f"✅ Generate: {len(mols)} molecules from text")
+            print(f"[OK] Generate: {len(mols)} molecules from text")
         else:
-            print(f"❌ Generate failed: {r.status_code}")
+            print(f"[FAIL] Generate failed: {r.status_code}")
             all_passed = False
     except Exception as e:
-        print(f"❌ Generate error: {e}")
+        print(f"[ERROR] Generate error: {e}")
         all_passed = False
     
     # 2.2 Validate API
@@ -72,12 +72,12 @@ def test_all_features():
         }, timeout=30)
         if r.status_code == 200:
             vals = r.json().get("validations", [])
-            print(f"✅ Validate: {len(vals)} SMILES validated")
+            print(f"[OK] Validate: {len(vals)} SMILES validated")
         else:
-            print(f"❌ Validate failed: {r.status_code}")
+            print(f"[FAIL] Validate failed: {r.status_code}")
             all_passed = False
     except Exception as e:
-        print(f"❌ Validate error: {e}")
+        print(f"[ERROR] Validate error: {e}")
         all_passed = False
     
     # 2.3 Rank API
@@ -92,12 +92,12 @@ def test_all_features():
         }, timeout=30)
         if r.status_code == 200:
             ranked = r.json().get("ranked", [])
-            print(f"✅ Rank: {len(ranked)} candidates ranked")
+            print(f"[OK] Rank: {len(ranked)} candidates ranked")
         else:
-            print(f"❌ Rank failed: {r.status_code}")
+            print(f"[FAIL] Rank failed: {r.status_code}")
             all_passed = False
     except Exception as e:
-        print(f"❌ Rank error: {e}")
+        print(f"[ERROR] Rank error: {e}")
         all_passed = False
     
     # 2.4 Full Workflow API
@@ -109,19 +109,19 @@ def test_all_features():
         }, timeout=60)
         if r.status_code == 200:
             data = r.json()
-            print(f"✅ Workflow: {data.get('steps_completed', 0)}/{data.get('total_steps', 0)} steps")
+            print(f"[OK] Workflow: {data.get('steps_completed', 0)}/{data.get('total_steps', 0)} steps")
             print(f"   Time: {data.get('execution_time_ms', 0):.1f}ms")
             top = data.get('top_candidates', [])
             print(f"   Top candidates: {len(top)}")
         else:
-            print(f"❌ Workflow failed: {r.status_code}")
+            print(f"[FAIL] Workflow failed: {r.status_code}")
             all_passed = False
     except Exception as e:
-        print(f"❌ Workflow error: {e}")
+        print(f"[ERROR] Workflow error: {e}")
         all_passed = False
     
     # 3. Test Export Functions (simulation)
-    print("\n📁 Testing Export Functions...")
+    print("\nTesting Export Functions...")
     print("-" * 50)
     
     sample_data = [
@@ -135,55 +135,55 @@ def test_all_features():
         csv = "id,content,score,modality\n" + "\n".join(
             f'{d["id"]},"{d["content"]}",{d["score"]},{d["modality"]}' for d in sample_data
         )
-        print(f"✅ CSV export: {len(csv)} bytes")
+        print(f"[OK] CSV export: {len(csv)} bytes")
     except Exception as e:
-        print(f"❌ CSV error: {e}")
+        print(f"[ERROR] CSV error: {e}")
         all_passed = False
     
     # JSON
     try:
         js = json.dumps(sample_data, indent=2)
-        print(f"✅ JSON export: {len(js)} bytes")
+        print(f"[OK] JSON export: {len(js)} bytes")
     except Exception as e:
-        print(f"❌ JSON error: {e}")
+        print(f"[ERROR] JSON error: {e}")
         all_passed = False
     
     # FASTA
     try:
         fasta = "\n".join(f">{d['id']}\n{d['content']}" 
                          for d in sample_data if d['modality'] == 'protein')
-        print(f"✅ FASTA export: {len(fasta)} bytes (proteins only)")
+        print(f"[OK] FASTA export: {len(fasta)} bytes (proteins only)")
     except Exception as e:
-        print(f"❌ FASTA error: {e}")
+        print(f"[ERROR] FASTA error: {e}")
         all_passed = False
     
     # 4. Test UI Pages
-    print("\n🖥️ Testing UI Pages...")
+    print("\nTesting UI Pages...")
     print("-" * 50)
     
     for page in ["visualization", "workflow"]:
         try:
             r = requests.get(f"http://localhost:3000/dashboard/{page}", timeout=10)
             if r.status_code == 200:
-                print(f"✅ /{page}: Renders correctly ({len(r.content)} bytes)")
+                print(f"[OK] /{page}: Renders correctly ({len(r.content)} bytes)")
             else:
-                print(f"❌ /{page}: Failed with {r.status_code}")
+                print(f"[FAIL] /{page}: Failed with {r.status_code}")
                 all_passed = False
         except Exception as e:
-            print(f"❌ /{page}: {e}")
+            print(f"[ERROR] /{page}: {e}")
             all_passed = False
     
     # Summary
     print("\n" + "=" * 70)
     if all_passed:
-        print("🎉 ALL PHASE 4 FEATURES WORKING CORRECTLY!")
+        print("ALL PHASE 4 FEATURES WORKING CORRECTLY!")
         print("=" * 70)
         print("""
 Phase 4 Deliverables Complete:
-  ✅ 4.1 3D Visualization - Interactive embedding space explorer
-  ✅ 4.2 Evidence Panel - Sources, citations, external links
-  ✅ 4.3 Workflow Builder - Visual pipeline configuration
-  ✅ 4.4 Export Features - CSV, JSON, FASTA export
+  [OK] 4.1 3D Visualization - Interactive embedding space explorer
+  [OK] 4.2 Evidence Panel - Sources, citations, external links
+  [OK] 4.3 Workflow Builder - Visual pipeline configuration
+  [OK] 4.4 Export Features - CSV, JSON, FASTA export
 
 UI Pages:
   • /dashboard/visualization - 3D embedding explorer
@@ -192,7 +192,7 @@ UI Pages:
 All APIs tested and functional!
 """)
     else:
-        print("⚠️ SOME TESTS FAILED - Review output above")
+        print("[WARN] SOME TESTS FAILED - Review output above")
         print("=" * 70)
     
     return all_passed

@@ -113,5 +113,5 @@ if __name__ == "__main__":
     result = test_workflow()
     
     print("\n" + "=" * 60)
-    print("✅ All Phase 3 tests passed!")
+    print("[OK] All Phase 3 tests passed!")
     print("=" * 60)

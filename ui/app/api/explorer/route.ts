@@ -9,7 +9,10 @@ export async function GET(request: Request) {
     const data = await getExplorerPoints(
       searchParams.get("dataset") || undefined,
       searchParams.get("view") || undefined,
-      searchParams.get("colorBy") || undefined
+      searchParams.get("colorBy") || undefined,
+      searchParams.get("query") || undefined,
+      searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
+      searchParams.get("modality") || undefined
     );
     return NextResponse.json(data);
   } catch {

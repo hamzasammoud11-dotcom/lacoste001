@@ -24,4 +24,7 @@ export const ExplorerRequestSchema = z.object({
   dataset: z.string().optional().default("DrugBank"),
   view: z.string().optional().default("UMAP"),
   colorBy: z.string().optional().default("Activity"),
+  query: z.string().optional(),
+  limit: z.number().optional(),
+  modality: z.string().optional(),
 });

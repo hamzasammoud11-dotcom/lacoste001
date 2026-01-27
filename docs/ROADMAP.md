@@ -98,75 +98,21 @@ The team works on their respective modules using the core interfaces.
 ## 📊 Phase 4: UI/UX & Deployment ✅ COMPLETE
 **Goal:** Build an intuitive, modern interface for the BioFlow platform.
 
-- [x] **Theme & Styling** (`bioflow/ui/config.py`):
-  - Glassmorphism design system with dark theme
-  - Custom CSS with animations, cards, badges
-  - Responsive layout with Inter font family
-  - Color palette: Indigo primary, Emerald success, Cyan accent
+- [x] **Next.js Frontend** (`ui/`):
+  - Next.js 16 app router + Tailwind + shadcn/ui
+  - Dashboard pages: Discovery, 3D Visualization, Workflow Builder
+  - `/app/api/*` proxy routes to the FastAPI backend
+  - Optional mock fallbacks for molecules/proteins list routes
 
-- [x] **Reusable Components** (`bioflow/ui/components.py`):
-  - `hero_section`: Landing hero with stats
-  - `metric_card`: Animated metric displays
-  - `glass_card`, `feature_cards`: Content cards
-  - `pipeline_flow`: Visual pipeline status
-  - `binding_affinity_chart`, `scatter_embedding`, `similarity_heatmap`: Charts
-  - `molecule_viewer_2d`: RDKit molecule rendering
-  - `evidence_card`: Traceability links
-  - `chat_message`, `chat_container`: AI chat interface
-  - `step_progress`, `notification`: UX helpers
-
-- [x] **Dashboard Home** (`bioflow/ui/pages/home.py`):
-  - Hero section with platform branding
-  - Key metrics (molecules, proteins, literature, predictions)
-  - Quick action cards (Discovery, Explorer, Upload)
-  - Feature highlights grid
-  - Recent discoveries chart
-  - Activity timeline
-  - Active pipeline visualization
-
-- [x] **Discovery Page** (`bioflow/ui/pages/discovery.py`):
-  - Query input (text, SMILES, FASTA)
-  - Target protein selection with common targets
-  - Real-time pipeline progress visualization
-  - Results with binding affinity chart
-  - Top hits with molecule viewer
-  - Evidence linking to PubMed/ChEMBL/PubChem
-  - Export options (CSV, SMILES, Report)
-
-- [x] **Explorer Page** (`bioflow/ui/pages/explorer.py`):
-  - 2D/3D embedding visualization
-  - Dimensionality reduction (t-SNE, PCA, UMAP)
-  - Modality filtering
-  - Cross-modal similarity heatmap
-  - Nearest neighbor search
-  - Cluster analysis with K-Means/DBSCAN
-
-- [x] **Data Management Page** (`bioflow/ui/pages/data.py`):
-  - Collection overview with metrics
-  - File upload (CSV, JSON, SMILES, FASTA)
-  - Data preview with molecule rendering
-  - Batch processing with progress
-  - Collection browsing and search
-  - Scheduled task management
-
-- [x] **Settings Page** (`bioflow/ui/pages/settings.py`):
-  - Qdrant connection configuration
-  - Model selection (PubMedBERT, ESM-2, ChemBERTa)
-  - Predictor configuration (DeepPurpose)
-  - Theme and appearance settings
-  - System status monitoring
-  - Resource usage (Memory, GPU, Storage)
-
-- [x] **Main App** (`bioflow/ui/app.py`):
-  - Navigation sidebar with routing
-  - User profile display
-  - Quick stats in sidebar
-
-**Launch:** `python launch_ui.py` or `streamlit run bioflow/ui/app.py`
+**Launch:**
+- Full stack (Windows): `launch_bioflow_full.bat`
+- Manual:
+  - Backend: `python -m uvicorn bioflow.api.server:app --host 0.0.0.0 --port 8000`
+  - UI: `cd ui && pnpm dev`
 
 ---
 
 ## 🚀 Phase 5: Open-Source Alignment
-- **Laila Connector**: Allow Laila to query the Qdrant memory.
-- **InstaNovo+ Specs**: Add support for peptide sequencing integration.
-- **Controlled Generation**: Pilot generation via ProtBFN/AbBFN2.
+- **Strict Open-Source Compliance**: remove proprietary integrations and keep only OSS models/tools.
+- **Open Protein/Peptide Options**: integrate open models (e.g., ESM-2 / ProGen2) behind `BioGenerator`.
+- **Open Retrieval + Evidence**: improve evidence traceability (PubMed/UniProt/ChEMBL) and evaluation.

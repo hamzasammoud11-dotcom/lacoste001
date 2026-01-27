@@ -1,6 +1,6 @@
 # BioFlow UI (Next.js)
 
-This project is a migration of the Streamlit "old_ui" to Next.js 16, Shadcn UI, Framer Motion, and Tailwind CSS v4.
+This project is the Next.js 16 UI for BioFlow (Shadcn UI, Framer Motion, Tailwind CSS v4).
 
 ## Getting Started
 
