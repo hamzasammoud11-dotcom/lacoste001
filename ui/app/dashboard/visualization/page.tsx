@@ -1,17 +1,16 @@
 "use client"
 
+import { ExternalLink, Loader2, RotateCcw, Search, ZoomIn, ZoomOut } from "lucide-react"
 import * as React from "react"
-import { Download, ExternalLink, Filter, Loader2, RotateCcw, Search, ZoomIn, ZoomOut } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // Types
 interface EmbeddingPoint {
@@ -77,7 +76,7 @@ function Scatter3DCanvas({
     const sinY = Math.sin(rotation.y * rad)
 
     // Rotate around Y axis
-    let x = point.x * cosY - point.z * sinY
+    const x = point.x * cosY - point.z * sinY
     let z = point.x * sinY + point.z * cosY
 
     // Rotate around X axis

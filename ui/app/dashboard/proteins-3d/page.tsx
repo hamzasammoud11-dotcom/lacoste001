@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProteins, getProteinPdbUrl } from '@/lib/visualization-api';
+import { getProteinPdbUrl,getProteins } from '@/lib/visualization-api';
 import type { Protein } from '@/lib/visualization-types';
 
 // Dynamic import of the protein viewer to prevent SSR issues

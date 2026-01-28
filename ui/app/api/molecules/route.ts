@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+
 import { API_CONFIG } from '@/config/api.config';
+
 import { molecules } from '../_mock/molecules';
 
 export async function GET(request: Request) {

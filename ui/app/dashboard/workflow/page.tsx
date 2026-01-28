@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import {
   ArrowRight,
   Check,
@@ -14,21 +13,20 @@ import {
   Sparkles,
   Trash2,
   Upload,
-  X,
 } from "lucide-react"
+import * as React from "react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
-import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
 
 // Types
 interface WorkflowStep {

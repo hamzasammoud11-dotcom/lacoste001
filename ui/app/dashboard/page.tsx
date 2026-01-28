@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowUp, Database, FileText, Search, Sparkles, Zap, Beaker, Dna, BookOpen } from "lucide-react"
+import { ArrowUp, Beaker, BookOpen,Database, Dna, FileText, Search, Sparkles, Zap } from "lucide-react"
 import Link from "next/link"
 
 import { Badge } from "@/components/ui/badge"

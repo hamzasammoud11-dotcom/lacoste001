@@ -5,7 +5,6 @@ import {
   BadgeCheck,
   BarChart2,
   Bell,
-  Box,
   ChevronRight,
   ChevronsUpDown,
   CreditCard,
@@ -52,8 +51,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/animate-ui/primitives/radix/collapsible';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const navMain = [

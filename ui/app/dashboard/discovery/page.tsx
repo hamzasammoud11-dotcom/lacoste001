@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowRight,CheckCircle2, Circle, Loader2, Microscope, Search, AlertCircle } from "lucide-react"
+import { AlertCircle,ArrowRight,CheckCircle2, Circle, Loader2, Microscope, Search } from "lucide-react"
 import * as React from "react"
 
 import { PageHeader, SectionHeader } from "@/components/page-header"

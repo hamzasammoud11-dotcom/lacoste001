@@ -1,8 +1,8 @@
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Suspense } from "react"
 
-import { getExplorerPoints } from "@/lib/explorer-service"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { getExplorerPoints } from "@/lib/explorer-service"
 
 import { ExplorerChart } from "./chart"
 import { ExplorerControls } from "./components"
@@ -20,12 +20,12 @@ function pickParam(v: string | string[] | undefined): string | undefined {
 export default async function ExplorerPage({ searchParams }: ExplorerPageProps) {
   // Await searchParams as required by Next.js 16/15
   const params = await searchParams
-  
+
   const dataset = pickParam(params.dataset) || "DrugBank"
   const view = pickParam(params.view) || "UMAP"
   const colorBy = pickParam(params.colorBy) || "Activity"
 
-  let data = []
+  let data: any[] = []
   let error: string | null = null
   try {
     const response = await getExplorerPoints(dataset, view, colorBy)

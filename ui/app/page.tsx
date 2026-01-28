@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowUp, Database, FileText, Search, Sparkles, Zap, Beaker, Dna, BookOpen } from "lucide-react"
+import { ArrowUp, Beaker, BookOpen,Database, Dna, FileText, Search, Sparkles, Zap } from "lucide-react"
 import Link from "next/link"
 
 import { SectionHeader } from "@/components/page-header"
@@ -14,7 +14,7 @@ export default function Home() {
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Hero Section */}
       <div className="flex flex-col lg:flex-row gap-6">
-        <div className="flex-1 rounded-2xl bg-gradient-to-br from-primary/10 via-background to-background p-8 border">
+        <div className="flex-1 rounded-2xl bg-linear-to-br from-primary/10 via-background to-background p-8 border">
           <Badge variant="secondary" className="mb-4">New • BioFlow 2.0</Badge>
           <h1 className="text-4xl font-bold tracking-tight mb-4">AI-Powered Drug Discovery</h1>
           <p className="text-lg text-muted-foreground mb-6 max-w-xl">

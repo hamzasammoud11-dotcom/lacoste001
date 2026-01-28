@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+
 import { API_CONFIG } from "@/config/api.config"
 
 // Mock workflow results for when backend is unavailable
