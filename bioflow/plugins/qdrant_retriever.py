@@ -193,13 +193,29 @@ class QdrantRetriever(BioRetriever):
                 query_filter=qdrant_filter
             )
         
-        # Convert to RetrievalResult
+        # Convert to RetrievalResult with safe modality mapping
+        def _safe_modality(payload: dict) -> Modality:
+            raw = payload.get("modality")
+            if isinstance(raw, Modality):
+                return raw
+            if not isinstance(raw, str):
+                return Modality.TEXT
+            norm = raw.strip().lower()
+            # Map legacy/synonym values
+            synonym_map = {"molecule": "smiles", "drug": "smiles"}
+            if norm in synonym_map:
+                norm = synonym_map[norm]
+            try:
+                return Modality(norm)
+            except ValueError:
+                return Modality.TEXT
+        
         return [
             RetrievalResult(
                 id=str(r.id),
                 score=r.score,
                 content=r.payload.get("content", ""),
-                modality=Modality(r.payload.get("modality", "text")),
+                modality=_safe_modality(r.payload),
                 payload=r.payload
             )
             for r in results

@@ -20,12 +20,12 @@
     "ci_approx": 0.8053618329014657
   },
   "files": {
-    "predictions_test_csv": "c:\\Users\\hamza\\Downloads\\Free Spitfire 3D printed RC plane - 2118624\\files\\runs\\20260125_080409_BindingDB_Kd\\predictions_test.csv",
-    "scatter_png": "c:\\Users\\hamza\\Downloads\\Free Spitfire 3D printed RC plane - 2118624\\files\\runs\\20260125_080409_BindingDB_Kd\\scatter.png",
-    "curves_sorted_png": "c:\\Users\\hamza\\Downloads\\Free Spitfire 3D printed RC plane - 2118624\\files\\runs\\20260125_080409_BindingDB_Kd\\curves_sorted.png",
-    "residuals_png": "c:\\Users\\hamza\\Downloads\\Free Spitfire 3D printed RC plane - 2118624\\files\\runs\\20260125_080409_BindingDB_Kd\\residuals.png",
-    "hist_true_pred_png": "c:\\Users\\hamza\\Downloads\\Free Spitfire 3D printed RC plane - 2118624\\files\\runs\\20260125_080409_BindingDB_Kd\\hist_true_pred.png",
-    "ecdf_true_pred_png": "c:\\Users\\hamza\\Downloads\\Free Spitfire 3D printed RC plane - 2118624\\files\\runs\\20260125_080409_BindingDB_Kd\\ecdf_true_pred.png"
+    "predictions_test_csv": "predictions_test.csv",
+    "scatter_png": "scatter.png",
+    "curves_sorted_png": "curves_sorted.png",
+    "residuals_png": "residuals.png",
+    "hist_true_pred_png": "hist_true_pred.png",
+    "ecdf_true_pred_png": "ecdf_true_pred.png"
   },
   "timing": {
     "total_seconds": 6569.407529115677,

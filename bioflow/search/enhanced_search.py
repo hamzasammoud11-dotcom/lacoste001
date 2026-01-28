@@ -252,6 +252,12 @@ class EnhancedSearchService:
             diversity_score = None
             enhanced_results = self._raw_to_enhanced(raw_results[:top_k])
         
+        # Sort by original score for display (MMR selection already done)
+        enhanced_results.sort(key=lambda x: x.score, reverse=True)
+        # Update ranks after sorting
+        for i, r in enumerate(enhanced_results):
+            r.rank = i + 1
+        
         # Apply evidence linking
         enhanced_results = self._add_evidence_links(enhanced_results)
         
@@ -413,14 +419,26 @@ class EnhancedSearchService:
         
         for coll in collections:
             try:
-                results = client.query_points(
-                    collection_name=coll,
-                    query=query_embedding,
-                    limit=limit,
-                    query_filter=query_filter,
-                    with_payload=True,
-                    with_vectors=with_vectors,
-                ).points
+                # Use search() for qdrant-client < 1.10, query_points() for >= 1.10
+                try:
+                    results = client.query_points(
+                        collection_name=coll,
+                        query=query_embedding,
+                        limit=limit,
+                        query_filter=query_filter,
+                        with_payload=True,
+                        with_vectors=with_vectors,
+                    ).points
+                except AttributeError:
+                    # Fallback to older API (qdrant-client < 1.10)
+                    results = client.search(
+                        collection_name=coll,
+                        query_vector=query_embedding,
+                        limit=limit,
+                        query_filter=query_filter,
+                        with_payload=True,
+                        with_vectors=with_vectors,
+                    )
                 
                 for r in results:
                     payload_modality = r.payload.get('modality', 'unknown')

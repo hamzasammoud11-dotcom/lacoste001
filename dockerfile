@@ -28,33 +28,36 @@ RUN conda init bash \
     && conda activate OpenBioMed \
     && pip install --upgrade pip setuptools
 
-# Installing PyTorch and torchvision
-RUN pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117 \
-    && pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-1.13.1+cu117.html \
-    && pip install pytorch_lightning==2.0.8 peft==0.9.0 accelerate==1.3.0 --no-deps -i https://pypi.tuna.tsinghua.edu.cn/simple
+# Installing PyTorch and torchvision (using conda run to install in OpenBioMed env)
+RUN conda run -n OpenBioMed pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117 \
+    && conda run -n OpenBioMed pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-1.13.1+cu117.html \
+    && conda run -n OpenBioMed pip install pytorch_lightning==2.0.8 peft==0.9.0 accelerate==1.3.0 --no-deps
+
+# Set working directory and copy application files
+WORKDIR /app
+COPY . /app/
 
 # Install additional packages from requirements.txt
-RUN pip install -r requirements.txt
+RUN conda run -n OpenBioMed pip install -r requirements.txt
 
 # Install visualization tools
-RUN conda install -c conda-forge pymol-open-source -y \
-    && pip install imageio
+RUN conda install -n OpenBioMed -c conda-forge pymol-open-source -y \
+    && conda run -n OpenBioMed pip install imageio
 
-# Install AutoDockVina tools
-RUN git config --global http.proxy http://100.68.173.241:3128 \
-    && git config --global https.proxy http://100.68.173.241:3128 \
-    && pip install meeko==0.1.dev3 pdb2pqr vina==1.2.2 \
-    && pip install git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3
+# Install AutoDockVina tools (proxy removed - use Docker build args if needed)
+RUN conda run -n OpenBioMed pip install meeko==0.1.dev3 pdb2pqr vina==1.2.2 \
+    && conda run -n OpenBioMed pip install git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3
 
 # Install NLTK
-RUN pip install spacy rouge_score nltk \
-    && python -c "import nltk; nltk.download('wordnet'); nltk.download('omw-1.4')"
-
-# Set working directory
-WORKDIR /app
+RUN conda run -n OpenBioMed pip install spacy rouge_score nltk \
+    && conda run -n OpenBioMed python -c "import nltk; nltk.download('wordnet'); nltk.download('omw-1.4')"
 
 # Activate the OpenBioMed environment by default
 RUN echo "source activate OpenBioMed" >> ~/.bashrc
+ENV PATH="/root/miniconda3/envs/OpenBioMed/bin:$PATH"
+
+# Make entrypoint executable
+RUN chmod +x ./scripts/run_server.sh || true
 
 # Set default command
 ENTRYPOINT ["./scripts/run_server.sh"]

@@ -159,11 +159,16 @@ class TextEncoder(BioEncoder):
             outputs = self.model(**inputs)
             hidden_states = outputs.last_hidden_state
             
-            if self.pooling == "mean":
+            # Apply same pooling strategy as encode()
+            if self.pooling == "cls":
+                embeddings = hidden_states[:, 0, :]
+            elif self.pooling == "mean":
                 attention_mask = inputs["attention_mask"].unsqueeze(-1)
                 embeddings = (hidden_states * attention_mask).sum(1) / attention_mask.sum(1)
+            elif self.pooling == "max":
+                embeddings = hidden_states.max(dim=1).values
             else:
-                embeddings = hidden_states[:, 0, :]
+                raise ValueError(f"Unknown pooling: {self.pooling}")
         
         results = []
         for i, emb in enumerate(embeddings):

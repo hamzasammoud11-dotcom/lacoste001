@@ -173,8 +173,13 @@ class ProteinEncoder(BioEncoder):
         with torch.no_grad():
             outputs = self.model(**inputs)
             hidden_states = outputs.last_hidden_state
-            attention_mask = inputs["attention_mask"].unsqueeze(-1)
-            embeddings = (hidden_states * attention_mask).sum(1) / attention_mask.sum(1)
+            
+            # Apply same pooling strategy as encode()
+            if self.pooling == "cls":
+                embeddings = hidden_states[:, 0, :]
+            else:  # mean pooling
+                attention_mask = inputs["attention_mask"].unsqueeze(-1)
+                embeddings = (hidden_states * attention_mask).sum(1) / attention_mask.sum(1)
         
         results = []
         for i, emb in enumerate(embeddings):

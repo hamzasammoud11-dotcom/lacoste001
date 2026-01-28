@@ -46,13 +46,21 @@ def register_all(registry=None):
     
     Args:
         registry: ToolRegistry instance (uses global if None)
+        
+    Returns:
+        dict: Available plugin classes by category
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     from bioflow.core import ToolRegistry
     registry = registry or ToolRegistry
     
-    # Note: Encoders are lazy-loaded, so we don't instantiate here
-    # They will be registered when first used
-    print("Plugins available for registration:")
-    print("  Encoders: OBMEncoder, TextEncoder, MoleculeEncoder, ProteinEncoder")
-    print("  Retrievers: QdrantRetriever")
-    print("  Predictors: DeepPurposePredictor")
+    available = {
+        "encoders": ["OBMEncoder", "TextEncoder", "MoleculeEncoder", "ProteinEncoder"],
+        "retrievers": ["QdrantRetriever"],
+        "predictors": ["DeepPurposePredictor"],
+    }
+    
+    logger.info(f"Plugins available for registration: {available}")
+    return available

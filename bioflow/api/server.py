@@ -539,7 +539,12 @@ async def enhanced_search(request: dict = None):
         collection = request.get("collection")
         use_mmr = request.get("use_mmr", True)
         lambda_param = request.get("lambda_param", 0.7)
-        filters = request.get("filters")
+        filters = request.get("filters") or {}
+        dataset = request.get("dataset")  # Optional dataset filter (davis, kiba)
+        
+        # Add dataset filter if specified
+        if dataset:
+            filters["source"] = dataset.lower()
         
         # Map old type names to new modality names
         type_to_modality = {
@@ -584,9 +589,9 @@ async def enhanced_search(request: dict = None):
         _log_event(
             "search",
             request_id,
-            query=request.query[:200],
-            top_k=request.top_k,
-            use_mmr=request.use_mmr,
+            query=query[:200] if query else "",
+            top_k=top_k,
+            use_mmr=use_mmr,
             returned=payload.get("returned"),
             total_found=payload.get("total_found"),
             duration_ms=round((time.perf_counter() - start) * 1000, 2),
