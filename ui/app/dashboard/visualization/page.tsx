@@ -348,24 +348,50 @@ export default function VisualizationPage() {
       const data = await response.json()
       
       if (data.results) {
-        // Convert to points with random 3D positions (in real use, these would come from UMAP/t-SNE)
-        const newPoints: EmbeddingPoint[] = data.results.map((r: SearchResult, idx: number) => {
-          // Create pseudo-3D positions based on score and index
-          const angle = (idx / data.results.length) * Math.PI * 2
-          const radius = 1 - r.score
-          return {
-            id: r.id || `point-${idx}`,
-            x: Math.cos(angle) * radius + (Math.random() - 0.5) * 0.3,
-            y: r.score * 2 - 1 + (Math.random() - 0.5) * 0.2,
-            z: Math.sin(angle) * radius + (Math.random() - 0.5) * 0.3,
-            label: r.content.slice(0, 50) + "...",
-            content: r.content,
-            modality: r.modality,
-            source: r.source,
-            score: r.score,
+        let newPoints: EmbeddingPoint[] = []
+
+        try {
+          const embedResp = await fetch(
+            `/api/explorer/embeddings?query=${encodeURIComponent(query)}&method=pca&limit=${data.results.length}`
+          )
+          const embedData = await embedResp.json()
+          if (embedResp.ok && embedData.points) {
+            newPoints = embedData.points.map((p: any) => ({
+              id: p.id,
+              x: p.x,
+              y: p.y,
+              z: p.z,
+              label: p.label || (p.content ? String(p.content).slice(0, 50) + "..." : p.id),
+              content: p.content || "",
+              modality: p.modality || "text",
+              source: p.source || "unknown",
+              score: p.score || 0,
+              metadata: p.metadata || {},
+            }))
           }
-        })
-        
+        } catch (e) {
+          console.warn("Embedding projection fetch failed, falling back:", e)
+        }
+
+        if (newPoints.length === 0) {
+          // Fallback to pseudo-positions if embedding API unavailable
+          newPoints = data.results.map((r: SearchResult, idx: number) => {
+            const angle = (idx / data.results.length) * Math.PI * 2
+            const radius = 1 - r.score
+            return {
+              id: r.id || `point-${idx}`,
+              x: Math.cos(angle) * radius + (Math.random() - 0.5) * 0.3,
+              y: r.score * 2 - 1 + (Math.random() - 0.5) * 0.2,
+              z: Math.sin(angle) * radius + (Math.random() - 0.5) * 0.3,
+              label: r.content.slice(0, 50) + "...",
+              content: r.content,
+              modality: r.modality,
+              source: r.source,
+              score: r.score,
+            }
+          })
+        }
+
         setPoints(newPoints)
         setResults(data.results)
       }
@@ -560,13 +586,19 @@ export default function VisualizationPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-4">
-              <Scatter3DCanvas
-                points={filteredPoints}
-                selectedPoint={selectedPoint}
-                onSelectPoint={handleSelectPoint}
-                rotation={rotation}
-                zoom={zoom}
-              />
+              {filteredPoints.length === 0 && !isLoading ? (
+                <div className="h-[500px] flex items-center justify-center text-muted-foreground border border-dashed rounded-lg">
+                  No points to display. Run a search to populate embeddings.
+                </div>
+              ) : (
+                <Scatter3DCanvas
+                  points={filteredPoints}
+                  selectedPoint={selectedPoint}
+                  onSelectPoint={handleSelectPoint}
+                  rotation={rotation}
+                  zoom={zoom}
+                />
+              )}
             </CardContent>
           </Card>
         </div>

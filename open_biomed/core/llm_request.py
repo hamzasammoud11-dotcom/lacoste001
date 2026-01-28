@@ -9,8 +9,7 @@ import shutil
 from datetime import datetime
 from typing import List, Optional, TypedDict, AsyncGenerator, Tuple
 from typing_extensions import Self
-from openai import OpenAI, Stream
-from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceDelta
+import requests
 
 from open_biomed.data import Text
 from open_biomed.utils.config import Config
@@ -77,7 +76,7 @@ class LLM_Local(LLM):
         except:
             raise ValueError("Only support BioMedGPTR1 and BioMedGPT for now.")
 
-        self._init_client(api_infos)
+        self._init_client(model_name_or_path=model_name_or_path, device=device)
     
     def _init_client(self, model_name_or_path: str, device: Optional[str]=None) -> Self:
         self.client = self.client_model.from_pretrained(model_name_or_path=model_name_or_path, device=device)
@@ -111,11 +110,15 @@ class LLM_API(LLM):
         self.think_start, self.think_end = "<think>", "</think>"
     
     def _init_client(self, api_infos: dict) -> Self:
-
-        self.client = OpenAI(
-            api_key=api_infos['api_key'],
-            base_url=api_infos['api_url']
-            )
+        # NOTE: OpenAI SDK usage is intentionally avoided to keep the project fully open-source.
+        # This client speaks a minimal OpenAI-compatible HTTP interface (e.g., local vLLM/Ollama proxy).
+        self.api_key = api_infos.get("api_key")
+        self.api_url = (api_infos.get("api_url") or "").rstrip("/")
+        if not self.api_url:
+            raise ValueError("API_URL is required for LLM_API (set in .env)")
+        if not api_infos.get("model_name"):
+            raise ValueError("MODEL_NAME is required for LLM_API (set in .env)")
+        return self
 
     
     def _update_query(self, query: str, context: ContextDict = {"ref_text": "", "others": dict()}) -> str:
@@ -131,46 +134,54 @@ class LLM_API(LLM):
 
         return messages
 
-    async def generate_stream(self, query: str, context: ContextDict = {"ref_text": "", "others": dict()}, is_debug=False):
+    async def generate_stream(
+        self,
+        query: str,
+        context: ContextDict = {"ref_text": "", "others": dict()},
+        is_debug: bool = False,
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Best-effort streaming adapter.
 
-        messages = self._get_input(query=query, context=context, is_debug=is_debug)
-
-        stream: Stream[ChatCompletionChunk] = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            stream=True,
-        )
-
-        is_think = False
-        for chunk in stream:
-            delta: ChoiceDelta = chunk.choices[0].delta
-            delta_json = delta.model_dump()
-            content = delta_json.get("content", "")
-            if content != "" or content!=None:
-                if content == self.think_start:
-                    is_think = True
-                    continue
-                elif content == self.think_end:
-                    is_think = False
-                    continue
-                elif is_think:
-                    stream_chunk: StreamChunk = {"final_resp": "", "reasoning": content}
-                else:
-                    stream_chunk: StreamChunk = {"final_resp": content, "reasoning": ""}
-            yield stream_chunk
+        This implementation does not rely on proprietary SDKs. If you need true token streaming,
+        run an OpenAI-compatible server that supports SSE streaming and implement parsing here.
+        """
+        resp = self.generate(query=query, context=context, is_debug=is_debug)
+        yield {"final_resp": resp.get("final_resp", ""), "reasoning": resp.get("reasoning", "")}
 
     def generate(self, query: str, context: ContextDict = {"ref_text": "", "others": dict()}, is_debug=False):
 
         messages = self._get_input(query=query, context=context, is_debug=is_debug)
+        # Build OpenAI-compatible endpoint
+        base = self.api_url
+        if base.endswith("/v1"):
+            endpoint = f"{base}/chat/completions"
+        elif "/v1/" in base:
+            # If user provided a deeper URL, try to append the standard path safely.
+            endpoint = f"{base.rstrip('/')}/chat/completions"
+        else:
+            endpoint = f"{base}/v1/chat/completions"
 
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            stream=False,
-            temperature=self.temperature
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "stream": False,
+            "temperature": self.temperature,
+        }
+
+        r = requests.post(endpoint, json=payload, headers=headers, timeout=120)
+        r.raise_for_status()
+        data = r.json()
+
+        text = (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
         )
-
-        text=response.choices[0].message.content
         start_index = text.find(self.think_start) + len(self.think_start)
         end_index = text.find(self.think_end)
         resp_thinking = text[start_index:end_index].strip()

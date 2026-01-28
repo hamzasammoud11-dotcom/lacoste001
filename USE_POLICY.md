@@ -6,7 +6,7 @@ You have the right to use BioMedGPT pursuant to relevant agreements, but you can
 
 1. inciting to resist or undermine the implementation of the Constitution, laws and administrative regulations;
 2. inciting to subvert the state power and the overthrow of the political system;
-3. inciting to sperate the state or undermine unity of the country;
+3. inciting to separate the state or undermine unity of the country;
 4. inciting national enmity or discrimination, undermine the unity of nations;
 5. content involving discrimination on the basis of race, sex, religion, geographical content, etc.;
 6. fabricating or distorting facts, spreading disinformation, or disturbing the public order;

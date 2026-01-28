@@ -12,13 +12,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from collections import defaultdict
 
-from typing import Optional as OptionalType
 from bioflow.core.base import BioEncoder, BioPredictor, BioGenerator, Modality
 from bioflow.core.config import NodeConfig, WorkflowConfig, NodeType
 from bioflow.core.registry import ToolRegistry
-
-# Re-import Optional with a different name to avoid conflicts
-from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -174,10 +170,11 @@ class BioFlowOrchestrator:
                 if self._retriever is None:
                     raise ValueError("No retriever configured. Call set_retriever() first.")
                 limit = node.params.get("limit", 5)
-                modality = node.params.get("modality", "text")
+                modality_name = node.params.get("modality", "text")
+                modality = Modality(modality_name)
                 return self._retriever.search(
                     query=node_input,
-                    query_modality=modality,
+                    modality=modality,
                     limit=limit
                 )
             
@@ -191,7 +188,13 @@ class BioFlowOrchestrator:
                 threshold = node.params.get("threshold", 0.5)
                 key = node.params.get("key", "score")
                 if isinstance(node_input, list):
-                    return [x for x in node_input if getattr(x, key, x.get(key, 0)) >= threshold]
+                    def _get_value(item: Any) -> float:
+                        if hasattr(item, key):
+                            return getattr(item, key)
+                        if isinstance(item, dict):
+                            return item.get(key, 0)
+                        return 0
+                    return [x for x in node_input if _get_value(x) >= threshold]
                 return node_input
             
             elif node.type == NodeType.CUSTOM:

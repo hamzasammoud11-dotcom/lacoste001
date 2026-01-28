@@ -26,13 +26,13 @@ def test_generate():
     
     if r.status_code == 200:
         result = r.json()
-        print(f"   ✅ Generated: {len(result.get('molecules', []))} molecules")
+        print(f"   [OK] Generated: {len(result.get('molecules', []))} molecules")
         for mol in result.get("molecules", [])[:2]:
             smiles = mol.get("smiles", "")[:40]
             print(f"      - {smiles}...")
         return True
     else:
-        print(f"   ❌ Error: {r.text}")
+        print(f"   [ERROR] {r.text}")
         return False
 
 def test_validate():
@@ -53,7 +53,7 @@ def test_validate():
     if r.status_code == 200:
         result = r.json()
         summary = result.get("summary", {})
-        print(f"   ✅ Validated: {summary.get('total', 0)} molecules")
+        print(f"   [OK] Validated: {summary.get('total', 0)} molecules")
         print(f"      Passed: {summary.get('passed', 0)}")
         for val in result.get("validations", [])[:2]:
             smiles = val.get("smiles", "")[:25]
@@ -62,7 +62,7 @@ def test_validate():
             print(f"      - {smiles}... score={score:.3f} ({status})")
         return True
     else:
-        print(f"   ❌ Error: {r.text}")
+        print(f"   [ERROR] {r.text}")
         return False
 
 def test_rank():
@@ -84,12 +84,12 @@ def test_rank():
     if r.status_code == 200:
         result = r.json()
         ranked = result.get("ranked", [])
-        print(f"   ✅ Ranked: {len(ranked)} candidates")
+        print(f"   [OK] Ranked: {len(ranked)} candidates")
         for cand in ranked:
             print(f"      [{cand.get('rank')}] {cand.get('smiles')} score={cand.get('final_score', 0):.3f}")
         return True
     else:
-        print(f"   ❌ Error: {r.text}")
+        print(f"   [ERROR] {r.text}")
         return False
 
 def test_workflow():
@@ -107,7 +107,7 @@ def test_workflow():
     
     if r.status_code == 200:
         result = r.json()
-        print(f"   ✅ Workflow status: {result.get('status')}")
+        print(f"   [OK] Workflow status: {result.get('status')}")
         print(f"      Steps: {result.get('steps_completed')}/{result.get('total_steps')}")
         print(f"      Time: {result.get('execution_time_ms', 0):.1f}ms")
         
@@ -119,7 +119,7 @@ def test_workflow():
             print(f"         - {smiles}... (score={score:.3f})")
         return True
     else:
-        print(f"   ❌ Error: {r.text}")
+        print(f"   [ERROR] {r.text}")
         return False
 
 if __name__ == "__main__":
@@ -137,7 +137,7 @@ if __name__ == "__main__":
             print(f"Waiting for server... ({i+1}/10)")
             time.sleep(1)
     else:
-        print("❌ Server not available")
+        print("[ERROR] Server not available")
         exit(1)
     
     # Run tests
@@ -147,5 +147,5 @@ if __name__ == "__main__":
     test_workflow()
     
     print("\n" + "=" * 60)
-    print("✅ Agent API tests complete!")
+    print("[OK] Agent API tests complete!")
     print("=" * 60)

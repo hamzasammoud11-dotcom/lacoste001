@@ -4,6 +4,9 @@ BioFlow Pipeline - Workflow Orchestration
 
 This module provides the pipeline orchestration for BioFlow,
 connecting agents, memory (Qdrant), and OBM encoders.
+
+DEPRECATED (legacy): Prefer the FastAPI backend (`bioflow/api/server.py`) and
+the agent system (`bioflow/agents/*`). This module is kept for older demos/scripts.
 """
 
 import logging

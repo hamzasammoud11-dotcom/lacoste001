@@ -145,6 +145,8 @@ cython_debug/
 /misc/*
 /tmp/*
 /third_party/*
+/qdrant_data/
+/stress_test_report.json
 !/third_party/.placeholder
 !/third_party/p2rank_2.5
 !/checkpoints/.placeholder

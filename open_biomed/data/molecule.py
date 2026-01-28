@@ -12,8 +12,17 @@ from rdkit import Chem, DataStructs, RDLogger
 RDLogger.DisableLog("rdApp.*")
 from rdkit.Chem import AllChem, MACCSkeys, rdMolDescriptors, Descriptors, Lipinski
 from rdkit.Chem.AllChem import RWMol
-from rdkit.six import iteritems
-from rdkit.six.moves import cPickle
+try:
+    # Older RDKit vendored `six` utilities here.
+    from rdkit.six import iteritems  # type: ignore
+except Exception:
+    def iteritems(d):
+        return d.items()
+
+try:
+    from rdkit.six.moves import cPickle  # type: ignore
+except Exception:
+    import pickle as cPickle
 import re
 
 from open_biomed.core.tool import Tool

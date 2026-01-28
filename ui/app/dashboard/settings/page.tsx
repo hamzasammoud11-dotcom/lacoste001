@@ -1,6 +1,7 @@
 "use client"
 
 import { Brain, Save,Settings } from "lucide-react"
+import { useEffect, useState } from "react"
 
 import { PageHeader, SectionHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,52 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent,TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function SettingsPage() {
+  const [molEncoder, setMolEncoder] = useState("MolCLR")
+  const [protEncoder, setProtEncoder] = useState("ESM-2")
+  const [bindingPredictor, setBindingPredictor] = useState("DrugBAN")
+  const [propertyPredictor, setPropertyPredictor] = useState("ADMET-AI")
+  const [llmProvider, setLlmProvider] = useState("Local")
+  const [llmModel, setLlmModel] = useState("Llama3")
+  const [temperature, setTemperature] = useState(0.7)
+  const [stream, setStream] = useState(true)
+  const [saveStatus, setSaveStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    const saved = localStorage.getItem("bioflow_settings")
+    if (!saved) return
+    try {
+      const data = JSON.parse(saved)
+      setMolEncoder(data.molEncoder || "MolCLR")
+      setProtEncoder(data.protEncoder || "ESM-2")
+      setBindingPredictor(data.bindingPredictor || "DrugBAN")
+      setPropertyPredictor(data.propertyPredictor || "ADMET-AI")
+      setLlmProvider(data.llmProvider || "Local")
+      setLlmModel(data.llmModel || "Llama3")
+      setTemperature(typeof data.temperature === "number" ? data.temperature : 0.7)
+      setStream(data.stream !== false)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const handleSave = () => {
+    localStorage.setItem(
+      "bioflow_settings",
+      JSON.stringify({
+        molEncoder,
+        protEncoder,
+        bindingPredictor,
+        propertyPredictor,
+        llmProvider,
+        llmModel,
+        temperature,
+        stream,
+      })
+    )
+    setSaveStatus("Saved")
+    setTimeout(() => setSaveStatus(null), 2000)
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
          <PageHeader
@@ -24,7 +71,7 @@ export default function SettingsPage() {
             <TabsList className="w-full justify-start overflow-x-auto">
                 <TabsTrigger value="models">Models</TabsTrigger>
                 <TabsTrigger value="database">Database</TabsTrigger>
-                <TabsTrigger value="api">API Keys</TabsTrigger>
+                <TabsTrigger value="api">Endpoints</TabsTrigger>
                 <TabsTrigger value="appearance">Appearance</TabsTrigger>
                 <TabsTrigger value="system">System</TabsTrigger>
             </TabsList>
@@ -40,7 +87,7 @@ export default function SettingsPage() {
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="mol-encoder">Molecule Encoder</Label>
-                                <Select defaultValue="MolCLR">
+                                <Select value={molEncoder} onValueChange={setMolEncoder}>
                                     <SelectTrigger id="mol-encoder">
                                         <SelectValue placeholder="Select molecule encoder" />
                                     </SelectTrigger>
@@ -54,7 +101,7 @@ export default function SettingsPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="prot-encoder">Protein Encoder</Label>
-                                <Select defaultValue="ESM-2">
+                                <Select value={protEncoder} onValueChange={setProtEncoder}>
                                     <SelectTrigger id="prot-encoder">
                                         <SelectValue placeholder="Select protein encoder" />
                                     </SelectTrigger>
@@ -77,7 +124,7 @@ export default function SettingsPage() {
                          <CardContent className="space-y-4">
                              <div className="space-y-2">
                                 <Label htmlFor="binding">Binding Predictor</Label>
-                                <Select defaultValue="DrugBAN">
+                                <Select value={bindingPredictor} onValueChange={setBindingPredictor}>
                                     <SelectTrigger id="binding">
                                         <SelectValue placeholder="Select predictor" />
                                     </SelectTrigger>
@@ -91,7 +138,7 @@ export default function SettingsPage() {
                             </div>
                              <div className="space-y-2">
                                 <Label htmlFor="property">Property Predictor</Label>
-                                <Select defaultValue="ADMET-AI">
+                                <Select value={propertyPredictor} onValueChange={setPropertyPredictor}>
                                     <SelectTrigger id="property">
                                         <SelectValue placeholder="Select predictor" />
                                     </SelectTrigger>
@@ -109,47 +156,43 @@ export default function SettingsPage() {
                  <Card>
                     <CardHeader>
                         <CardTitle>LLM Settings</CardTitle>
-                        <CardDescription>Configure language models for evidence retrieval and reasoning</CardDescription>
+                        <CardDescription>Configure open-source local models for evidence retrieval and reasoning</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <Label htmlFor="llm-provider">LLM Provider</Label>
-                            <Select defaultValue="OpenAI">
+                            <Select value={llmProvider} onValueChange={setLlmProvider}>
                                 <SelectTrigger id="llm-provider">
                                     <SelectValue placeholder="Select provider" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="OpenAI">OpenAI</SelectItem>
-                                    <SelectItem value="Anthropic">Anthropic</SelectItem>
-                                    <SelectItem value="Local">Local (Ollama)</SelectItem>
-                                    <SelectItem value="Azure">Azure OpenAI</SelectItem>
+                                    <SelectItem value="Local">Local (Open-Source)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                          <div className="space-y-2">
                              <Label htmlFor="llm-model">Model</Label>
-                             <Select defaultValue="GPT-4o">
+                             <Select value={llmModel} onValueChange={setLlmModel}>
                                 <SelectTrigger id="llm-model">
                                     <SelectValue placeholder="Select model" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="GPT-4o">GPT-4o</SelectItem>
-                                    <SelectItem value="GPT-4-turbo">GPT-4-turbo</SelectItem>
-                                    <SelectItem value="Claude 3.5">Claude 3.5 Sonnet</SelectItem>
-                                    <SelectItem value="Llama 3">Llama 3.1 70B</SelectItem>
+                                    <SelectItem value="Llama3">Llama 3</SelectItem>
+                                    <SelectItem value="Mistral">Mistral</SelectItem>
+                                    <SelectItem value="Qwen">Qwen</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="col-span-1 md:col-span-2 space-y-4">
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <Label>Temperature: 0.7</Label>
+                                    <Label>Temperature: {temperature.toFixed(1)}</Label>
                                     <span className="text-xs text-muted-foreground">Creativity vs Precision</span>
                                 </div>
-                                <Slider defaultValue={[0.7]} max={1} step={0.1} />
+                                <Slider value={[temperature]} max={1} step={0.1} onValueChange={([v]) => setTemperature(v)} />
                             </div>
                             <div className="flex items-center space-x-2">
-                                <Switch id="stream" defaultChecked />
+                                <Switch id="stream" checked={stream} onCheckedChange={setStream} />
                                 <Label htmlFor="stream">Stream Responses</Label>
                             </div>
                         </div>
@@ -176,14 +219,15 @@ export default function SettingsPage() {
             <TabsContent value="api">
                 <Card>
                      <CardContent className="p-12 text-center text-muted-foreground">
-                        API Key configuration.
+                        Configure local model endpoints or proxies.
                     </CardContent>
                 </Card>
             </TabsContent>
         </Tabs>
 
-        <div className="fixed bottom-6 right-6">
-            <Button size="lg" className="shadow-2xl">
+        <div className="fixed bottom-6 right-6 flex items-center gap-3">
+            {saveStatus && <span className="text-sm text-emerald-500">{saveStatus}</span>}
+            <Button size="lg" className="shadow-2xl" onClick={handleSave}>
                 <Save className="mr-2 h-4 w-4" />
                 Save Changes
             </Button>

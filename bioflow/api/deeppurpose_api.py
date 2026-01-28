@@ -18,7 +18,7 @@ sys.path.insert(0, ROOT_DIR)
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/dp", tags=["deeppurpose"])
+router = APIRouter(prefix="/api", tags=["deeppurpose"])
 
 # Global state for DeepPurpose model
 _dp_model = None

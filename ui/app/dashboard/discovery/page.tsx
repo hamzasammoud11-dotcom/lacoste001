@@ -16,15 +16,24 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 interface SearchResult {
   id: string;
   score: number;
-  smiles: string;
-  target_seq: string;
-  label: number;
-  affinity_class: string;
+  mmr_score?: number;
+  content: string;
+  modality: string;
+  metadata: {
+    name?: string;
+    smiles?: string;
+    description?: string;
+    source?: string;
+    label_true?: number;
+    affinity_class?: string;
+    [key: string]: unknown;
+  };
 }
 
 export default function DiscoveryPage() {
   const [query, setQuery] = React.useState("")
   const [searchType, setSearchType] = React.useState("Similarity")
+  const [database, setDatabase] = React.useState("both")
   const [isSearching, setIsSearching] = React.useState(false)
   const [step, setStep] = React.useState(0)
   const [results, setResults] = React.useState<SearchResult[]>([])
@@ -70,7 +79,8 @@ export default function DiscoveryPage() {
         body: JSON.stringify({
           query: query.trim(),
           type: apiType,
-          limit: 10
+          limit: 10,
+          dataset: database !== "both" ? database.toLowerCase() : undefined
         })
       });
       
@@ -112,7 +122,7 @@ export default function DiscoveryPage() {
         icon={<Microscope className="h-8 w-8" />}
       />
 
-      <Card>
+      <Card id="search">
         <div className="p-4 border-b font-semibold">Search Query</div>
         <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -146,13 +156,14 @@ export default function DiscoveryPage() {
                     </div>
                      <div className="space-y-2">
                         <Label>Database</Label>
-                        <Select defaultValue="KIBA">
+                        <Select value={database} onValueChange={setDatabase}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select database" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="KIBA">KIBA (23.5K pairs)</SelectItem>
-                                <SelectItem value="DAVIS">DAVIS Kinase</SelectItem>
+                                <SelectItem value="both">All Datasets</SelectItem>
+                                <SelectItem value="kiba">KIBA (Kinase Inhibitors)</SelectItem>
+                                <SelectItem value="davis">DAVIS (Kinase Targets)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -221,19 +232,40 @@ export default function DiscoveryPage() {
                         <Card key={result.id}>
                             <CardContent className="p-4 flex items-center justify-between">
                                 <div className="flex-1">
-                                    <div className="font-mono text-sm font-medium">
-                                      {result.smiles?.slice(0, 50)}{result.smiles?.length > 50 ? '...' : ''}
+                                    <div className="font-semibold text-base mb-1">
+                                      {result.metadata?.name || `Result ${i + 1}`}
                                     </div>
-                                    <div className="flex gap-4 text-sm text-muted-foreground mt-1">
-                                        <span>Affinity: {result.affinity_class}</span>
-                                        <span>Label: {result.label?.toFixed(2)}</span>
+                                    <div className="font-mono text-sm text-muted-foreground">
+                                      {(result.metadata?.smiles || result.content)?.slice(0, 60)}
+                                      {(result.metadata?.smiles || result.content)?.length > 60 ? '...' : ''}
+                                    </div>
+                                    {result.metadata?.description && (
+                                      <div className="text-sm text-muted-foreground mt-1">
+                                        {result.metadata.description}
+                                      </div>
+                                    )}
+                                    <div className="flex gap-4 text-xs text-muted-foreground mt-2">
+                                        {result.metadata?.affinity_class && (
+                                          <span className="bg-muted px-2 py-0.5 rounded">
+                                            Affinity: {result.metadata.affinity_class}
+                                          </span>
+                                        )}
+                                        {result.metadata?.label_true != null && (
+                                          <span className="bg-muted px-2 py-0.5 rounded">
+                                            Label: {result.metadata.label_true.toFixed(2)}
+                                          </span>
+                                        )}
+                                        <span className="bg-muted px-2 py-0.5 rounded">
+                                          {result.modality}
+                                        </span>
                                     </div>
                                 </div>
                                 <div className="text-right">
                                     <div className="text-sm text-muted-foreground">Similarity</div>
                                     <div className={`text-xl font-bold ${
                                         result.score >= 0.9 ? 'text-green-600' : 
-                                        result.score >= 0.7 ? 'text-green-500' : 'text-amber-500'
+                                        result.score >= 0.7 ? 'text-green-500' : 
+                                        result.score >= 0.5 ? 'text-amber-500' : 'text-muted-foreground'
                                     }`}>
                                         {result.score.toFixed(3)}
                                     </div>

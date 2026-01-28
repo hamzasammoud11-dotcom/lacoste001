@@ -4,6 +4,9 @@
 
 Ce document présente l'intégration complète de **BioFlow** avec **OpenBioMed (OBM)** et **Qdrant** pour créer un système d'intelligence biologique multimodale. L'architecture permet d'unifier textes scientifiques, molécules (SMILES) et protéines dans un espace vectoriel commun, facilitant la découverte cross-modale et la conception de médicaments assistée par IA.
 
+> **Note (27/01/2026)**: L'interface Streamlit historique a été retirée du runtime.  
+> L'UI officielle est **Next.js** (dossier `ui/`) et le backend est **FastAPI** (port 8000).
+
 ---
 
 ## 📋 Table des matières
@@ -24,7 +27,7 @@ Ce document présente l'intégration complète de **BioFlow** avec **OpenBioMed 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        BioFlow Explorer                         │
-│                     (Interface Streamlit)                        │
+│                     (Interface Next.js)                          │
 └─────────────────────────────────┬───────────────────────────────┘
                                   │
 ┌─────────────────────────────────▼───────────────────────────────┐
@@ -140,16 +143,9 @@ Outils de visualisation pour exploration.
 - **MoleculeVisualizer** : SVG, grilles de molécules (via RDKit)
 - **ResultsVisualizer** : Dashboard, graphiques de scores
 
-### 5. Application Streamlit (`bioflow/app.py`)
+### 5. Application Web (Next.js)
 
-Interface interactive complète avec :
-
-- 🔍 **Search & Explore** : Recherche multimodale
-- 📥 **Data Ingestion** : Upload simple/batch
-- 🧪 **Cross-Modal Analysis** : Comparaison inter-modalités
-- 📊 **Visualization** : Plots embeddings et molécules
-- 🔬 **Pipeline Demo** : Workflow de découverte complet
-- 📚 **Documentation** : Guide intégré
+L'interface officielle est la **Next.js UI** dans `ui/` (aucun runtime Streamlit).
 
 ---
 
@@ -192,7 +188,7 @@ protein → protein: Protéines homologues
 ```bash
 # Dépendances principales
 pip install -r requirements.txt
-pip install qdrant-client streamlit plotly scikit-learn
+pip install qdrant-client plotly scikit-learn
 
 # Optionnel pour visualisation moléculaire
 pip install rdkit
@@ -202,7 +198,9 @@ pip install rdkit
 
 ```bash
 cd OpenBioMed
-streamlit run bioflow/app.py
+# UI (Next.js)
+cd ui
+pnpm dev
 ```
 
 ### Utilisation Programmatique
@@ -350,7 +348,7 @@ if not validation.content["passed"]:
 | Mémoire vectorielle centrale | `QdrantManager` avec collection partagée |
 | Encodeur multimodal | `OBMWrapper` (BioMedGPT) |
 | Nœuds-agents | Classes `*Agent` dans `pipeline.py` |
-| Workflow visuel | `BioFlowPipeline` + Streamlit UI |
+| Workflow visuel | **Next.js UI** (`ui/`) + API FastAPI |
 | Evidence linking | Payload avec `source`, `tags`, scores |
 
 ### Points d'extension
@@ -385,7 +383,7 @@ pipeline:
 - [x] OBM Wrapper avec encodage multimodal
 - [x] Intégration Qdrant
 - [x] Agents de base (Miner, Validator, Ranker)
-- [x] Interface Streamlit
+- [x] Interface Next.js (UI officielle)
 - [x] Mode Mock pour développement
 
 ### Phase 2 (Court terme)

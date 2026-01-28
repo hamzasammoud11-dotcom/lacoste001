@@ -4,6 +4,9 @@ Qdrant Manager - Vector Database Integration
 
 This module provides high-level management for Qdrant collections,
 including ingestion, search, and retrieval operations for BioFlow.
+
+DEPRECATED (legacy): Prefer `bioflow/api/qdrant_service.py` for the active FastAPI backend.
+This module is kept for backward compatibility with older demos/scripts.
 """
 
 import logging
