@@ -143,6 +143,12 @@ langflow run --host 0.0.0.0 --port 7860
 # Or directly at http://localhost:7860
 ```
 
+**Note:** To use a dedicated Python environment for Langflow without installing it in the project venv, set the `LANGFLOW_PYTHON` environment variable to the path of the Python executable that has Langflow installed:
+
+```bash
+LANGFLOW_PYTHON=C:\path\to\python.exe python run_langflow.py
+```
+
 Open [http://localhost:3000](http://localhost:3000)
 
 ---

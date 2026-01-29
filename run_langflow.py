@@ -11,18 +11,23 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_dir)
     
-    # Prefer langflow executable in .venv if present, else fall back to PATH
-    langflow_exe = os.path.join(script_dir, ".venv", "Scripts", "langflow.exe")
-    cmd = [langflow_exe, "run", "--host", "0.0.0.0", "--port", "7860"]
-    if not os.path.exists(langflow_exe):
-        cmd = ["langflow", "run", "--host", "0.0.0.0", "--port", "7860"]
+    # Prefer a dedicated Python for Langflow if provided, else use local .venv or PATH
+    langflow_python = os.getenv("LANGFLOW_PYTHON")
+    if langflow_python:
+        cmd = [langflow_python, "-m", "langflow", "run", "--host", "0.0.0.0", "--port", "7860"]
+    else:
+        langflow_exe = os.path.join(script_dir, ".venv", "Scripts", "langflow.exe")
+        cmd = [langflow_exe, "run", "--host", "0.0.0.0", "--port", "7860"]
+        if not os.path.exists(langflow_exe):
+            cmd = ["langflow", "run", "--host", "0.0.0.0", "--port", "7860"]
     
     try:
         subprocess.run(cmd, check=True)
     except FileNotFoundError:
         raise SystemExit(
-            "Langflow executable not found. Install with: pip install langflow "
-            "and ensure it is in your PATH or in .venv\\Scripts."
+            "Langflow executable not found. Set LANGFLOW_PYTHON to a Python "
+            "environment that has langflow installed, or ensure langflow is in "
+            "your PATH or .venv\\Scripts."
         )
 
 if __name__ == "__main__":
