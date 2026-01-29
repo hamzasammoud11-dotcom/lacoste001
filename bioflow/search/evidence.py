@@ -81,10 +81,29 @@ class EvidenceLinker:
             EnrichedResult with evidence links
         """
         metadata = result.get('metadata', result.get('payload', {}))
-        source = metadata.get('source', '').lower()
+        raw_source = metadata.get('source') or metadata.get('source_type') or ''
+        source = str(raw_source).lower()
         source_id = metadata.get('source_id', '')
         
         links = []
+        # Accept precomputed evidence links if provided in metadata
+        meta_links = metadata.get("evidence_links") or []
+        if isinstance(meta_links, list):
+            for item in meta_links:
+                if not isinstance(item, dict):
+                    continue
+                src = item.get("source")
+                ident = item.get("identifier")
+                url = item.get("url")
+                label = item.get("label")
+                if src and ident and url:
+                    links.append(EvidenceLink(
+                        source=str(src),
+                        identifier=str(ident),
+                        url=str(url),
+                        label=str(label or ident),
+                        confidence=float(item.get("confidence", 1.0)),
+                    ))
         citation = None
         source_type = source or "unknown"
         
