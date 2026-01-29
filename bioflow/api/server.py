@@ -666,14 +666,14 @@ async def search_image(
 ):
     """
     Image similarity search.
-    
+
     Find similar biological images (microscopy, gels, spectra).
     Supports query-by-image and cross-modal search.
     """
     try:
         if not qdrant_service:
             raise HTTPException(status_code=503, detail="Qdrant service not available")
-        
+
         search_service = get_enhanced_search_service()
         response = search_service.enhanced_search(
             query=image,
@@ -684,9 +684,9 @@ async def search_image(
             lambda_param=lambda_param,
             filters=filters or {}
         )
-        
+
         return response.to_dict()
-        
+
     except Exception as e:
         logger.error(f"Image search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -900,9 +900,16 @@ async def list_molecules(limit: int = 20, offset: int = 0):
         molecules = []
         for r in results:
             metadata = r.metadata or {}
+            # Ensure smiles is always a string
+            smiles = r.content
+            if not isinstance(smiles, str):
+                smiles = str(smiles) if smiles else ""
+            # Also check metadata for smiles
+            if not smiles:
+                smiles = metadata.get("smiles", "") or metadata.get("SMILES", "") or ""
             molecules.append({
                 "id": r.id,
-                "smiles": r.content,
+                "smiles": smiles,
                 "name": metadata.get("name", metadata.get("title", "Unknown")),
                 "pubchemCid": metadata.get("pubchem_cid", metadata.get("pubchemCid", metadata.get("cid", 0))),
                 "description": metadata.get("description", metadata.get("title", "")),
@@ -1429,14 +1436,14 @@ async def ingest_image(request: ImageIngestRequest):
     """Ingest a single biological image."""
     try:
         from bioflow.ingestion.image_ingestor import ImageIngestor
-        
+
         # Initialize ingestor
         ingestor = ImageIngestor(
-            encoder=model_service.encoder,
-            qdrant=qdrant_service.qdrant_manager,
+            qdrant_service=qdrant_service,
+            obm_encoder=model_service.get_obm_encoder(),
             collection=request.collection
         )
-        
+
         # Prepare image data
         image_data = {
             "image": request.image,
@@ -1446,10 +1453,10 @@ async def ingest_image(request: ImageIngestRequest):
             "caption": request.caption,
             "metadata": request.metadata or {}
         }
-        
+
         # Ingest single image
         result = ingestor.batch_ingest([image_data], collection=request.collection)
-        
+
         return {
             "success": True,
             "result": result.to_dict()
@@ -1464,14 +1471,14 @@ async def ingest_images_batch(request: BatchImageIngestRequest):
     """Batch ingest multiple biological images."""
     try:
         from bioflow.ingestion.image_ingestor import ImageIngestor
-        
+
         # Initialize ingestor
         ingestor = ImageIngestor(
-            encoder=model_service.encoder,
-            qdrant=qdrant_service.qdrant_manager,
+            qdrant_service=qdrant_service,
+            obm_encoder=model_service.get_obm_encoder(),
             collection=request.collection
         )
-        
+
         # Prepare image data
         images_data = []
         for img in request.images:
@@ -1483,41 +1490,16 @@ async def ingest_images_batch(request: BatchImageIngestRequest):
                 "caption": img.caption,
                 "metadata": img.metadata or {}
             })
-        
+
         # Batch ingest
         result = ingestor.batch_ingest(images_data, collection=request.collection)
-        
+
         return {
             "success": True,
             "result": result.to_dict()
         }
     except Exception as e:
         logger.error(f"Batch image ingestion failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/ingest/image/metadata")
-async def ingest_images_from_metadata(metadata_file: str, collection: Optional[str] = "bioflow_memory"):
-    """Ingest images from a metadata JSON file."""
-    try:
-        from bioflow.ingestion.image_ingestor import ImageIngestor
-        
-        # Initialize ingestor
-        ingestor = ImageIngestor(
-            encoder=model_service.encoder,
-            qdrant=qdrant_service.qdrant_manager,
-            collection=collection
-        )
-        
-        # Ingest from metadata file
-        result = ingestor.ingest_from_metadata(metadata_file, collection=collection)
-        
-        return {
-            "success": True,
-            "result": result.to_dict()
-        }
-    except Exception as e:
-        logger.error(f"Metadata-based image ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1602,6 +1584,8 @@ async def get_stats():
     """Get system statistics for the data page."""
     total_vectors = 0
     collections_info = []
+    molecules_count = 0
+    proteins_count = 0
     
     if qdrant_service:
         try:
@@ -1609,14 +1593,42 @@ async def get_stats():
             for coll in collections:
                 try:
                     stats = qdrant_service.get_collection_stats(coll)
-                    total_vectors += stats.get("points_count", 0)
+                    points = stats.get("points_count", 0)
+                    total_vectors += points
                     collections_info.append(stats)
+                    
+                    # Track by collection type
+                    if "molecule" in coll.lower():
+                        molecules_count += points
+                    elif "protein" in coll.lower():
+                        proteins_count += points
                 except Exception as e:
                     logger.warning(f"Failed to get stats for {coll}: {e}")
         except Exception as e:
             logger.warning(f"Failed to list collections: {e}")
     
+    # Format datasets for frontend
+    datasets = []
+    for coll_stat in collections_info:
+        coll_name = coll_stat.get("name", "unknown")
+        points = coll_stat.get("points_count", 0)
+        datasets.append({
+            "name": coll_name,
+            "type": "molecule" if "molecule" in coll_name.lower() else ("protein" if "protein" in coll_name.lower() else "mixed"),
+            "count": f"{points:,}",
+            "size": f"{(points * 3072) / 1024 / 1024:.1f} MB",  # Estimate based on vector size
+            "updated": "Recently",
+        })
+    
     return {
+        "datasets": datasets,
+        "stats": {
+            "datasets": len(collections_info),
+            "molecules": f"{molecules_count:,}",
+            "proteins": f"{proteins_count:,}",
+            "storage": f"{(total_vectors * 3072) / 1024 / 1024:.1f} MB",
+        },
+        # Also include legacy fields for compatibility
         "total_vectors": total_vectors,
         "collections": collections_info,
         "model_status": "loaded" if model_service else "not_loaded",

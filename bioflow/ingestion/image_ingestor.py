@@ -1,4 +1,4 @@
-"""
+﻿"""
 Image Ingestor - Biological Image Ingestion
 ============================================
 
@@ -283,7 +283,7 @@ class ImageIngestor(BaseIngestor):
             errors=errors[:10]  # Limit errors
         )
         
-        logger.info(f"✅ Ingestion complete: {indexed} indexed, {failed} failed in {duration:.2f}s")
+        logger.info(f"Γ£à Ingestion complete: {indexed} indexed, {failed} failed in {duration:.2f}s")
         
         return result
     

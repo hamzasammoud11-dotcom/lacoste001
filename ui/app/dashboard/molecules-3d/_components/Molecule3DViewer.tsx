@@ -1,8 +1,7 @@
 'use client';
 
 import { AlertCircle, RotateCcw } from 'lucide-react';
-import dynamic from 'next/dynamic';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { MoleculeRepresentation } from '@/types/visualization';
+
+type MoleculeRepresentation = 'stick' | 'sphere' | 'line' | 'cartoon';
 
 interface Molecule3DViewerProps {
   sdfData: string;
@@ -24,11 +24,8 @@ interface Molecule3DViewerProps {
   initialRepresentation?: MoleculeRepresentation;
 }
 
-// Lazy-load 3Dmol only on client (no SSR)
-const Viewer3D = dynamic(() => import('./Viewer3D'), {
-  ssr: false,
-  loading: () => null, // we handle loading ourselves with Skeleton
-});
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type $3DmolType = any;
 
 export function Molecule3DViewer({
   sdfData,
@@ -37,32 +34,116 @@ export function Molecule3DViewer({
   className,
   initialRepresentation = 'stick',
 }: Molecule3DViewerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const viewerRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [representation, setRepresentation] = useState<MoleculeRepresentation>(
-    initialRepresentation,
-  );
+  const [representation, setRepresentation] =
+    useState<MoleculeRepresentation>(initialRepresentation);
+  const [$3Dmol, set$3Dmol] = useState<$3DmolType | null>(null);
 
-  // We'll show skeleton until both library + model are ready
-  const handleReady = useCallback(() => {
-    setIsLoading(false);
+  // Load 3Dmol.js dynamically
+  useEffect(() => {
+    const load3Dmol = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const module = (await import('3dmol')) as any;
+        set$3Dmol(module);
+      } catch (err) {
+        console.error('Failed to load 3Dmol:', err);
+        setError('Failed to load 3D visualization library');
+        setIsLoading(false);
+      }
+    };
+    load3Dmol();
   }, []);
 
-  const handleError = useCallback((msg: string) => {
-    setError(msg);
-    setIsLoading(false);
+  const getStyleForRepresentation = useCallback(
+    (rep: MoleculeRepresentation) => {
+      switch (rep) {
+        case 'stick':
+          return { stick: { radius: 0.15 } };
+        case 'sphere':
+          return { sphere: { scale: 0.3 } };
+        case 'line':
+          return { line: { linewidth: 2 } };
+        case 'cartoon':
+          return { cartoon: {} };
+        default:
+          return { stick: { radius: 0.15 } };
+      }
+    },
+    []
+  );
+
+  const initViewer = useCallback(() => {
+    if (!containerRef.current || !$3Dmol || !sdfData) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Clean up existing viewer
+      if (viewerRef.current) {
+        viewerRef.current.removeAllModels();
+      }
+
+      // Create viewer
+      const viewer = $3Dmol.createViewer(containerRef.current, {
+        backgroundColor: '#0a0a0a',
+      });
+      viewerRef.current = viewer;
+
+      // Add molecule
+      viewer.addModel(sdfData, 'sdf');
+      viewer.setStyle({}, getStyleForRepresentation(representation));
+      viewer.zoomTo();
+      viewer.render();
+
+      setIsLoading(false);
+    } catch (err) {
+      console.error('3D viewer error:', err);
+      setError(
+        err instanceof Error
+          ? `Visualization error: ${err.message}`
+          : 'Failed to render 3D structure'
+      );
+      setIsLoading(false);
+    }
+  }, [$3Dmol, sdfData, representation, getStyleForRepresentation]);
+
+  useEffect(() => {
+    initViewer();
+  }, [$3Dmol, sdfData, initViewer]);
+
+  // Update representation
+  useEffect(() => {
+    if (!viewerRef.current) return;
+    try {
+      viewerRef.current.setStyle({}, getStyleForRepresentation(representation));
+      viewerRef.current.render();
+    } catch (err) {
+      console.error('Style update error:', err);
+    }
+  }, [representation, getStyleForRepresentation]);
+
+  const handleResetCamera = useCallback(() => {
+    if (!viewerRef.current) return;
+    viewerRef.current.zoomTo();
+    viewerRef.current.render();
   }, []);
 
   if (error) {
     return (
       <Card className={`border-destructive bg-destructive/10 ${className}`}>
         <CardContent className="flex items-center gap-3 p-4">
-          <AlertCircle className="text-destructive size-5" />
+          <AlertCircle className="size-5 text-destructive" />
           <div className="flex flex-col">
-            <span className="text-destructive text-sm font-medium">
+            <span className="text-sm font-medium text-destructive">
               3D Visualization Error
             </span>
-            <span className="text-muted-foreground text-xs">{error}</span>
+            <span className="text-xs text-muted-foreground">{error}</span>
           </div>
         </CardContent>
       </Card>
@@ -74,7 +155,9 @@ export function Molecule3DViewer({
       <div className="flex items-center gap-2">
         <Select
           value={representation}
-          onValueChange={(v) => setRepresentation(v as MoleculeRepresentation)}
+          onValueChange={(value) =>
+            setRepresentation(value as MoleculeRepresentation)
+          }
         >
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Style" />
@@ -83,11 +166,9 @@ export function Molecule3DViewer({
             <SelectItem value="stick">Stick</SelectItem>
             <SelectItem value="sphere">Sphere</SelectItem>
             <SelectItem value="line">Line</SelectItem>
-            <SelectItem value="cartoon">Cartoon</SelectItem>
           </SelectContent>
         </Select>
-
-        <Button variant="outline" size="sm" onClick={() => { }}>
+        <Button variant="outline" size="sm" onClick={handleResetCamera}>
           <RotateCcw className="mr-1 size-4" />
           Reset
         </Button>
@@ -100,14 +181,10 @@ export function Molecule3DViewer({
             style={{ width, height }}
           />
         )}
-
-        <Viewer3D
-          sdfData={sdfData}
-          representation={representation}
-          width={width}
-          height={height}
-          onReady={handleReady}
-          onError={handleError}
+        <div
+          ref={containerRef}
+          style={{ width, height }}
+          className={`rounded-lg border bg-background ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
         />
       </div>
     </div>

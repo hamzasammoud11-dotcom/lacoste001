@@ -264,7 +264,10 @@ class QdrantService:
         elif modality == "protein":
             result = self.model_service.encode_protein(content)
         elif modality == "image":
-            result = self.model_service.encode_image(content)
+            # Use OBMEncoder for image encoding
+            obm = self.model_service.get_obm_encoder()
+            from bioflow.core.base import Modality
+            result = obm.encode(content, Modality.IMAGE)
         else:
             result = self.model_service.encode_text(content)
         
@@ -443,26 +446,27 @@ class QdrantService:
                         )]
                     )
                 
-                # Use query_points for newer qdrant-client versions
+                # Use search() for qdrant-client v1.x compatibility (query_points doesn't exist)
                 try:
-                    results = client.query_points(
+                    results = client.search(
                         collection_name=coll,
-                        query=query_vector,
+                        query_vector=query_vector,
                         limit=limit,
                         query_filter=filter_conditions,
                         search_params=search_params,
                         with_payload=True,
                         with_vectors=with_vectors,
-                    ).points
+                    )
                 except TypeError:
-                    results = client.query_points(
+                    # Fallback without search_params if not supported
+                    results = client.search(
                         collection_name=coll,
-                        query=query_vector,
+                        query_vector=query_vector,
                         limit=limit,
                         query_filter=filter_conditions,
                         with_payload=True,
                         with_vectors=with_vectors,
-                    ).points
+                    )
                 
                 for r in results:
                     raw_modality = r.payload.get("modality", "unknown")

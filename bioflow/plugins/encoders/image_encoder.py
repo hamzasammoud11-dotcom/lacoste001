@@ -1,4 +1,4 @@
-"""
+﻿"""
 Image Encoder - BiomedCLIP Integration
 =======================================
 
@@ -14,7 +14,7 @@ Note: OBMEncoder projects these to 768-dim for unified cross-modal search
 
 This encoder enables:
 - Image similarity search
-- Cross-modal search (image ↔ text/molecule/protein)
+- Cross-modal search (image Γåö text/molecule/protein)
 - Image-based experimental result retrieval
 """
 
@@ -116,7 +116,7 @@ class ImageEncoder(BioEncoder):
             self._preprocess = preprocess_val  # Use validation preprocessing
             self._tokenizer = tokenizer
             
-            logger.info("✅ BiomedCLIP model loaded successfully")
+            logger.info("Γ£à BiomedCLIP model loaded successfully")
             
         except Exception as e:
             logger.error(f"Failed to load BiomedCLIP: {e}")
@@ -233,9 +233,15 @@ class ImageEncoder(BioEncoder):
         if isinstance(img_input, str) and os.path.exists(img_input):
             return Image.open(img_input).convert('RGB')
         
-        # URL (not implemented - would require requests)
+        # URL - download using requests
         if isinstance(img_input, str) and (img_input.startswith('http://') or img_input.startswith('https://')):
-            raise NotImplementedError("URL loading not yet supported. Use local files or base64.")
+            import requests
+            try:
+                response = requests.get(img_input, timeout=30, headers={'User-Agent': 'Mozilla/5.0'})
+                response.raise_for_status()
+                return Image.open(io.BytesIO(response.content)).convert('RGB')
+            except Exception as e:
+                raise ValueError(f"Failed to download image from URL: {e}")
         
         # Raw bytes
         if isinstance(img_input, bytes):

@@ -175,23 +175,18 @@ class QdrantRetriever(BioRetriever):
                 )
             qdrant_filter = qdrant["Filter"](must=conditions)
         
-        # Search (use query method for newer qdrant-client versions)
+        # Search (use search() for qdrant-client v1.x compatibility)
         try:
-            # New API (qdrant-client >= 1.6)
-            results = self.client.query_points(
-                collection_name=collection,
-                query=query_vector,
-                limit=limit,
-                query_filter=qdrant_filter
-            ).points
-        except AttributeError:
-            # Fallback to old API
+            # Use search() which exists in all versions
             results = self.client.search(
                 collection_name=collection,
                 query_vector=query_vector,
                 limit=limit,
                 query_filter=qdrant_filter
             )
+        except Exception as e:
+            logger.warning(f"Search failed: {e}")
+            results = []
         
         # Convert to RetrievalResult with safe modality mapping
         def _safe_modality(payload: dict) -> Modality:

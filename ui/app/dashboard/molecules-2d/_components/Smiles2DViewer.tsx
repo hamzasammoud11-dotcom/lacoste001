@@ -7,6 +7,18 @@ import SmilesDrawer from 'smiles-drawer';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
+/**
+ * Extract dominant fragment from multi-part SMILES (removes salts/solvents).
+ */
+function sanitizeSmiles(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const s = raw.trim();
+  if (s.includes('.')) {
+    return s.split('.').sort((a, b) => b.length - a.length)[0] || '';
+  }
+  return s;
+}
+
 interface Smiles2DViewerProps {
   smiles: string;
   width?: number;
@@ -26,8 +38,11 @@ export function Smiles2DViewer({
   const [isLoading, setIsLoading] = useState(true);
 
   const drawMolecule = useCallback(async () => {
-    if (!canvasRef.current || !smiles) {
+    const cleanSmiles = sanitizeSmiles(smiles);
+
+    if (!canvasRef.current || !cleanSmiles) {
       setIsLoading(false);
+      if (!cleanSmiles) setError('SMILES string is missing or invalid');
       return;
     }
 
@@ -53,20 +68,15 @@ export function Smiles2DViewer({
         padding: 20,
       });
 
-      try {
-        await new Promise<void>((resolve, reject) => {
-          SmilesDrawer.parse(
-            smiles,
-            (tree) => {
-              drawer.draw(tree, canvasRef.current, 'light');
-              resolve();
-            },
-            (err) => reject(err),
-          );
-        });
-      } catch (drawError) {
-        throw drawError;
-      }
+      await new Promise<void>((resolve, reject) => {
+        (drawer as any).draw(
+          cleanSmiles,
+          `[id="${canvasId}"]`,
+          'light',
+          () => resolve(),
+          (drawError: Error) => reject(drawError)
+        );
+      });
 
       setIsLoading(false);
     } catch (err) {
@@ -74,7 +84,7 @@ export function Smiles2DViewer({
       setError(
         err instanceof Error
           ? `Invalid SMILES: ${err.message}`
-          : 'Failed to render molecule structure',
+          : 'Failed to render molecule structure'
       );
       setIsLoading(false);
     }
@@ -88,12 +98,12 @@ export function Smiles2DViewer({
     return (
       <Card className={`border-destructive bg-destructive/10 ${className}`}>
         <CardContent className="flex items-center gap-3 p-4">
-          <AlertCircle className="text-destructive size-5" />
+          <AlertCircle className="size-5 text-destructive" />
           <div className="flex flex-col">
-            <span className="text-destructive text-sm font-medium">
+            <span className="text-sm font-medium text-destructive">
               Visualization Error
             </span>
-            <span className="text-muted-foreground text-xs">{error}</span>
+            <span className="text-xs text-muted-foreground">{error}</span>
           </div>
         </CardContent>
       </Card>

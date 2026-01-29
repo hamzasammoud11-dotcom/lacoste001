@@ -25,8 +25,11 @@ export function Smiles2DViewer({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Ensure smiles is a valid string
+  const smilesString = typeof smiles === 'string' ? smiles : String(smiles || '');
+
   const drawMolecule = useCallback(async () => {
-    if (!canvasRef.current || !smiles) {
+    if (!canvasRef.current || !smilesString || smilesString.trim() === '') {
       setIsLoading(false);
       return;
     }
@@ -56,7 +59,7 @@ export function Smiles2DViewer({
       try {
         await new Promise<void>((resolve, reject) => {
           SmilesDrawer.parse(
-            smiles,
+            smilesString,
             (tree) => {
               drawer.draw(tree, canvasRef.current, 'light');
               resolve();
@@ -78,7 +81,7 @@ export function Smiles2DViewer({
       );
       setIsLoading(false);
     }
-  }, [smiles, width, height, canvasId]);
+  }, [smilesString, width, height, canvasId]);
 
   useEffect(() => {
     drawMolecule();
