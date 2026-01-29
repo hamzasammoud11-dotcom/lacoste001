@@ -335,12 +335,17 @@ class QdrantService:
 
         # Prepare payload with defaults for traceability
         payload_meta = dict(metadata or {})
-        if "source" not in payload_meta:
-            payload_meta["source"] = "manual"
-        if "source_type" not in payload_meta:
-            payload_meta["source_type"] = payload_meta.get("source", "manual")
+        source = payload_meta.get("source") or payload_meta.get("source_type") or "manual"
+        payload_meta["source"] = str(source).lower()
+        payload_meta["source_type"] = payload_meta.get("source_type") or payload_meta["source"]
         if "ingested_at" not in payload_meta:
             payload_meta["ingested_at"] = datetime.utcnow().isoformat()
+        if "evidence_links" not in payload_meta:
+            payload_meta["evidence_links"] = []
+        if "year" not in payload_meta:
+            payload_meta["year"] = payload_meta.get("pub_year") or payload_meta.get("pub_date")
+        if "organism" not in payload_meta:
+            payload_meta["organism"] = payload_meta.get("species")
 
         payload = {
             "content": content,
