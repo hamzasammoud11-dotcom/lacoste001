@@ -13,6 +13,7 @@ Supports:
 
 import logging
 import os
+import base64
 from typing import List, Dict, Any, Optional, Generator, Union
 from pathlib import Path
 import json
@@ -129,6 +130,10 @@ class ImageIngestor(BaseIngestor):
                 # Generate UUID v5 from image hash
                 image_hash = hashlib.sha256(img_bytes.getvalue()).hexdigest()
                 image_id = str(uuid.uuid5(uuid.NAMESPACE_OID, image_hash))
+                
+                # Convert to base64 for UI display
+                base64_str = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
+                image_b64 = f"data:image/png;base64,{base64_str}"
             
             # If bytes, convert to PIL Image
             elif isinstance(image_data, bytes):
@@ -138,6 +143,10 @@ class ImageIngestor(BaseIngestor):
                 import uuid
                 image_hash = hashlib.sha256(image_data).hexdigest()
                 image_id = str(uuid.uuid5(uuid.NAMESPACE_OID, image_hash))
+                
+                # Convert to base64 for UI display
+                base64_str = base64.b64encode(image_data).decode('utf-8')
+                image_b64 = f"data:image/png;base64,{base64_str}"
             
             # If string (path/URL), generate UUID from string
             else:
@@ -145,6 +154,7 @@ class ImageIngestor(BaseIngestor):
                 import uuid
                 image_hash = hashlib.sha256(str(image_data).encode()).hexdigest()
                 image_id = str(uuid.uuid5(uuid.NAMESPACE_OID, image_hash))
+                image_b64 = None # Can't base64 a string path easily without reading it, assume URL or path is handled elsewhere
             
             # Build metadata
             metadata = {
@@ -155,6 +165,7 @@ class ImageIngestor(BaseIngestor):
                 "description": raw_data.get("description", ""),
                 "caption": raw_data.get("caption", ""),
                 "indexed_at": datetime.now().isoformat(),
+                "image": image_b64, # Add base64 image for UI rendering
                 **raw_data.get("metadata", {})
             }
             

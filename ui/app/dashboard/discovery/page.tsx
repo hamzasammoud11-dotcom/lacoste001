@@ -3,14 +3,22 @@
 import {
   AlertCircle,
   ArrowRight,
+  Check,
   CheckCircle2,
   Circle,
+  ImageIcon,
   Loader2,
+  Maximize2,
   Microscope,
   Search,
+  X,
 } from 'lucide-react';
 import * as React from 'react';
 
+import {
+  Checkbox,
+  CheckboxIndicator,
+} from '@/components/animate-ui/primitives/radix/checkbox';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,6 +39,7 @@ export default function DiscoveryPage() {
   const [query, setQuery] = React.useState('');
   const [searchType, setSearchType] = React.useState('Similarity');
   const [database, setDatabase] = React.useState('both');
+  const [includeImages, setIncludeImages] = React.useState(false);
   const [isSearching, setIsSearching] = React.useState(false);
   const [step, setStep] = React.useState(0);
   const [results, setResults] = React.useState<SearchResult[]>([]);
@@ -71,6 +80,7 @@ export default function DiscoveryPage() {
         type: apiType,
         limit: 10,
         dataset: database !== 'both' ? database.toLowerCase() : undefined,
+        include_images: includeImages,
       });
 
       setStep(3);
@@ -168,6 +178,26 @@ export default function DiscoveryPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox
+                  id="include-images"
+                  checked={includeImages}
+                  onCheckedChange={(c: boolean | "indeterminate") => setIncludeImages(!!c)}
+                  className="peer flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                >
+                  <CheckboxIndicator className="flex items-center justify-center text-current">
+                    <Check className="h-3 w-3" />
+                  </CheckboxIndicator>
+                </Checkbox>
+                <label
+                  htmlFor="include-images"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Include Images
+                </label>
+              </div>
+
               <Button
                 className="w-full"
                 onClick={handleSearch}
@@ -194,7 +224,7 @@ export default function DiscoveryPage() {
               <div className="text-sm">{error}</div>
               <div className="text-muted-foreground mt-1 text-xs">
                 Make sure the API server is running: python -m uvicorn
-                server.api:app --port 8001
+                server.api:app --port 8000
               </div>
             </div>
           </CardContent>
@@ -258,19 +288,71 @@ export default function DiscoveryPage() {
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="flex-1">
                       <div className="mb-1 text-base font-semibold">
-                        {result.metadata?.name || `Result ${i + 1}`}
+                        {result.metadata?.name || (result.modality === 'image' ? 'Image Result' : `Result ${i + 1}`)}
                       </div>
-                      <div className="text-muted-foreground font-mono text-sm">
-                        {(result.metadata?.smiles || result.content)?.slice(
-                          0,
-                          60,
-                        )}
-                        {(result.metadata?.smiles || result.content)?.length >
-                          60
-                          ? '...'
-                          : ''}
-                      </div>
-                      {result.metadata?.description && (
+                      
+                      {result.modality === 'image' ? (
+                        <div className="flex items-start gap-4 py-2">
+                          {/* If we have a URL or base64, try to show it. Otherwise show icon placeholder */}
+                          {(() => {
+                            // Check for base64 image (Priority 1)
+                            const base64Img = result.metadata?.image;
+                            if (typeof base64Img === 'string' && base64Img.startsWith('data:')) {
+                              return (
+                                <ExpandableImage 
+                                    src={base64Img} 
+                                    alt="Result" 
+                                    caption={typeof result.metadata?.caption === 'string' ? result.metadata.caption : undefined}
+                                />
+                              );
+                            }
+
+                            // Check for direct URL or thumbnail URL (Priority 2 - e.g. IDR public URLs)
+                            const directUrl = result.metadata?.thumbnail_url || result.metadata?.url;
+                            if (typeof directUrl === 'string' && (directUrl.startsWith('http'))) {
+                                // IDR thumbnail URLs are valid images. IDR 'url' is a webpage, so we prefer thumbnail_url if available.
+                                // We'll try to use it if it looks like a thumbnail or if we have no other choice.
+                                return (
+                                <ExpandableImage 
+                                    src={directUrl} 
+                                    alt="Result (Remote)" 
+                                    caption={typeof result.metadata?.caption === 'string' ? result.metadata.caption : undefined}
+                                />
+                                );
+                            }
+
+                            // Fallback: Data is missing (Stale record or ingestion failure)
+                            return (
+                              <div className="bg-muted flex h-24 w-24 flex-col items-center justify-center gap-1 rounded border p-1 text-center">
+                                <ImageIcon className="text-muted-foreground h-6 w-6" />
+                                <span className="text-[10px] text-muted-foreground leading-tight">Image Data<br/>Missing</span>
+                              </div>
+                            );
+                          })()}
+                          <div>
+                            <div className="text-sm font-medium">{result.metadata?.description || "No description"}</div>
+                            <div className="text-muted-foreground mt-1 text-xs break-all">
+                              Source: {result.metadata?.source || "Upload"}
+                              {typeof result.metadata?.caption === 'string' && result.metadata.caption.trim() !== '' ? (
+                                <p className="mt-1 italic">{`"${result.metadata.caption}"`}</p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground font-mono text-sm">
+                          {(result.metadata?.smiles || result.content)?.slice(
+                            0,
+                            60,
+                          )}
+                          {(result.metadata?.smiles || result.content)?.length >
+                            60
+                            ? '...'
+                            : ''}
+                        </div>
+                      )}
+
+                      {result.modality !== 'image' && result.metadata?.description && (
                         <div className="text-muted-foreground mt-1 text-sm">
                           {result.metadata.description}
                         </div>
@@ -316,7 +398,21 @@ export default function DiscoveryPage() {
               <Card>
                 <CardContent className="p-4">
                   <pre className="bg-muted max-h-[400px] overflow-auto rounded p-4 text-xs">
-                    {JSON.stringify(results, null, 2)}
+                    {JSON.stringify(
+                      results.map(r => ({
+                        ...r,
+                        metadata: {
+                          ...r.metadata,
+                          image: r.metadata?.image 
+                            ? (String(r.metadata.image).length > 50 
+                                ? `${String(r.metadata.image).substring(0, 50)}... [truncated]` 
+                                : String(r.metadata.image))
+                            : undefined
+                        }
+                      })), 
+                      null, 
+                      2
+                    )}
                   </pre>
                 </CardContent>
               </Card>
@@ -333,5 +429,40 @@ export default function DiscoveryPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+function ExpandableImage({ src, alt, caption }: { src: string, alt: string, caption?: string }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  return (
+    <>
+      <div 
+        className="group relative h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-md border border-gray-200"
+        onClick={() => setIsOpen(true)}
+      >
+        <img 
+          src={src} 
+          alt={alt} 
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/20">
+            <Maximize2 className="text-white opacity-0 transition-opacity group-hover:opacity-100 h-6 w-6" />
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setIsOpen(false)}>
+          <div className="relative max-h-[90vh] max-w-[90vw] overflow-auto rounded-lg bg-white p-2 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+             <button onClick={() => setIsOpen(false)} className="absolute right-2 top-2 z-10 rounded-full bg-white/80 p-1 hover:bg-white text-black transition-colors shadow-sm">
+                <X className="h-5 w-5" />
+             </button>
+             <img src={src} alt={alt} className="max-h-[85vh] w-auto rounded" />
+             {caption && <p className="mt-2 text-center text-sm text-gray-700 font-medium px-4 pb-2">{caption}</p>}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

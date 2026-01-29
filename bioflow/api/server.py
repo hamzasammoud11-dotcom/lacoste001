@@ -556,6 +556,7 @@ async def enhanced_search(request: dict = None):
         collection = request.get("collection")
         use_mmr = request.get("use_mmr", True)
         lambda_param = request.get("lambda_param", 0.7)
+        include_images = request.get("include_images", False)
         filters = request.get("filters") or {}
         dataset = request.get("dataset")  # Optional dataset filter (davis, kiba)
         
@@ -600,6 +601,7 @@ async def enhanced_search(request: dict = None):
             use_mmr=use_mmr,
             lambda_param=lambda_param,
             filters=filters,
+            include_images=include_images,
         )
         
         payload = response.to_dict()

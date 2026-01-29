@@ -140,6 +140,7 @@ export async function search(params: {
     dataset?: string;
     top_k?: number;
     use_mmr?: boolean;
+    include_images?: boolean;
 }): Promise<{ results: SearchResult[] }> {
     return fetchJson(`${API_BASE}/api/search`, {
         method: 'POST',

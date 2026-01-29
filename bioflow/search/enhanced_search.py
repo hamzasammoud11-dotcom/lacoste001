@@ -163,6 +163,7 @@ class EnhancedSearchService:
         lambda_param: float = None,
         filters: Union[SearchFilters, Dict[str, Any]] = None,
         include_embeddings: bool = False,
+        include_images: bool = False,
     ) -> SearchResponse:
         """
         Execute enhanced search with all features.
@@ -176,6 +177,7 @@ class EnhancedSearchService:
             lambda_param: Override default lambda for MMR
             filters: Search filters
             include_embeddings: Include embeddings in response
+            include_images: Also include relevant images in results
             
         Returns:
             SearchResponse with enhanced results
@@ -213,7 +215,40 @@ class EnhancedSearchService:
             limit=fetch_limit,
             filters=filters,
             with_vectors=need_vectors,
+            include_images=include_images,
         )
+
+        # If include_images is True, perform a dedicated image search to ensure they are represented
+        # often image scores are on a different scale or lower than exact molecule matches
+        if include_images:
+            # Create image-specific filters (preserving other filters like source/year)
+            image_filters = SearchFilters(**{
+                k: v for k, v in filters.__dict__.items() 
+                if k != 'modality' and v is not None
+            })
+            image_filters.modality = "image"
+            
+            image_results = self._execute_search(
+                query_embedding=query_embedding,
+                collection=collection,
+                limit=max(5, top_k // 2),  # Ensure we get at least some images
+                filters=image_filters,
+                with_vectors=need_vectors,
+                include_images=False  # Avoid efficient OR logic recursion
+            )
+            
+            # Merge results (deduplicate by id)
+            existing_ids = {r['id'] for r in raw_results}
+            for img in image_results:
+                if img['id'] not in existing_ids:
+                    raw_results.append(img)
+            
+            # If using MMR, the diversity reranker should pick them up.
+            # If NOT using MMR, we might need to interleave manually if we want to force them.
+            if not use_mmr:
+                # Interleave if strictly ranking by score would bury them
+                # Sort everything by score first
+                raw_results.sort(key=lambda x: x['score'], reverse=True)
 
         # Post-filters that are difficult to express robustly in Qdrant filters.
         raw_results = self._apply_post_filters(raw_results, filters)
@@ -221,10 +256,33 @@ class EnhancedSearchService:
         total_found = len(raw_results)
         
         # Apply MMR if requested
-        if use_mmr and len(raw_results) > 1:
+        # Logic update: Force-include images if requested, as they often have lower scores than exact molecule matches
+        # and would be dropped by standard MMR or top-k truncation.
+        
+        forced_images = []
+        mmr_pool = raw_results
+        
+        if include_images:
+            images = [r for r in raw_results if r.get('modality') == 'image']
+            others = [r for r in raw_results if r.get('modality') != 'image']
+            
+            if images:
+                # Force top 3 images or 30% of top_k, whichever is larger, but constrained by availability and total top_k
+                target_img_cnt = min(len(images), max(3, int(top_k * 0.3)))
+                target_img_cnt = min(target_img_cnt, top_k)
+                
+                forced_images = images[:target_img_cnt]
+                mmr_pool = others # We only run MMR/truncation on the non-images
+                
+                # Reduce the quota for the pool
+                top_k = max(0, top_k - len(forced_images))
+            else:
+                top_k = top_k # No images found, proceed as normal
+        
+        if use_mmr and len(mmr_pool) > 0:
             # Get embeddings for MMR
             embeddings = (
-                self._get_result_embeddings(raw_results, expected_dim=query_dim)
+                self._get_result_embeddings(mmr_pool, expected_dim=query_dim)
                 if include_embeddings or use_mmr
                 else None
             )
@@ -236,12 +294,27 @@ class EnhancedSearchService:
             )
             
             mmr_results = mmr_rerank(
-                results=raw_results,
+                results=mmr_pool,
                 query_embedding=query_embedding,
                 lambda_param=effective_lambda,
                 embeddings=embeddings,
                 top_k=top_k,
             )
+            
+            # Inject forced images as MMRResults
+            for img in forced_images:
+                # Construct MMRResult manually for the forced images
+                mmr_img = MMRResult(
+                    id=str(img['id']),
+                    original_score=float(img['score']),
+                    mmr_score=float(img['score']), # Dummy value
+                    diversity_penalty=0.0,
+                    content=img.get('content', ''),
+                    modality=img.get('modality', 'image'),
+                    metadata=img.get('metadata', {}),
+                    embedding=img.get('vector')
+                )
+                mmr_results.append(mmr_img)
             
             # Calculate diversity score
             diversity_score = self.mmr_reranker.compute_diversity_score(mmr_results)
@@ -249,10 +322,14 @@ class EnhancedSearchService:
             # Convert to enhanced results
             enhanced_results = self._mmr_to_enhanced(mmr_results, include_embeddings)
         else:
+            # Manual truncation without MMR
+            final_pool = mmr_pool[:top_k]
+            combined = forced_images + final_pool
+            
             diversity_score = None
-            enhanced_results = self._raw_to_enhanced(raw_results[:top_k])
+            enhanced_results = self._raw_to_enhanced(combined)
         
-        # Sort by original score for display (MMR selection already done)
+        # Sort by original score for display
         enhanced_results.sort(key=lambda x: x.score, reverse=True)
         # Update ranks after sorting
         for i, r in enumerate(enhanced_results):
@@ -356,6 +433,7 @@ class EnhancedSearchService:
         limit: int,
         filters: SearchFilters,
         with_vectors: bool,
+        include_images: bool = False,
     ) -> List[Dict[str, Any]]:
         """Execute search against Qdrant."""
         from qdrant_client.models import Filter, FieldCondition, MatchValue
@@ -365,17 +443,24 @@ class EnhancedSearchService:
         
         if filters.modality:
             requested = str(filters.modality).lower()
+            modality_conditions = []
+            
+            # Handle molecule/smiles alias
             if requested in ("molecule", "smiles"):
-                # Historical payloads may use "smiles". Treat both as molecule.
-                must_conditions.append(Filter(should=[
-                    FieldCondition(key="modality", match=MatchValue(value="molecule")),
-                    FieldCondition(key="modality", match=MatchValue(value="smiles")),
-                ]))
+                modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="molecule")))
+                modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="smiles")))
             else:
-                must_conditions.append(FieldCondition(
-                    key="modality",
-                    match=MatchValue(value=requested)
-                ))
+                modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value=requested)))
+            
+            # If include_images is requested, add it to the allowed modalities
+            if include_images:
+                modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="image")))
+            
+            # Combine into a SHOULD filter if we have multiple options
+            if len(modality_conditions) > 1:
+                must_conditions.append(Filter(should=modality_conditions))
+            else:
+                must_conditions.append(modality_conditions[0])
         
         if filters.source:
             must_conditions.append(FieldCondition(

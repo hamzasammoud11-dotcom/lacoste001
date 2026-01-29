@@ -295,7 +295,7 @@ def run_full_ingestion(
                 failed=0, duration_seconds=0, errors=[str(e)]
             )
     
-    # Images (NEW!)
+    # Images
     if not skip_images:
         logger.info("\n🖼️  Starting Image ingestion...")
         try:
