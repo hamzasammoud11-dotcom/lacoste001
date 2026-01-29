@@ -15,8 +15,8 @@ const MOCK_PUBCHEM_CIDS: Record<string, number> = {
   water: 962,
 };
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const moleculeId = id.toLowerCase();
 
   try {

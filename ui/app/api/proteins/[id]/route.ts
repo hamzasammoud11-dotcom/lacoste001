@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { API_CONFIG } from '@/config/api.config';
 import { proteins } from '../../_mock/proteins';
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     const response = await fetch(`${API_CONFIG.baseUrl}/api/proteins/${id}`, { cache: 'no-store' });
     const data = await response.json().catch(() => null);
