@@ -1,12 +1,16 @@
+import { API_CONFIG } from "@/config/api.config";
 import { ExplorerRequestSchema } from "@/schemas/explorer";
 import { DataPoint, ExplorerResponse } from "@/types/explorer";
 
 export async function getExplorerPoints(
   dataset?: string,
   view?: string,
-  colorBy?: string
+  colorBy?: string,
+  query?: string,
+  limit?: number,
+  modality?: string
 ): Promise<ExplorerResponse> {
-  const result = ExplorerRequestSchema.safeParse({ dataset, view, colorBy });
+  const result = ExplorerRequestSchema.safeParse({ dataset, view, colorBy, query, limit, modality });
 
   if (!result.success) {
     throw new Error("Invalid parameters");
@@ -14,10 +18,11 @@ export async function getExplorerPoints(
 
   // Map view param to API view type
   const apiView = view === "UMAP" ? "combined" : view === "PCA-Drug" ? "drug" : view === "PCA-Target" ? "target" : "combined";
+  const fetchLimit = limit || 500;
 
   // Phase 3: Fetch from Python API with pre-computed PCA
   try {
-    const res = await fetch(`http://127.0.0.1:8001/api/points?limit=500&view=${apiView}`, {
+    const res = await fetch(`${API_CONFIG.baseUrl}/api/points?limit=${fetchLimit}&view=${apiView}`, {
         next: { revalidate: 0 },
         signal: AbortSignal.timeout(5000)
     });
