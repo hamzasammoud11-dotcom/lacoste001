@@ -263,6 +263,8 @@ class QdrantService:
             result = self.model_service.encode_molecule(content)
         elif modality == "protein":
             result = self.model_service.encode_protein(content)
+        elif modality == "image":
+            result = self.model_service.encode_image(content)
         else:
             result = self.model_service.encode_text(content)
         
