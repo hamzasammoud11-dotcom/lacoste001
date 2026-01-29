@@ -1,4 +1,6 @@
-import { SidebarTrigger } from "@/components/animate-ui/components/radix/sidebar"
+import * as React from 'react';
+
+import { SidebarTrigger } from '@/components/animate-ui/components/radix/sidebar';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -6,31 +8,31 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
+} from '@/components/ui/breadcrumb';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 interface PageHeaderProps {
-  title: string
-  subtitle?: string
-  icon?: React.ReactNode
-  className?: string
-  breadcrumbs?: Array<{ label: string; href?: string }>
-  showSidebarTrigger?: boolean
+  title: string;
+  subtitle?: string;
+  icon?: React.ReactNode;
+  className?: string;
+  breadcrumbs?: Array<{ label: string; href?: string }>;
+  showSidebarTrigger?: boolean;
 }
 
-export function PageHeader({ 
-  title, 
-  subtitle, 
-  icon, 
+export function PageHeader({
+  title,
+  subtitle,
+  icon,
   className,
   breadcrumbs,
-  showSidebarTrigger = true 
+  showSidebarTrigger = true,
 }: PageHeaderProps) {
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn('space-y-4', className)}>
       {(showSidebarTrigger || breadcrumbs) && (
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2">
             {showSidebarTrigger && (
               <>
@@ -43,10 +45,16 @@ export function PageHeader({
                 <BreadcrumbList>
                   {breadcrumbs.map((crumb, index) => (
                     <React.Fragment key={index}>
-                      {index > 0 && <BreadcrumbSeparator className="hidden md:block" />}
-                      <BreadcrumbItem className={index === 0 ? "hidden md:block" : ""}>
+                      {index > 0 && (
+                        <BreadcrumbSeparator className="hidden md:block" />
+                      )}
+                      <BreadcrumbItem
+                        className={index === 0 ? 'hidden md:block' : ''}
+                      >
                         {crumb.href ? (
-                          <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
+                          <BreadcrumbLink href={crumb.href}>
+                            {crumb.label}
+                          </BreadcrumbLink>
                         ) : (
                           <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                         )}
@@ -65,25 +73,29 @@ export function PageHeader({
           {title}
         </h1>
         {subtitle && (
-          <p className="text-lg text-muted-foreground">
-            {subtitle}
-          </p>
+          <p className="text-muted-foreground text-lg">{subtitle}</p>
         )}
       </div>
     </div>
-  )
+  );
 }
 
-export function SectionHeader({ title, icon, action }: { title: string, icon?: React.ReactNode, action?: React.ReactNode }) {
-    return (
-        <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-                {icon}
-                {title}
-            </h2>
-            {action}
-        </div>
-    )
+export function SectionHeader({
+  title,
+  icon,
+  action,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-6 flex items-center justify-between">
+      <h2 className="flex items-center gap-2 text-xl font-semibold">
+        {icon}
+        {title}
+      </h2>
+      {action}
+    </div>
+  );
 }
-
-import * as React from "react"

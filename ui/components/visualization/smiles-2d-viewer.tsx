@@ -55,12 +55,13 @@ export function Smiles2DViewer({
 
       try {
         await new Promise<void>((resolve, reject) => {
-          (drawer as any).draw(
+          SmilesDrawer.parse(
             smiles,
-            `[id="${canvasId}"]`,
-            'light',
-            () => resolve(),
-            (drawError: Error) => reject(drawError)
+            (tree) => {
+              drawer.draw(tree, canvasRef.current, 'light');
+              resolve();
+            },
+            (err) => reject(err),
           );
         });
       } catch (drawError) {
@@ -73,7 +74,7 @@ export function Smiles2DViewer({
       setError(
         err instanceof Error
           ? `Invalid SMILES: ${err.message}`
-          : 'Failed to render molecule structure'
+          : 'Failed to render molecule structure',
       );
       setIsLoading(false);
     }
@@ -87,12 +88,12 @@ export function Smiles2DViewer({
     return (
       <Card className={`border-destructive bg-destructive/10 ${className}`}>
         <CardContent className="flex items-center gap-3 p-4">
-          <AlertCircle className="size-5 text-destructive" />
+          <AlertCircle className="text-destructive size-5" />
           <div className="flex flex-col">
-            <span className="text-sm font-medium text-destructive">
+            <span className="text-destructive text-sm font-medium">
               Visualization Error
             </span>
-            <span className="text-xs text-muted-foreground">{error}</span>
+            <span className="text-muted-foreground text-xs">{error}</span>
           </div>
         </CardContent>
       </Card>
@@ -102,10 +103,7 @@ export function Smiles2DViewer({
   return (
     <div className={`relative ${className}`}>
       {isLoading && (
-        <Skeleton
-          className="absolute inset-0"
-          style={{ width, height }}
-        />
+        <Skeleton className="absolute inset-0" style={{ width, height }} />
       )}
       <canvas
         ref={canvasRef}

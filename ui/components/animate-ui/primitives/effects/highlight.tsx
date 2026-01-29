@@ -43,8 +43,8 @@ type HighlightContextType<T extends string> = {
 };
 
 const HighlightContext = React.createContext<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  HighlightContextType<any> | undefined
+
+  HighlightContextType<string> | undefined
 >(undefined);
 
 function useHighlight<T extends string>(): HighlightContextType<T> {
@@ -80,11 +80,11 @@ type ParentModeHighlightProps = {
 
 type ControlledParentModeHighlightProps<T extends React.ElementType = 'div'> =
   BaseHighlightProps<T> &
-    ParentModeHighlightProps & {
-      mode: 'parent';
-      controlledItems: true;
-      children: React.ReactNode;
-    };
+  ParentModeHighlightProps & {
+    mode: 'parent';
+    controlledItems: true;
+    children: React.ReactNode;
+  };
 
 type ControlledChildrenModeHighlightProps<T extends React.ElementType = 'div'> =
   BaseHighlightProps<T> & {
@@ -95,12 +95,12 @@ type ControlledChildrenModeHighlightProps<T extends React.ElementType = 'div'> =
 
 type UncontrolledParentModeHighlightProps<T extends React.ElementType = 'div'> =
   BaseHighlightProps<T> &
-    ParentModeHighlightProps & {
-      mode: 'parent';
-      controlledItems?: false;
-      itemsClassName?: string;
-      children: React.ReactElement | React.ReactElement[];
-    };
+  ParentModeHighlightProps & {
+    mode: 'parent';
+    controlledItems?: false;
+    itemsClassName?: string;
+    children: React.ReactElement | React.ReactElement[];
+  };
 
 type UncontrolledChildrenModeHighlightProps<
   T extends React.ElementType = 'div',
@@ -327,12 +327,12 @@ function Highlight<T extends React.ElementType = 'div'>({
         ? controlledItems
           ? render(children)
           : render(
-              React.Children.map(children, (child, index) => (
-                <HighlightItem key={index} className={props?.itemsClassName}>
-                  {child}
-                </HighlightItem>
-              )),
-            )
+            React.Children.map(children, (child, index) => (
+              <HighlightItem key={index} className={props?.itemsClassName}>
+                {child}
+              </HighlightItem>
+            )),
+          )
         : children}
     </HighlightContext.Provider>
   );
@@ -467,6 +467,7 @@ function HighlightItem<T extends React.ElementType>({
     } else if (!activeValue) clearBounds();
 
     if (shouldUpdateBounds) return () => cancelAnimationFrame(rafId);
+    return;
   }, [
     mode,
     isActive,
@@ -491,22 +492,22 @@ function HighlightItem<T extends React.ElementType>({
 
   const commonHandlers = hover
     ? {
-        onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
-          setActiveValue(childValue);
-          element.props.onMouseEnter?.(e);
-        },
-        onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
-          setActiveValue(null);
-          element.props.onMouseLeave?.(e);
-        },
-      }
+      onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
+        setActiveValue(childValue);
+        element.props.onMouseEnter?.(e);
+      },
+      onMouseLeave: (e: React.MouseEvent<HTMLDivElement>) => {
+        setActiveValue(null);
+        element.props.onMouseLeave?.(e);
+      },
+    }
     : click
       ? {
-          onClick: (e: React.MouseEvent<HTMLDivElement>) => {
-            setActiveValue(childValue);
-            element.props.onClick?.(e);
-          },
-        }
+        onClick: (e: React.MouseEvent<HTMLDivElement>) => {
+          setActiveValue(childValue);
+          element.props.onClick?.(e);
+        },
+      }
       : {};
 
   if (asChild) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { CloudUpload, Database, Download, Eye, FileText, Folder, HardDrive, Trash2, Upload, ExternalLink } from "lucide-react"
+import { CloudUpload, Database, Download, Eye, FileText, Folder, HardDrive, Upload, ExternalLink } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { SectionHeader } from "@/components/page-header"

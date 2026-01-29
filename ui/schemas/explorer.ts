@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const DataPointSchema = z.object({
   x: z.number(),
@@ -21,10 +21,15 @@ export const ExplorerResponseSchema = z.object({
 });
 
 export const ExplorerRequestSchema = z.object({
-  dataset: z.string().optional().default("DrugBank"),
-  view: z.string().optional().default("UMAP"),
-  colorBy: z.string().optional().default("Activity"),
+  dataset: z.string().optional().default('DrugBank'),
+  view: z.string().optional().default('UMAP'),
+  colorBy: z.string().optional().default('Activity'),
   query: z.string().optional(),
   limit: z.number().optional(),
   modality: z.string().optional(),
 });
+
+export type DataPoint = z.infer<typeof DataPointSchema>;
+export type ExplorerMetrics = z.infer<typeof ExplorerMetricsSchema>;
+export type ExplorerResponse = z.infer<typeof ExplorerResponseSchema>;
+export type ExplorerRequest = z.infer<typeof ExplorerRequestSchema>;

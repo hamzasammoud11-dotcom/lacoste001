@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, type HTMLMotionProps,motion } from 'motion/react';
+import { AnimatePresence, type HTMLMotionProps, motion } from 'motion/react';
 import { Dialog as SheetPrimitive } from 'radix-ui';
 import * as React from 'react';
 

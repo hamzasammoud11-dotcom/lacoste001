@@ -1,7 +1,5 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-
 // Workflow has its own layout that bypasses the main sidebar
 // This gives Langflow the full viewport for proper UX
 export default function WorkflowLayout({

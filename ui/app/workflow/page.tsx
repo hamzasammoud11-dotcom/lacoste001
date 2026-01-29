@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Dna, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Dna, ExternalLink, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function WorkflowPage() {

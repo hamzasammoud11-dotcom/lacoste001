@@ -1,11 +1,9 @@
-// ui/components/sidebar.tsx
 'use client';
 
 import {
   BadgeCheck,
   BarChart2,
   Bell,
-  Box,
   ChevronRight,
   ChevronsUpDown,
   CreditCard,
@@ -21,7 +19,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import * as React from 'react';
 
 import {
   DropdownMenu,
@@ -52,8 +49,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/animate-ui/primitives/radix/collapsible';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const navMain = [
@@ -176,12 +173,11 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        {/* App Header */}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   <Dna className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
@@ -195,17 +191,21 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Nav Main */}
         <SidebarGroup>
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarMenu>
             {navMain.map((item) => {
-              const isActive = pathname === item.url || pathname?.startsWith(item.url + '/');
-              
+              const isActive =
+                pathname === item.url || pathname?.startsWith(item.url + '/');
+
               if (!item.items || item.items.length === 0) {
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                    >
                       <Link href={item.url}>
                         {item.icon && <item.icon />}
                         <span>{item.title}</span>
@@ -224,7 +224,10 @@ export function AppSidebar() {
                 >
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip={item.title} isActive={isActive}>
+                      <SidebarMenuButton
+                        tooltip={item.title}
+                        isActive={isActive}
+                      >
                         {item.icon && <item.icon />}
                         <span>{item.title}</span>
                         <ChevronRight className="ml-auto transition-transform duration-300 group-data-[state=open]/collapsible:rotate-90" />
@@ -234,7 +237,10 @@ export function AppSidebar() {
                       <SidebarMenuSub>
                         {item.items?.map((subItem) => (
                           <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={pathname === subItem.url}
+                            >
                               <Link href={subItem.url}>
                                 <span>{subItem.title}</span>
                               </Link>
@@ -249,35 +255,33 @@ export function AppSidebar() {
             })}
           </SidebarMenu>
         </SidebarGroup>
-        {/* Nav Main */}
 
-        {/* Status Section */}
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden mt-auto">
+        <SidebarGroup className="mt-auto group-data-[collapsible=icon]:hidden">
           <SidebarGroupLabel className="flex items-center justify-between">
             <span>System Status</span>
             <ThemeToggle />
           </SidebarGroupLabel>
           <div className="px-3 py-2">
-            <div className="rounded-lg border bg-muted/50 p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Terminal className="h-4 w-4 text-muted-foreground" />
+            <div className="bg-muted/50 rounded-lg border p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <Terminal className="text-muted-foreground h-4 w-4" />
                 <span className="text-xs font-medium">Status</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
                 </span>
-                <span className="text-xs text-muted-foreground">System Online</span>
+                <span className="text-muted-foreground text-xs">
+                  System Online
+                </span>
               </div>
             </div>
           </div>
         </SidebarGroup>
-        {/* Status Section */}
       </SidebarContent>
 
       <SidebarFooter>
-        {/* Nav User */}
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
@@ -288,12 +292,14 @@ export function AppSidebar() {
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage src={userData.avatar} alt={userData.name} />
-                    <AvatarFallback className="rounded-lg bg-primary text-primary-foreground">
+                    <AvatarFallback className="bg-primary text-primary-foreground rounded-lg">
                       <User className="h-4 w-4" />
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{userData.name}</span>
+                    <span className="truncate font-semibold">
+                      {userData.name}
+                    </span>
                     <span className="truncate text-xs">{userData.email}</span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-4" />
@@ -309,12 +315,14 @@ export function AppSidebar() {
                   <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                     <Avatar className="h-8 w-8 rounded-lg">
                       <AvatarImage src={userData.avatar} alt={userData.name} />
-                      <AvatarFallback className="rounded-lg bg-primary text-primary-foreground">
+                      <AvatarFallback className="bg-primary text-primary-foreground rounded-lg">
                         <User className="h-4 w-4" />
                       </AvatarFallback>
                     </Avatar>
                     <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{userData.name}</span>
+                      <span className="truncate font-semibold">
+                        {userData.name}
+                      </span>
                       <span className="truncate text-xs">{userData.email}</span>
                     </div>
                   </div>
@@ -350,7 +358,6 @@ export function AppSidebar() {
             </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
-        {/* Nav User */}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

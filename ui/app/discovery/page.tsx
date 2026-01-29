@@ -217,7 +217,7 @@ export default function DiscoveryPage() {
                     <TabsTrigger value="details">Raw Data</TabsTrigger>
                 </TabsList>
                 <TabsContent value="candidates" className="space-y-4">
-                    {results.map((result, i) => (
+                    {results.map((result) => (
                         <Card key={result.id}>
                             <CardContent className="p-4 flex items-center justify-between">
                                 <div className="flex-1">
