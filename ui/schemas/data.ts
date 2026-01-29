@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const DatasetSchema = z.object({
   name: z.string(),
@@ -19,3 +19,7 @@ export const DataResponseSchema = z.object({
   datasets: z.array(DatasetSchema),
   stats: StatisticsSchema,
 });
+
+export type Dataset = z.infer<typeof DatasetSchema>;
+export type Statistics = z.infer<typeof StatisticsSchema>;
+export type DataResponse = z.infer<typeof DataResponseSchema>;

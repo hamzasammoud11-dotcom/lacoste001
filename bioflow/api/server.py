@@ -76,8 +76,25 @@ class PredictRequest(BaseModel):
 class IngestRequest(BaseModel):
     """Request to ingest data into vector DB."""
     content: str
-    modality: str = Field(default="smiles", description="smiles | protein | text")
+    modality: str = Field(default="smiles", description="smiles | protein | text | image")
     metadata: Optional[Dict[str, Any]] = None
+
+
+class ImageIngestRequest(BaseModel):
+    """Request to ingest a biological image."""
+    image: str = Field(..., description="Image file path, URL, or base64 encoded string")
+    image_type: str = Field(default="other", description="microscopy | gel | spectra | xray | other")
+    experiment_id: Optional[str] = Field(default=None, description="Experiment identifier")
+    description: Optional[str] = Field(default="", description="Image description")
+    caption: Optional[str] = Field(default="", description="Image caption")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+    collection: Optional[str] = Field(default="bioflow_memory", description="Target collection")
+
+
+class BatchImageIngestRequest(BaseModel):
+    """Request to batch ingest multiple images."""
+    images: List[ImageIngestRequest] = Field(..., description="List of images to ingest")
+    collection: Optional[str] = Field(default="bioflow_memory", description="Target collection")
 
 
 class IngestSourceRequest(BaseModel):
@@ -539,6 +556,7 @@ async def enhanced_search(request: dict = None):
         collection = request.get("collection")
         use_mmr = request.get("use_mmr", True)
         lambda_param = request.get("lambda_param", 0.7)
+        include_images = request.get("include_images", False)
         filters = request.get("filters") or {}
         dataset = request.get("dataset")  # Optional dataset filter (davis, kiba)
         
@@ -583,6 +601,7 @@ async def enhanced_search(request: dict = None):
             use_mmr=use_mmr,
             lambda_param=lambda_param,
             filters=filters,
+            include_images=include_images,
         )
         
         payload = response.to_dict()
@@ -635,6 +654,43 @@ async def hybrid_search(request: HybridSearchRequest):
         
     except Exception as e:
         logger.error(f"Hybrid search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/search/image")
+async def search_image(
+    image: str,
+    collection: Optional[str] = None,
+    top_k: int = 10,
+    use_mmr: bool = True,
+    lambda_param: float = 0.7,
+    filters: Optional[Dict[str, Any]] = None
+):
+    """
+    Image similarity search.
+
+    Find similar biological images (microscopy, gels, spectra).
+    Supports query-by-image and cross-modal search.
+    """
+    try:
+        if not qdrant_service:
+            raise HTTPException(status_code=503, detail="Qdrant service not available")
+
+        search_service = get_enhanced_search_service()
+        response = search_service.enhanced_search(
+            query=image,
+            modality="image",
+            collection=collection,
+            top_k=top_k,
+            use_mmr=use_mmr,
+            lambda_param=lambda_param,
+            filters=filters or {}
+        )
+
+        return response.to_dict()
+
+    except Exception as e:
+        logger.error(f"Image search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -846,9 +902,16 @@ async def list_molecules(limit: int = 20, offset: int = 0):
         molecules = []
         for r in results:
             metadata = r.metadata or {}
+            # Ensure smiles is always a string
+            smiles = r.content
+            if not isinstance(smiles, str):
+                smiles = str(smiles) if smiles else ""
+            # Also check metadata for smiles
+            if not smiles:
+                smiles = metadata.get("smiles", "") or metadata.get("SMILES", "") or ""
             molecules.append({
                 "id": r.id,
-                "smiles": r.content,
+                "smiles": smiles,
                 "name": metadata.get("name", metadata.get("title", "Unknown")),
                 "pubchemCid": metadata.get("pubchem_cid", metadata.get("pubchemCid", metadata.get("cid", 0))),
                 "description": metadata.get("description", metadata.get("title", "")),
@@ -1370,6 +1433,78 @@ async def ingest_all(request: IngestAllRequest, background_tasks: BackgroundTask
     return {"success": True, "job_id": job_id, "status": "pending"}
 
 
+@app.post("/api/ingest/image")
+async def ingest_image(request: ImageIngestRequest):
+    """Ingest a single biological image."""
+    try:
+        from bioflow.ingestion.image_ingestor import ImageIngestor
+
+        # Initialize ingestor
+        ingestor = ImageIngestor(
+            qdrant_service=qdrant_service,
+            obm_encoder=model_service.get_obm_encoder(),
+            collection=request.collection
+        )
+
+        # Prepare image data
+        image_data = {
+            "image": request.image,
+            "image_type": request.image_type,
+            "experiment_id": request.experiment_id or "",
+            "description": request.description,
+            "caption": request.caption,
+            "metadata": request.metadata or {}
+        }
+
+        # Ingest single image
+        result = ingestor.batch_ingest([image_data], collection=request.collection)
+
+        return {
+            "success": True,
+            "result": result.to_dict()
+        }
+    except Exception as e:
+        logger.error(f"Image ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/ingest/image/batch")
+async def ingest_images_batch(request: BatchImageIngestRequest):
+    """Batch ingest multiple biological images."""
+    try:
+        from bioflow.ingestion.image_ingestor import ImageIngestor
+
+        # Initialize ingestor
+        ingestor = ImageIngestor(
+            qdrant_service=qdrant_service,
+            obm_encoder=model_service.get_obm_encoder(),
+            collection=request.collection
+        )
+
+        # Prepare image data
+        images_data = []
+        for img in request.images:
+            images_data.append({
+                "image": img.image,
+                "image_type": img.image_type,
+                "experiment_id": img.experiment_id or "",
+                "description": img.description,
+                "caption": img.caption,
+                "metadata": img.metadata or {}
+            })
+
+        # Batch ingest
+        result = ingestor.batch_ingest(images_data, collection=request.collection)
+
+        return {
+            "success": True,
+            "result": result.to_dict()
+        }
+    except Exception as e:
+        logger.error(f"Batch image ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/ingest/jobs/{job_id}")
 async def get_ingest_status(job_id: str):
     if job_id not in JOBS:
@@ -1451,6 +1586,8 @@ async def get_stats():
     """Get system statistics for the data page."""
     total_vectors = 0
     collections_info = []
+    molecules_count = 0
+    proteins_count = 0
     
     if qdrant_service:
         try:
@@ -1458,14 +1595,42 @@ async def get_stats():
             for coll in collections:
                 try:
                     stats = qdrant_service.get_collection_stats(coll)
-                    total_vectors += stats.get("points_count", 0)
+                    points = stats.get("points_count", 0)
+                    total_vectors += points
                     collections_info.append(stats)
+                    
+                    # Track by collection type
+                    if "molecule" in coll.lower():
+                        molecules_count += points
+                    elif "protein" in coll.lower():
+                        proteins_count += points
                 except Exception as e:
                     logger.warning(f"Failed to get stats for {coll}: {e}")
         except Exception as e:
             logger.warning(f"Failed to list collections: {e}")
     
+    # Format datasets for frontend
+    datasets = []
+    for coll_stat in collections_info:
+        coll_name = coll_stat.get("name", "unknown")
+        points = coll_stat.get("points_count", 0)
+        datasets.append({
+            "name": coll_name,
+            "type": "molecule" if "molecule" in coll_name.lower() else ("protein" if "protein" in coll_name.lower() else "mixed"),
+            "count": f"{points:,}",
+            "size": f"{(points * 3072) / 1024 / 1024:.1f} MB",  # Estimate based on vector size
+            "updated": "Recently",
+        })
+    
     return {
+        "datasets": datasets,
+        "stats": {
+            "datasets": len(collections_info),
+            "molecules": f"{molecules_count:,}",
+            "proteins": f"{proteins_count:,}",
+            "storage": f"{(total_vectors * 3072) / 1024 / 1024:.1f} MB",
+        },
+        # Also include legacy fields for compatibility
         "total_vectors": total_vectors,
         "collections": collections_info,
         "model_status": "loaded" if model_service else "not_loaded",
@@ -1475,40 +1640,72 @@ async def get_stats():
 
 @app.get("/api/points")
 async def get_points(limit: int = 500, view: str = "combined"):
-    """Get points for visualization."""
+    """Get points for visualization using pre-computed PCA from bio_discovery."""
     import numpy as np
     
     if not qdrant_service:
-        # Return mock data if qdrant not available
         return _get_mock_points(limit)
     
     points = []
     try:
-        # Get from molecules collection
-        mol_results = qdrant_service.search("", modality="text", collection="molecules", limit=min(limit // 2, 250))
-        for i, r in enumerate(mol_results):
-            np.random.seed(hash(r.content) % 2**32)
+        # Get available collections
+        collections = qdrant_service.list_collections()
+        if not collections:
+            return _get_mock_points(limit)
+        
+        main_collection = collections[0]
+        logger.info(f"Getting points from collection: {main_collection}")
+        
+        # Get Qdrant client directly to scroll through data
+        client = qdrant_service._get_client()
+        
+        # Scroll through collection to get points with PCA data
+        scroll_result = client.scroll(
+            collection_name=main_collection,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+        
+        records = scroll_result[0]
+        
+        for i, r in enumerate(records):
+            payload = r.payload
+            
+            # Get PCA coordinates based on view type
+            pca_key = f"pca_{view}" if view in ("drug", "target", "combined") else "pca_combined"
+            pca_coords = payload.get(pca_key) or payload.get("pca_combined") or [0, 0]
+            
+            # Use first 2 dimensions of PCA for x, y
+            x = float(pca_coords[0]) if len(pca_coords) > 0 else 0
+            y = float(pca_coords[1]) if len(pca_coords) > 1 else 0
+            
+            # Determine cluster based on affinity class
+            affinity = payload.get("affinity_class", "unknown")
+            cluster = 0 if affinity == "high" else (1 if affinity == "medium" else 2)
+            
+            # Get label from SMILES
+            smiles = payload.get("smiles", "")
+            label = smiles[:30] + "..." if len(smiles) > 30 else smiles
+            
             points.append({
-                "id": r.id,
-                "x": float(2 + np.random.randn() * 0.8),
-                "y": float(3 + np.random.randn() * 0.8),
-                "cluster": 0,
-                "label": r.metadata.get("name", r.content[:20] if r.content else f"mol-{i}"),
+                "id": str(r.id),
+                "x": x * 10,  # Scale for visualization
+                "y": y * 10,
+                "cluster": cluster,
+                "label": label,
                 "modality": "molecule",
+                "affinity_class": affinity,
+                "score": payload.get("label_true", 0),
             })
         
-        # Get from proteins collection
-        prot_results = qdrant_service.search("", modality="text", collection="proteins", limit=min(limit // 2, 250))
-        for i, r in enumerate(prot_results):
-            np.random.seed(hash(r.content) % 2**32)
-            points.append({
-                "id": r.id,
-                "x": float(-2 + np.random.randn() * 0.8),
-                "y": float(-1 + np.random.randn() * 0.8),
-                "cluster": 1,
-                "label": r.metadata.get("name", r.content[:20] if r.content else f"prot-{i}"),
-                "modality": "protein",
-            })
+        logger.info(f"Loaded {len(points)} points from {main_collection}")
+        
+    except Exception as e:
+        logger.error(f"Failed to get points from Qdrant: {e}")
+        import traceback
+        traceback.print_exc()
+        return _get_mock_points(limit)
     except Exception as e:
         logger.warning(f"Failed to get points from Qdrant: {e}")
         return _get_mock_points(limit)

@@ -1,6 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/refs */
 import {
   arrow as floatingArrow,
   autoUpdate,
@@ -21,7 +20,10 @@ import {
 } from 'motion/react';
 import * as React from 'react';
 
-import { Slot, type WithAsChild } from '@/components/animate-ui/primitives/animate/slot';
+import {
+  Slot,
+  type WithAsChild,
+} from '@/components/animate-ui/primitives/animate/slot';
 import { getStrictContext } from '@/lib/get-strict-context';
 
 type Side = 'top' | 'bottom' | 'left' | 'right';
@@ -322,10 +324,10 @@ function TooltipOverlay() {
                     rendered.open
                       ? { opacity: 1, scale: 1, x: 0, y: 0 }
                       : {
-                          opacity: 0,
-                          scale: 0,
-                          ...initialFromSide(rendered.data.side),
-                        }
+                        opacity: 0,
+                        scale: 0,
+                        ...initialFromSide(rendered.data.side),
+                      }
                   }
                   exit={{
                     opacity: 0,

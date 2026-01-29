@@ -276,10 +276,10 @@ class QdrantManager:
         if conditions:
             qdrant_filter = Filter(must=conditions)
         
-        # Search using query_points (new API)
-        results = self.client.query_points(
+        # Search using search() for qdrant-client v1.x compatibility
+        results = self.client.search(
             collection_name=collection,
-            query=embedding.vector.tolist(),
+            query_vector=embedding.vector.tolist(),
             limit=limit,
             query_filter=qdrant_filter
         )
@@ -292,7 +292,7 @@ class QdrantManager:
                 modality=r.payload.get("modality", "unknown") if r.payload else "unknown",
                 payload=r.payload or {}
             )
-            for r in results.points
+            for r in results
         ]
     
     def cross_modal_search(

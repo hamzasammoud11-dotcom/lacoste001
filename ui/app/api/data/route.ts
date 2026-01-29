@@ -1,8 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
-import { getData } from "@/lib/data-service";
+import { getStats } from '@/lib/api';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const data = await getData();
-  return NextResponse.json(data);
+  try {
+    const data = await getStats();
+    return NextResponse.json(data);
+  } catch (err) {
+    return NextResponse.json({ error: `Failed to fetch stats: ${err}` }, { status: 500 });
+  }
 }

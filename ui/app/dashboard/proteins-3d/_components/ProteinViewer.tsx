@@ -13,8 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProteinPdbUrl } from '@/lib/visualization-api';
-import type { ProteinRepresentation } from '@/lib/visualization-types';
+import { getProteinPdbUrl } from '@/lib/api';
+import type { ProteinRepresentation } from '@/types/visualization';
 
 interface ProteinViewerProps {
   pdbId: string;

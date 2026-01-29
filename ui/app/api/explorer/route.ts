@@ -1,21 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
-import { getExplorerPoints } from "@/lib/explorer-service";
+import { getExplorerPoints } from '@/lib/api';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  
+
   try {
     const data = await getExplorerPoints(
-      searchParams.get("dataset") || undefined,
-      searchParams.get("view") || undefined,
-      searchParams.get("colorBy") || undefined,
-      searchParams.get("query") || undefined,
-      searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined,
-      searchParams.get("modality") || undefined
+      searchParams.get('dataset') || undefined,
+      searchParams.get('view') || undefined,
+      searchParams.get('colorBy') || undefined,
     );
     return NextResponse.json(data);
-  } catch {
-    return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid parameters' }, { status: 400 });
   }
 }

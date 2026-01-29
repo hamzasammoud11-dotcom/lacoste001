@@ -11,8 +11,21 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProteins, getProteinPdbUrl } from '@/lib/visualization-api';
-import type { Protein } from '@/lib/visualization-types';
+import type { Protein } from '@/types/visualization';
+
+// Fetch proteins from local API route (which has mock fallback)
+async function fetchProteinsWithFallback(): Promise<Protein[]> {
+  const response = await fetch('/api/proteins');
+  if (!response.ok) {
+    throw new Error('Failed to fetch proteins');
+  }
+  return response.json();
+}
+
+// Get PDB URL for a protein (direct RCSB link)
+function getProteinPdbUrl(pdbId: string): string {
+  return `https://files.rcsb.org/download/${pdbId.toUpperCase()}.pdb`;
+}
 
 // Dynamic import of the protein viewer to prevent SSR issues
 const ProteinViewer = dynamic(
@@ -36,7 +49,7 @@ export default function Proteins3DPage() {
     const loadProteins = async () => {
       try {
         setIsLoading(true);
-        const data = await getProteins();
+        const data = await fetchProteinsWithFallback();
         setProteins(data);
         if (data.length > 0) {
           setSelectedProtein(data[0]);
@@ -77,7 +90,7 @@ export default function Proteins3DPage() {
   }
 
   return (
-    <div className="flex h-full gap-4 p-4">
+    <div className="flex h-full gap-6 p-6">
       {/* Left Panel - Protein List */}
       <Card className="w-80 shrink-0">
         <CardHeader className="pb-3">

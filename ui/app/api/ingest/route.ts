@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
+
 import { API_CONFIG } from '@/config/api.config';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { content, modality = "smiles", metadata = {} } = body;
+    const { content, modality = 'smiles', metadata = {} } = body;
 
     if (!content) {
       return NextResponse.json(
-        { error: "content is required" },
-        { status: 400 }
+        { error: 'content is required' },
+        { status: 400 },
       );
     }
 
@@ -32,12 +35,13 @@ export async function POST(request: Request) {
 
     const data = await response.json();
     return NextResponse.json(data);
-
   } catch (error) {
-    console.error("Ingest API error:", error);
+    console.error('Ingest API error:', error);
     return NextResponse.json(
-      { error: `Ingestion failed: ${error instanceof Error ? error.message : 'Unknown error'}. Ensure backend is running.` },
-      { status: 503 }
+      {
+        error: `Ingestion failed: ${error instanceof Error ? error.message : 'Unknown error'}. Ensure backend is running.`,
+      },
+      { status: 503 },
     );
   }
 }

@@ -7,6 +7,18 @@ import SmilesDrawer from 'smiles-drawer';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
+/**
+ * Extract dominant fragment from multi-part SMILES (removes salts/solvents).
+ */
+function sanitizeSmiles(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const s = raw.trim();
+  if (s.includes('.')) {
+    return s.split('.').sort((a, b) => b.length - a.length)[0] || '';
+  }
+  return s;
+}
+
 interface Smiles2DViewerProps {
   smiles: string;
   width?: number;
@@ -26,8 +38,11 @@ export function Smiles2DViewer({
   const [isLoading, setIsLoading] = useState(true);
 
   const drawMolecule = useCallback(async () => {
-    if (!canvasRef.current || !smiles) {
+    const cleanSmiles = sanitizeSmiles(smiles);
+
+    if (!canvasRef.current || !cleanSmiles) {
       setIsLoading(false);
+      if (!cleanSmiles) setError('SMILES string is missing or invalid');
       return;
     }
 
@@ -53,19 +68,15 @@ export function Smiles2DViewer({
         padding: 20,
       });
 
-      try {
-        await new Promise<void>((resolve, reject) => {
-          (drawer as any).draw(
-            smiles,
-            `[id="${canvasId}"]`,
-            'light',
-            () => resolve(),
-            (drawError: Error) => reject(drawError)
-          );
-        });
-      } catch (drawError) {
-        throw drawError;
-      }
+      await new Promise<void>((resolve, reject) => {
+        (drawer as any).draw(
+          cleanSmiles,
+          `[id="${canvasId}"]`,
+          'light',
+          () => resolve(),
+          (drawError: Error) => reject(drawError)
+        );
+      });
 
       setIsLoading(false);
     } catch (err) {
@@ -102,10 +113,7 @@ export function Smiles2DViewer({
   return (
     <div className={`relative ${className}`}>
       {isLoading && (
-        <Skeleton
-          className="absolute inset-0"
-          style={{ width, height }}
-        />
+        <Skeleton className="absolute inset-0" style={{ width, height }} />
       )}
       <canvas
         ref={canvasRef}

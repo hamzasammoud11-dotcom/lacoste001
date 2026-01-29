@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { MoleculeRepresentation } from '@/lib/visualization-types';
+
+type MoleculeRepresentation = 'stick' | 'sphere' | 'line' | 'cartoon';
 
 interface Molecule3DViewerProps {
   sdfData: string;
@@ -24,7 +25,7 @@ interface Molecule3DViewerProps {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type $3Dmol = any;
+type $3DmolType = any;
 
 export function Molecule3DViewer({
   sdfData,
@@ -40,14 +41,14 @@ export function Molecule3DViewer({
   const [isLoading, setIsLoading] = useState(true);
   const [representation, setRepresentation] =
     useState<MoleculeRepresentation>(initialRepresentation);
-  const [$3Dmol, set$3Dmol] = useState<$3Dmol | null>(null);
+  const [$3Dmol, set$3Dmol] = useState<$3DmolType | null>(null);
 
   // Load 3Dmol.js dynamically
   useEffect(() => {
     const load3Dmol = async () => {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const module = await import('3dmol') as any;
+        const module = (await import('3dmol')) as any;
         set$3Dmol(module);
       } catch (err) {
         console.error('Failed to load 3Dmol:', err);
@@ -88,10 +89,9 @@ export function Molecule3DViewer({
         viewerRef.current.removeAllModels();
       }
 
-      // Create viewer - use white for light mode, dark for dark mode
-      // 3Dmol doesn't support 'transparent', use hex color instead
+      // Create viewer
       const viewer = $3Dmol.createViewer(containerRef.current, {
-        backgroundColor: 0xffffff,
+        backgroundColor: '#0a0a0a',
       });
       viewerRef.current = viewer;
 

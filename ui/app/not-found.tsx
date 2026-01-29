@@ -1,31 +1,30 @@
-import Link from "next/link";
+import { Compass, Home } from 'lucide-react';
+import Link from 'next/link';
 
-import { Compass, Home } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from '@/components/ui/empty';
 
 export default function NotFound() {
   return (
     <div className="flex w-full items-center justify-center">
       <div className="flex h-screen items-center border-x">
         <div className="relative">
-          <div className="absolute inset-x-0 top-0 h-px bg-border" />
+          <div className="bg-border absolute inset-x-0 top-0 h-px" />
           <Empty>
             <EmptyHeader>
-              <EmptyTitle className="font-black font-mono text-8xl md:text-9xl">
+              <EmptyTitle className="font-mono text-8xl font-black md:text-9xl">
                 404
               </EmptyTitle>
-              <EmptyDescription className="text-nowrap text-lg">
+              <EmptyDescription className="text-lg text-nowrap">
                 La page que vous recherchez a peut-être été
                 <br />
-                déplacée ou n'existe plus.
+                déplacée ou n&apos;existe plus.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
@@ -48,7 +47,7 @@ export default function NotFound() {
               </div>
             </EmptyContent>
           </Empty>
-          <div className="absolute inset-x-0 bottom-0 h-px bg-border" />
+          <div className="bg-border absolute inset-x-0 bottom-0 h-px" />
         </div>
       </div>
     </div>

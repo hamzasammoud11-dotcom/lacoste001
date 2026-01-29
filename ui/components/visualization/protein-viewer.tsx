@@ -13,8 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProteinPdbUrl } from '@/lib/visualization-api';
-import type { ProteinRepresentation } from '@/lib/visualization-types';
+import { getProteinPDB } from '@/lib/api';
+import type { ProteinRepresentation } from '@/types/visualization';
 
 interface ProteinViewerProps {
   pdbId: string;
@@ -24,7 +24,7 @@ interface ProteinViewerProps {
   initialRepresentation?: ProteinRepresentation;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 type $3Dmol = any;
 
 export function ProteinViewer({
@@ -35,12 +35,13 @@ export function ProteinViewer({
   initialRepresentation = 'cartoon',
 }: ProteinViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const viewerRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [representation, setRepresentation] =
-    useState<ProteinRepresentation>(initialRepresentation);
+  const [representation, setRepresentation] = useState<ProteinRepresentation>(
+    initialRepresentation,
+  );
   const [$3Dmol, set$3Dmol] = useState<$3Dmol | null>(null);
   const [pdbData, setPdbData] = useState<string | null>(null);
 
@@ -48,9 +49,9 @@ export function ProteinViewer({
   useEffect(() => {
     const load3Dmol = async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const module = await import('3dmol') as any;
-        set$3Dmol(module);
+
+        const m = (await import('3dmol')) as any;
+        set$3Dmol(m);
       } catch (err) {
         console.error('Failed to load 3Dmol:', err);
         setError('Failed to load 3D visualization library');
@@ -60,7 +61,6 @@ export function ProteinViewer({
     load3Dmol();
   }, []);
 
-  // Fetch PDB data when pdbId changes
   useEffect(() => {
     if (!pdbId) return;
 
@@ -68,19 +68,12 @@ export function ProteinViewer({
       try {
         setIsLoading(true);
         setError(null);
-        const pdbUrl = getProteinPdbUrl(pdbId);
-        const response = await fetch(pdbUrl);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch PDB: ${response.statusText}`);
-        }
-
-        const data = await response.text();
+        const data = await getProteinPDB(pdbId);
         setPdbData(data);
       } catch (err) {
         console.error('Failed to fetch PDB:', err);
         setError(
-          err instanceof Error ? err.message : 'Failed to load PDB data'
+          err instanceof Error ? err.message : 'Failed to load PDB data',
         );
         setIsLoading(false);
       }
@@ -103,7 +96,7 @@ export function ProteinViewer({
           return { cartoon: { color: 'spectrum' } };
       }
     },
-    []
+    [],
   );
 
   const initViewer = useCallback(() => {
@@ -113,26 +106,28 @@ export function ProteinViewer({
     setError(null);
 
     try {
-      // Clean up existing viewer
       if (viewerRef.current) {
         viewerRef.current.removeAllModels();
       }
 
-      // Create viewer
       const viewer = $3Dmol.createViewer(containerRef.current, {
         backgroundColor: '#0a0a0a',
       });
       viewerRef.current = viewer;
 
-      // Add protein structure
       viewer.addModel(pdbData, 'pdb');
 
       if (representation === 'surface') {
-        viewer.setStyle({}, { cartoon: { color: 'spectrum' } }); // Base style
-        viewer.addSurface($3Dmol.SurfaceType.VDW, {
-          opacity: 0.85,
-          color: 'spectrum',
-        }, {}, {});
+        viewer.setStyle({}, { cartoon: { color: 'spectrum' } });
+        viewer.addSurface(
+          $3Dmol.SurfaceType.VDW,
+          {
+            opacity: 0.85,
+            color: 'spectrum',
+          },
+          {},
+          {},
+        );
       } else {
         viewer.setStyle({}, getStyleForRepresentation(representation));
       }
@@ -146,7 +141,7 @@ export function ProteinViewer({
       setError(
         err instanceof Error
           ? `Visualization error: ${err.message}`
-          : 'Failed to render 3D structure'
+          : 'Failed to render 3D structure',
       );
       setIsLoading(false);
     }
@@ -156,20 +151,30 @@ export function ProteinViewer({
     initViewer();
   }, [$3Dmol, pdbData, initViewer]);
 
-  // Update representation
   useEffect(() => {
     if (!viewerRef.current || !pdbData || !$3Dmol) return;
     try {
       viewerRef.current.removeAllSurfaces();
 
       if (representation === 'surface') {
-        viewerRef.current.setStyle({}, { cartoon: { color: 'spectrum', opacity: 0.5 } });
-        viewerRef.current.addSurface($3Dmol.SurfaceType.VDW, {
-          opacity: 0.85,
-          color: 'spectrum',
-        }, {}, {});
+        viewerRef.current.setStyle(
+          {},
+          { cartoon: { color: 'spectrum', opacity: 0.5 } },
+        );
+        viewerRef.current.addSurface(
+          $3Dmol.SurfaceType.VDW,
+          {
+            opacity: 0.85,
+            color: 'spectrum',
+          },
+          {},
+          {},
+        );
       } else {
-        viewerRef.current.setStyle({}, getStyleForRepresentation(representation));
+        viewerRef.current.setStyle(
+          {},
+          getStyleForRepresentation(representation),
+        );
       }
 
       viewerRef.current.render();
@@ -188,12 +193,12 @@ export function ProteinViewer({
     return (
       <Card className={`border-destructive bg-destructive/10 ${className}`}>
         <CardContent className="flex items-center gap-3 p-4">
-          <AlertCircle className="size-5 text-destructive" />
+          <AlertCircle className="text-destructive size-5" />
           <div className="flex flex-col">
-            <span className="text-sm font-medium text-destructive">
+            <span className="text-destructive text-sm font-medium">
               Protein Visualization Error
             </span>
-            <span className="text-xs text-muted-foreground">{error}</span>
+            <span className="text-muted-foreground text-xs">{error}</span>
           </div>
         </CardContent>
       </Card>
@@ -235,7 +240,7 @@ export function ProteinViewer({
         <div
           ref={containerRef}
           style={{ width, height }}
-          className={`rounded-lg border bg-background ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
+          className={`bg-background rounded-lg border ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
         />
       </div>
     </div>

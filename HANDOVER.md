@@ -77,6 +77,7 @@ OBM is the **multimodal embedding backbone** - it is ONE tool among several in t
 | TextEncoder | PubMedBERT | `microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext` | Encode biomedical abstracts |
 | MoleculeEncoder | ChemBERTa | `seyonec/ChemBERTa-zinc-base-v1` | Encode SMILES molecules |
 | ProteinEncoder | ESM-2 | `facebook/esm2_t12_35M_UR50D` | Encode protein sequences |
+| ImageEncoder | BiomedCLIP | `microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224` | Encode microscopy, gels, spectra |
 
 ### What OBM Does NOT Provide
 
@@ -104,6 +105,7 @@ OBM is the **multimodal embedding backbone** - it is ONE tool among several in t
   - `text_encoder.py` → PubMedBERT
   - `molecule_encoder.py` → ChemBERTa / RDKit fingerprints
   - `protein_encoder.py` → ESM-2
+  - `image_encoder.py` → BiomedCLIP (BiomedCLIP-PubMedBERT_256-vit_base_patch16_224)
 - **bioflow/obm_wrapper.py**: High-level API (`encode_text`, `encode_smiles`, `encode_protein`)
 
 ### Layer 3: Vector Storage (Qdrant)
@@ -139,7 +141,7 @@ OBM is the **multimodal embedding backbone** - it is ONE tool among several in t
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| OBMEncoder | ✅ Working | PubMedBERT + ChemBERTa + ESM-2 |
+| OBMEncoder | ✅ Working | PubMedBERT + ChemBERTa + ESM-2 + BiomedCLIP |
 | Qdrant Integration | ✅ Working | Local storage at `./qdrant_data` |
 | FastAPI Server | ✅ Working | Port 8000 |
 | Next.js UI | ✅ Working | Port 3000 |
@@ -150,7 +152,7 @@ OBM is the **multimodal embedding backbone** - it is ONE tool among several in t
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| Image Embeddings | Medium | Need BioMedCLIP or similar |
+| Image Embeddings | ✅ Implemented | BiomedCLIP encoder integrated |
 | MMR Diversification | High | In RankerAgent (basic) |
 | Evidence Linking | High | Need to add source tracking |
 | PubMed Ingestion | High | Need data pipeline |
@@ -200,6 +202,7 @@ pnpm dev
 | Text Embedding | SciBERT | Apache 2.0 | `allenai/scibert_scivocab_uncased` |
 | Molecule Embedding | ChemBERTa | MIT | `seyonec/ChemBERTa-zinc-base-v1` |
 | Protein Embedding | ESM-2 | MIT | `facebook/esm2_t12_35M_UR50D` |
+| Image Embedding | BiomedCLIP | MIT | `microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224` |
 | DTI Prediction | DeepPurpose | BSD | [GitHub](https://github.com/kexinhuang12345/DeepPurpose) |
 | Molecule Generation | MolT5 | Apache 2.0 | `laituan245/molt5-base` |
 | Protein Folding | ESMFold | MIT | `facebook/esmfold_v1` |
