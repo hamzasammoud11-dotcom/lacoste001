@@ -10,6 +10,7 @@ NO FALLBACKS - Qdrant must be available or operations will fail explicitly.
 import os
 import sys
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, field
 from enum import Enum
@@ -105,6 +106,7 @@ class QdrantService:
         """
         self.model_service = model_service
         self.url = url or os.getenv("QDRANT_URL")
+        self.api_key = os.getenv("QDRANT_API_KEY")
         self.path = path or os.getenv("QDRANT_PATH")
         self.use_embedded = os.getenv("QDRANT_USE_EMBEDDED", "false").lower() in ("1", "true", "yes")
         if not self.url and not self.path:
@@ -149,8 +151,12 @@ class QdrantService:
             from qdrant_client import QdrantClient
             
             if self.url:
-                self._client = QdrantClient(url=self.url)
-                logger.info(f"Connected to Qdrant at {self.url}")
+                if self.api_key:
+                    self._client = QdrantClient(url=self.url, api_key=self.api_key)
+                    logger.info(f"Connected to Qdrant Cloud at {self.url}")
+                else:
+                    self._client = QdrantClient(url=self.url)
+                    logger.info(f"Connected to Qdrant at {self.url}")
             else:
                 self._client = QdrantClient(path=self.path)
                 logger.info(f"Using local Qdrant at {self.path}")
@@ -327,11 +333,19 @@ class QdrantService:
         # Normalize modality for downstream UI consistency
         stored_modality = "molecule" if modality in ("smiles", "molecule") else modality
 
-        # Prepare payload
+        # Prepare payload with defaults for traceability
+        payload_meta = dict(metadata or {})
+        if "source" not in payload_meta:
+            payload_meta["source"] = "manual"
+        if "source_type" not in payload_meta:
+            payload_meta["source_type"] = payload_meta.get("source", "manual")
+        if "ingested_at" not in payload_meta:
+            payload_meta["ingested_at"] = datetime.utcnow().isoformat()
+
         payload = {
             "content": content,
             "modality": stored_modality,
-            **(metadata or {})
+            **payload_meta,
         }
         
         # Insert into Qdrant
