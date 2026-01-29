@@ -254,6 +254,20 @@ class EnhancedSearchService:
         raw_results = self._apply_post_filters(raw_results, filters)
         
         total_found = len(raw_results)
+
+        # Guard: no results to rerank or enrich
+        if total_found == 0:
+            search_time_ms = (time.time() - start_time) * 1000
+            return SearchResponse(
+                results=[],
+                query=query,
+                modality=requested_modality,
+                total_found=0,
+                returned=0,
+                diversity_score=None,
+                filters_applied=self._filters_to_dict(filters),
+                search_time_ms=search_time_ms,
+            )
         
         # Apply MMR if requested
         # Logic update: Force-include images if requested, as they often have lower scores than exact molecule matches

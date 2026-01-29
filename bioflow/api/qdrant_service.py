@@ -10,6 +10,7 @@ NO FALLBACKS - Qdrant must be available or operations will fail explicitly.
 import os
 import sys
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, field
 from enum import Enum
@@ -105,7 +106,14 @@ class QdrantService:
         """
         self.model_service = model_service
         self.url = url or os.getenv("QDRANT_URL")
-        self.path = path or os.getenv("QDRANT_PATH", "./qdrant_data")
+        self.api_key = os.getenv("QDRANT_API_KEY")
+        self.path = path or os.getenv("QDRANT_PATH")
+        self.use_embedded = os.getenv("QDRANT_USE_EMBEDDED", "false").lower() in ("1", "true", "yes")
+        if not self.url and not self.path:
+            if self.use_embedded:
+                self.path = "./qdrant_data"
+            else:
+                self.url = "http://localhost:6333"
         self.vector_dim = vector_dim
         self.hnsw_m = int(os.getenv("QDRANT_HNSW_M", "16"))
         self.hnsw_ef_construct = int(os.getenv("QDRANT_HNSW_EF_CONSTRUCT", "128"))
@@ -143,8 +151,12 @@ class QdrantService:
             from qdrant_client import QdrantClient
             
             if self.url:
-                self._client = QdrantClient(url=self.url)
-                logger.info(f"Connected to Qdrant at {self.url}")
+                if self.api_key:
+                    self._client = QdrantClient(url=self.url, api_key=self.api_key)
+                    logger.info(f"Connected to Qdrant Cloud at {self.url}")
+                else:
+                    self._client = QdrantClient(url=self.url)
+                    logger.info(f"Connected to Qdrant at {self.url}")
             else:
                 self._client = QdrantClient(path=self.path)
                 logger.info(f"Using local Qdrant at {self.path}")
@@ -321,11 +333,24 @@ class QdrantService:
         # Normalize modality for downstream UI consistency
         stored_modality = "molecule" if modality in ("smiles", "molecule") else modality
 
-        # Prepare payload
+        # Prepare payload with defaults for traceability
+        payload_meta = dict(metadata or {})
+        source = payload_meta.get("source") or payload_meta.get("source_type") or "manual"
+        payload_meta["source"] = str(source).lower()
+        payload_meta["source_type"] = payload_meta.get("source_type") or payload_meta["source"]
+        if "ingested_at" not in payload_meta:
+            payload_meta["ingested_at"] = datetime.utcnow().isoformat()
+        if "evidence_links" not in payload_meta:
+            payload_meta["evidence_links"] = []
+        if "year" not in payload_meta:
+            payload_meta["year"] = payload_meta.get("pub_year") or payload_meta.get("pub_date")
+        if "organism" not in payload_meta:
+            payload_meta["organism"] = payload_meta.get("species")
+
         payload = {
             "content": content,
             "modality": stored_modality,
-            **(metadata or {})
+            **payload_meta,
         }
         
         # Insert into Qdrant

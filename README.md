@@ -21,7 +21,7 @@
 - **Drug-Target Interaction (DTI) Prediction** - Deep learning models for binding affinity prediction
 - **Vector Similarity Search** - Qdrant Cloud-powered semantic search across 23,000+ compounds
 - **3D Molecular Visualization** - Interactive 3D viewers for molecules and proteins
-- **Visual Workflow Builder** - Langflow-powered drag-and-drop pipeline construction
+- **Visual Workflow Builder** - drag-and-drop pipeline construction
 - **Multi-Agent System** - Generator, Ranker, and Validator agents for compound discovery
 
 ---
@@ -36,7 +36,7 @@
 | **🧬 Protein Viewer** | Interactive PDB structure visualization |
 | **📊 3D Explorer** | Real PCA projections of chemical embedding space |
 | **🤖 AI Agents** | Generator → Ranker → Validator pipeline for discovery |
-| **🔧 Visual Workflows** | Langflow integration for custom pipelines |
+| **🔧 Visual Workflows** | Custom pipeline builder |
 | **☁️ Cloud-Native** | Qdrant Cloud + Hugging Face Spaces deployment |
 
 ---
@@ -262,7 +262,6 @@ python tests/stress_test_uc4.py
 - [OpenBioMed](https://github.com/PharMolix/OpenBioMed) - Multimodal Bio-AI
 - [Qdrant](https://qdrant.tech/) - Vector Database
 - [3Dmol.js](https://3dmol.csb.pitt.edu/) - Molecular Visualization
-- [Langflow](https://langflow.org/) - Visual LLM Workflows
 
 ---
 
