@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { API_CONFIG } from '@/config/api.config';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   const body = await request.json();
   const {

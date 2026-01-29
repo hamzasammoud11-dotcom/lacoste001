@@ -6,6 +6,8 @@ import { getData } from "@/lib/data-service"
 
 import { DataView } from "./data-view"
 
+export const dynamic = 'force-dynamic';
+
 export default async function DataPage() {
     const { datasets, stats } = await getData()
 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { API_CONFIG } from '@/config/api.config';
 
+export const dynamic = 'force-dynamic';
+
 function generateMockWorkflowResult(numCandidates: number) {
   const candidates = [];
   for (let i = 0; i < numCandidates; i++) {

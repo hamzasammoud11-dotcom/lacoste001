@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { API_CONFIG } from '@/config/api.config';
 
+export const dynamic = 'force-dynamic';
+
 // Mock PubChem CIDs for common molecules when backend is unavailable
 const MOCK_PUBCHEM_CIDS: Record<string, number> = {
   caffeine: 2519,

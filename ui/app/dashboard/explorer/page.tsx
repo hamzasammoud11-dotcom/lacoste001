@@ -9,6 +9,8 @@ import { ExplorerChart } from './chart';
 import { ExplorerControls } from './components';
 import { ExplorerPredictions } from './predictions';
 
+export const dynamic = 'force-dynamic';
+
 interface ExplorerPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
