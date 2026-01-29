@@ -63,6 +63,7 @@ class OBMEncoder(BioEncoder):
         text_model: str = "pubmedbert",
         molecule_model: str = "chemberta",
         protein_model: str = "esm2_t12",
+        image_model: str = "biomedclip",
         device: str = None,
         output_dim: int = 768,
         lazy_load: bool = True
@@ -74,6 +75,7 @@ class OBMEncoder(BioEncoder):
             text_model: Model for text encoding
             molecule_model: Model for molecule encoding
             protein_model: Model for protein encoding
+            image_model: Model for image encoding
             device: torch device (auto-detected if None)
             output_dim: Target dimension for all embeddings
             lazy_load: If True, load encoders on first use
@@ -81,6 +83,7 @@ class OBMEncoder(BioEncoder):
         self.text_model = text_model
         self.molecule_model = molecule_model
         self.protein_model = protein_model
+        self.image_model = image_model
         self.device = device
         self._output_dim = output_dim
         self.lazy_load = lazy_load
@@ -89,6 +92,7 @@ class OBMEncoder(BioEncoder):
         self._text_encoder = None
         self._molecule_encoder = None
         self._protein_encoder = None
+        self._image_encoder = None
         
         # Projection matrices (for dimension alignment)
         self._projections: Dict[Modality, Any] = {}
@@ -103,6 +107,7 @@ class OBMEncoder(BioEncoder):
         self._get_text_encoder()
         self._get_molecule_encoder()
         self._get_protein_encoder()
+        self._get_image_encoder()
     
     def _get_text_encoder(self):
         """Get or create text encoder."""
@@ -151,6 +156,20 @@ class OBMEncoder(BioEncoder):
             )
         return self._protein_encoder
     
+    def _get_image_encoder(self):
+        """Get or create image encoder."""
+        if self._image_encoder is None:
+            try:
+                from bioflow.plugins.encoders.image_encoder import ImageEncoder
+                self._image_encoder = ImageEncoder(
+                    model_name=self.image_model,
+                    device=self.device
+                )
+            except ImportError as e:
+                logger.warning(f"Image encoder not available: {e}")
+                return None
+        return self._image_encoder
+    
     def _get_encoder_for_modality(self, modality: Modality) -> BioEncoder:
         """Get the appropriate encoder for a modality."""
         if modality == Modality.TEXT:
@@ -159,6 +178,11 @@ class OBMEncoder(BioEncoder):
             return self._get_molecule_encoder()
         elif modality == Modality.PROTEIN:
             return self._get_protein_encoder()
+        elif modality == Modality.IMAGE:
+            encoder = self._get_image_encoder()
+            if encoder is None:
+                raise ValueError("Image encoder not available. Install: pip install open_clip_torch")
+            return encoder
         else:
             raise ValueError(f"Unsupported modality: {modality}")
     
@@ -184,7 +208,11 @@ class OBMEncoder(BioEncoder):
     
     @property
     def supported_modalities(self) -> List[Modality]:
-        return [Modality.TEXT, Modality.SMILES, Modality.PROTEIN]
+        modalities = [Modality.TEXT, Modality.SMILES, Modality.PROTEIN]
+        # Add IMAGE if encoder is available
+        if self._get_image_encoder() is not None:
+            modalities.append(Modality.IMAGE)
+        return modalities
     
     def encode(self, content: Any, modality: Modality) -> EmbeddingResult:
         """
@@ -305,6 +333,12 @@ class OBMEncoder(BioEncoder):
             info["encoders"]["protein"] = {
                 "model": self._protein_encoder.model_path,
                 "dim": self._protein_encoder.dimension
+            }
+        
+        if self._image_encoder:
+            info["encoders"]["image"] = {
+                "model": self._image_encoder.model_name,
+                "dim": self._image_encoder.dimension
             }
         
         return info

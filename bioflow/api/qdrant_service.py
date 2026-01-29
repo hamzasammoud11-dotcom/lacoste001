@@ -263,6 +263,11 @@ class QdrantService:
             result = self.model_service.encode_molecule(content)
         elif modality == "protein":
             result = self.model_service.encode_protein(content)
+        elif modality == "image":
+            # Use OBMEncoder for image encoding
+            obm = self.model_service.get_obm_encoder()
+            from bioflow.core.base import Modality
+            result = obm.encode(content, Modality.IMAGE)
         else:
             result = self.model_service.encode_text(content)
         

@@ -76,8 +76,25 @@ class PredictRequest(BaseModel):
 class IngestRequest(BaseModel):
     """Request to ingest data into vector DB."""
     content: str
-    modality: str = Field(default="smiles", description="smiles | protein | text")
+    modality: str = Field(default="smiles", description="smiles | protein | text | image")
     metadata: Optional[Dict[str, Any]] = None
+
+
+class ImageIngestRequest(BaseModel):
+    """Request to ingest a biological image."""
+    image: str = Field(..., description="Image file path, URL, or base64 encoded string")
+    image_type: str = Field(default="other", description="microscopy | gel | spectra | xray | other")
+    experiment_id: Optional[str] = Field(default=None, description="Experiment identifier")
+    description: Optional[str] = Field(default="", description="Image description")
+    caption: Optional[str] = Field(default="", description="Image caption")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+    collection: Optional[str] = Field(default="bioflow_memory", description="Target collection")
+
+
+class BatchImageIngestRequest(BaseModel):
+    """Request to batch ingest multiple images."""
+    images: List[ImageIngestRequest] = Field(..., description="List of images to ingest")
+    collection: Optional[str] = Field(default="bioflow_memory", description="Target collection")
 
 
 class IngestSourceRequest(BaseModel):
@@ -635,6 +652,43 @@ async def hybrid_search(request: HybridSearchRequest):
         
     except Exception as e:
         logger.error(f"Hybrid search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/search/image")
+async def search_image(
+    image: str,
+    collection: Optional[str] = None,
+    top_k: int = 10,
+    use_mmr: bool = True,
+    lambda_param: float = 0.7,
+    filters: Optional[Dict[str, Any]] = None
+):
+    """
+    Image similarity search.
+
+    Find similar biological images (microscopy, gels, spectra).
+    Supports query-by-image and cross-modal search.
+    """
+    try:
+        if not qdrant_service:
+            raise HTTPException(status_code=503, detail="Qdrant service not available")
+
+        search_service = get_enhanced_search_service()
+        response = search_service.enhanced_search(
+            query=image,
+            modality="image",
+            collection=collection,
+            top_k=top_k,
+            use_mmr=use_mmr,
+            lambda_param=lambda_param,
+            filters=filters or {}
+        )
+
+        return response.to_dict()
+
+    except Exception as e:
+        logger.error(f"Image search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1368,6 +1422,78 @@ async def ingest_all(request: IngestAllRequest, background_tasks: BackgroundTask
         return {"success": True, "result": {k: v.to_dict() for k, v in results.items()}}
     job_id = _start_ingestion_job("all", request.model_dump(), background_tasks)
     return {"success": True, "job_id": job_id, "status": "pending"}
+
+
+@app.post("/api/ingest/image")
+async def ingest_image(request: ImageIngestRequest):
+    """Ingest a single biological image."""
+    try:
+        from bioflow.ingestion.image_ingestor import ImageIngestor
+
+        # Initialize ingestor
+        ingestor = ImageIngestor(
+            qdrant_service=qdrant_service,
+            obm_encoder=model_service.get_obm_encoder(),
+            collection=request.collection
+        )
+
+        # Prepare image data
+        image_data = {
+            "image": request.image,
+            "image_type": request.image_type,
+            "experiment_id": request.experiment_id or "",
+            "description": request.description,
+            "caption": request.caption,
+            "metadata": request.metadata or {}
+        }
+
+        # Ingest single image
+        result = ingestor.batch_ingest([image_data], collection=request.collection)
+
+        return {
+            "success": True,
+            "result": result.to_dict()
+        }
+    except Exception as e:
+        logger.error(f"Image ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/ingest/image/batch")
+async def ingest_images_batch(request: BatchImageIngestRequest):
+    """Batch ingest multiple biological images."""
+    try:
+        from bioflow.ingestion.image_ingestor import ImageIngestor
+
+        # Initialize ingestor
+        ingestor = ImageIngestor(
+            qdrant_service=qdrant_service,
+            obm_encoder=model_service.get_obm_encoder(),
+            collection=request.collection
+        )
+
+        # Prepare image data
+        images_data = []
+        for img in request.images:
+            images_data.append({
+                "image": img.image,
+                "image_type": img.image_type,
+                "experiment_id": img.experiment_id or "",
+                "description": img.description,
+                "caption": img.caption,
+                "metadata": img.metadata or {}
+            })
+
+        # Batch ingest
+        result = ingestor.batch_ingest(images_data, collection=request.collection)
+
+        return {
+            "success": True,
+            "result": result.to_dict()
+        }
+    except Exception as e:
+        logger.error(f"Batch image ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/ingest/jobs/{job_id}")
