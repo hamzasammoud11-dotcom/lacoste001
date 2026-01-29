@@ -504,26 +504,15 @@ class EnhancedSearchService:
         
         for coll in collections:
             try:
-                # Use search() for qdrant-client < 1.10, query_points() for >= 1.10
-                try:
-                    results = client.query_points(
-                        collection_name=coll,
-                        query=query_embedding,
-                        limit=limit,
-                        query_filter=query_filter,
-                        with_payload=True,
-                        with_vectors=with_vectors,
-                    ).points
-                except AttributeError:
-                    # Fallback to older API (qdrant-client < 1.10)
-                    results = client.search(
-                        collection_name=coll,
-                        query_vector=query_embedding,
-                        limit=limit,
-                        query_filter=query_filter,
-                        with_payload=True,
-                        with_vectors=with_vectors,
-                    )
+                # Use search() for qdrant-client v1.x compatibility
+                results = client.search(
+                    collection_name=coll,
+                    query_vector=query_embedding,
+                    limit=limit,
+                    query_filter=query_filter,
+                    with_payload=True,
+                    with_vectors=with_vectors,
+                )
                 
                 for r in results:
                     payload_modality = r.payload.get('modality', 'unknown')

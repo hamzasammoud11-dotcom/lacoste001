@@ -6,27 +6,35 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProteinPdbUrl, getProteins } from '@/lib/api';
 import type { Protein } from '@/types/visualization';
+
+// Fetch proteins from local API route (which has mock fallback)
+async function fetchProteinsWithFallback(): Promise<Protein[]> {
+  const response = await fetch('/api/proteins');
+  if (!response.ok) {
+    throw new Error('Failed to fetch proteins');
+  }
+  return response.json();
+}
+
+// Get PDB URL for a protein (direct RCSB link)
+function getProteinPdbUrl(pdbId: string): string {
+  return `https://files.rcsb.org/download/${pdbId.toUpperCase()}.pdb`;
+}
 
 // Dynamic import of the protein viewer to prevent SSR issues
 const ProteinViewer = dynamic(
-  () => import('./_components/ProteinViewer').then((mod) => mod.ProteinViewer),
+  () =>
+    import('./_components/ProteinViewer').then((mod) => mod.ProteinViewer),
   {
     ssr: false,
     loading: () => <Skeleton className="size-[500px]" />,
-  },
+  }
 );
 
 export default function Proteins3DPage() {
@@ -36,18 +44,19 @@ export default function Proteins3DPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Load proteins list
   useEffect(() => {
     const loadProteins = async () => {
       try {
         setIsLoading(true);
-        const data = await getProteins();
+        const data = await fetchProteinsWithFallback();
         setProteins(data);
         if (data.length > 0) {
-          setSelectedProtein(data[0] || null);
+          setSelectedProtein(data[0]);
         }
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Failed to load proteins',
+          err instanceof Error ? err.message : 'Failed to load proteins'
         );
       } finally {
         setIsLoading(false);
@@ -63,7 +72,7 @@ export default function Proteins3DPage() {
       (p) =>
         p.name.toLowerCase().includes(query) ||
         p.pdbId.toLowerCase().includes(query) ||
-        p.description?.toLowerCase().includes(query),
+        p.description?.toLowerCase().includes(query)
     );
   }, [proteins, searchQuery]);
 
@@ -81,7 +90,8 @@ export default function Proteins3DPage() {
   }
 
   return (
-    <div className="flex h-full gap-4 p-4">
+    <div className="flex h-full gap-6 p-6">
+      {/* Left Panel - Protein List */}
       <Card className="w-80 shrink-0">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Proteins</CardTitle>
@@ -89,7 +99,7 @@ export default function Proteins3DPage() {
         </CardHeader>
         <CardContent className="pb-3">
           <div className="relative">
-            <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input
               placeholder="Search proteins..."
               className="pl-8"
@@ -108,7 +118,7 @@ export default function Proteins3DPage() {
                 ))}
               </div>
             ) : filteredProteins.length === 0 ? (
-              <p className="text-muted-foreground p-4 text-center text-sm">
+              <p className="p-4 text-center text-sm text-muted-foreground">
                 No proteins found
               </p>
             ) : (
@@ -117,10 +127,11 @@ export default function Proteins3DPage() {
                   <button
                     key={protein.id}
                     onClick={() => setSelectedProtein(protein)}
-                    className={`hover:bg-accent w-full rounded-lg p-3 text-left transition-colors ${selectedProtein?.id === protein.id
+                    className={`w-full rounded-lg p-3 text-left transition-colors hover:bg-accent ${
+                      selectedProtein?.id === protein.id
                         ? 'bg-accent'
                         : 'bg-transparent'
-                      }`}
+                    }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{protein.name}</span>
@@ -129,7 +140,7 @@ export default function Proteins3DPage() {
                       </Badge>
                     </div>
                     {protein.description && (
-                      <div className="text-muted-foreground mt-1 truncate text-xs">
+                      <div className="mt-1 truncate text-xs text-muted-foreground">
                         {protein.description}
                       </div>
                     )}
@@ -141,9 +152,11 @@ export default function Proteins3DPage() {
         </ScrollArea>
       </Card>
 
+      {/* Right Panel - 3D Visualization */}
       <div className="flex flex-1 flex-col gap-6">
         {selectedProtein ? (
           <>
+            {/* Protein Info Card */}
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -154,10 +167,12 @@ export default function Proteins3DPage() {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">
-                      PDB: {selectedProtein.pdbId}
-                    </Badge>
-                    <Button variant="outline" size="sm" asChild>
+                    <Badge variant="outline">PDB: {selectedProtein.pdbId}</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                    >
                       <a
                         href={getProteinPdbUrl(selectedProtein.id)}
                         target="_blank"
@@ -171,12 +186,12 @@ export default function Proteins3DPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-muted-foreground flex gap-4 text-sm">
+                <div className="flex gap-4 text-sm text-muted-foreground">
                   <a
                     href={`https://www.rcsb.org/structure/${selectedProtein.pdbId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-foreground flex items-center gap-1"
+                    className="flex items-center gap-1 hover:text-foreground"
                   >
                     <ExternalLink className="size-3" />
                     View on RCSB PDB
@@ -185,7 +200,7 @@ export default function Proteins3DPage() {
                     href={`https://www.uniprot.org/uniprotkb?query=${selectedProtein.name}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-foreground flex items-center gap-1"
+                    className="flex items-center gap-1 hover:text-foreground"
                   >
                     <ExternalLink className="size-3" />
                     Search UniProt
@@ -194,6 +209,7 @@ export default function Proteins3DPage() {
               </CardContent>
             </Card>
 
+            {/* 3D Structure Card */}
             <Card className="flex-1">
               <CardHeader>
                 <CardTitle className="text-lg">3D Structure</CardTitle>

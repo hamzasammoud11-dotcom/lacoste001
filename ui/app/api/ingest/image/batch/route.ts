@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { API_CONFIG } from '@/config/api.config';
 
 /**
