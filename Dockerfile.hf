@@ -1,0 +1,44 @@
+# Use a lightweight python image
+FROM python:3.9-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies required for RDKit and build tools
+RUN apt-get update && apt-get install -y \
+    libxrender1 \
+    libxext6 \
+    build-essential \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# Copy only requirements first to cache dependencies
+COPY requirements.txt .
+
+# Install dependencies
+# Using automatic cpu version for torch to keep image small
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
+
+# Expose the API port
+EXPOSE 8000
+
+# Create a non-root user for security (good practice for HF Spaces)
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+# Command to run the application
+CMD ["uvicorn", "bioflow.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
