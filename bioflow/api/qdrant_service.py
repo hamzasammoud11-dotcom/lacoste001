@@ -470,10 +470,14 @@ class QdrantService:
                         vec = r.vector
                         if isinstance(vec, dict):
                             vec = list(vec.values())[0] if vec else None
+                    # Support both old schema (content) and bio_discovery schema (smiles/target_seq)
+                    content = r.payload.get("content", "")
+                    if not content:
+                        content = r.payload.get("smiles", "") or r.payload.get("target_seq", "")
                     all_results.append(SearchResult(
                         id=str(r.id),
                         score=r.score,
-                        content=r.payload.get("content", ""),
+                        content=content,
                         modality=normalized_modality,
                         metadata=r.payload,
                         vector=vec,

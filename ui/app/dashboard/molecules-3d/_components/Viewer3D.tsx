@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { MoleculeRepresentation } from '@/types/visualization';
 
@@ -23,20 +23,37 @@ export default function Viewer3D({
 }: Viewer3DProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<any>(null);
+    const [isClient, setIsClient] = useState(false);
+
+    // Ensure we're on client
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     useEffect(() => {
+        if (!isClient) return;
+        
         let viewer: any;
+        let mounted = true;
 
         async function init() {
-            if (!containerRef.current) return;
+            if (!containerRef.current || !mounted) return;
 
             try {
-                const $3Dmol = (await import('3dmol')).default;
+                // Dynamic import with error handling
+                const $3Dmol = await import('3dmol').then(m => m.default).catch(() => null);
+                
+                if (!$3Dmol || !mounted) {
+                    onError('3Dmol library failed to load');
+                    return;
+                }
 
                 viewer = $3Dmol.createViewer(containerRef.current, {
                     backgroundColor: "#ffffff",
                 });
 
+                if (!mounted) return;
+                
                 viewerRef.current = viewer;
 
                 viewer.addModel(sdfData, 'sdf');
@@ -47,24 +64,27 @@ export default function Viewer3D({
                 onReady();
             } catch (err: any) {
                 console.error('3Dmol init failed:', err);
-                onError(
-                    err?.message
-                        ? `Visualization error: ${err.message}`
-                        : 'Failed to load or initialize 3D viewer'
-                );
+                if (mounted) {
+                    onError(
+                        err?.message
+                            ? `Visualization error: ${err.message}`
+                            : 'Failed to load or initialize 3D viewer'
+                    );
+                }
             }
         }
 
         init();
 
         return () => {
+            mounted = false;
             if (viewer?.removeAllModels) {
                 try {
                     viewer.removeAllModels();
                 } catch { }
             }
         };
-    }, [sdfData, onReady, onError]);
+    }, [sdfData, onReady, onError, isClient]);
 
     useEffect(() => {
         const v = viewerRef.current;

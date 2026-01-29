@@ -444,10 +444,14 @@ class EnhancedSearchService:
                     payload_modality = r.payload.get('modality', 'unknown')
                     # Normalize legacy modality value for UI consistency.
                     normalized_modality = "molecule" if payload_modality == "smiles" else payload_modality
+                    # Support both old schema (content) and bio_discovery schema (smiles/target_seq)
+                    content = r.payload.get('content', '')
+                    if not content:
+                        content = r.payload.get('smiles', '') or r.payload.get('target_seq', '')
                     all_results.append({
                         'id': str(r.id),
                         'score': r.score,
-                        'content': r.payload.get('content', ''),
+                        'content': content,
                         'modality': normalized_modality,
                         'metadata': r.payload,
                         'vector': r.vector if with_vectors else None,

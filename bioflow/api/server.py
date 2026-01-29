@@ -1475,40 +1475,72 @@ async def get_stats():
 
 @app.get("/api/points")
 async def get_points(limit: int = 500, view: str = "combined"):
-    """Get points for visualization."""
+    """Get points for visualization using pre-computed PCA from bio_discovery."""
     import numpy as np
     
     if not qdrant_service:
-        # Return mock data if qdrant not available
         return _get_mock_points(limit)
     
     points = []
     try:
-        # Get from molecules collection
-        mol_results = qdrant_service.search("", modality="text", collection="molecules", limit=min(limit // 2, 250))
-        for i, r in enumerate(mol_results):
-            np.random.seed(hash(r.content) % 2**32)
+        # Get available collections
+        collections = qdrant_service.list_collections()
+        if not collections:
+            return _get_mock_points(limit)
+        
+        main_collection = collections[0]
+        logger.info(f"Getting points from collection: {main_collection}")
+        
+        # Get Qdrant client directly to scroll through data
+        client = qdrant_service._get_client()
+        
+        # Scroll through collection to get points with PCA data
+        scroll_result = client.scroll(
+            collection_name=main_collection,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+        
+        records = scroll_result[0]
+        
+        for i, r in enumerate(records):
+            payload = r.payload
+            
+            # Get PCA coordinates based on view type
+            pca_key = f"pca_{view}" if view in ("drug", "target", "combined") else "pca_combined"
+            pca_coords = payload.get(pca_key) or payload.get("pca_combined") or [0, 0]
+            
+            # Use first 2 dimensions of PCA for x, y
+            x = float(pca_coords[0]) if len(pca_coords) > 0 else 0
+            y = float(pca_coords[1]) if len(pca_coords) > 1 else 0
+            
+            # Determine cluster based on affinity class
+            affinity = payload.get("affinity_class", "unknown")
+            cluster = 0 if affinity == "high" else (1 if affinity == "medium" else 2)
+            
+            # Get label from SMILES
+            smiles = payload.get("smiles", "")
+            label = smiles[:30] + "..." if len(smiles) > 30 else smiles
+            
             points.append({
-                "id": r.id,
-                "x": float(2 + np.random.randn() * 0.8),
-                "y": float(3 + np.random.randn() * 0.8),
-                "cluster": 0,
-                "label": r.metadata.get("name", r.content[:20] if r.content else f"mol-{i}"),
+                "id": str(r.id),
+                "x": x * 10,  # Scale for visualization
+                "y": y * 10,
+                "cluster": cluster,
+                "label": label,
                 "modality": "molecule",
+                "affinity_class": affinity,
+                "score": payload.get("label_true", 0),
             })
         
-        # Get from proteins collection
-        prot_results = qdrant_service.search("", modality="text", collection="proteins", limit=min(limit // 2, 250))
-        for i, r in enumerate(prot_results):
-            np.random.seed(hash(r.content) % 2**32)
-            points.append({
-                "id": r.id,
-                "x": float(-2 + np.random.randn() * 0.8),
-                "y": float(-1 + np.random.randn() * 0.8),
-                "cluster": 1,
-                "label": r.metadata.get("name", r.content[:20] if r.content else f"prot-{i}"),
-                "modality": "protein",
-            })
+        logger.info(f"Loaded {len(points)} points from {main_collection}")
+        
+    except Exception as e:
+        logger.error(f"Failed to get points from Qdrant: {e}")
+        import traceback
+        traceback.print_exc()
+        return _get_mock_points(limit)
     except Exception as e:
         logger.warning(f"Failed to get points from Qdrant: {e}")
         return _get_mock_points(limit)

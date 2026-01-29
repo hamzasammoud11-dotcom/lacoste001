@@ -76,8 +76,16 @@ export async function getExplorerPoints(
 
 // --- MOLECULES / PROTEINS ---
 
+interface MoleculesResponse {
+    molecules: Molecule[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
 export async function getMolecules(): Promise<Molecule[]> {
-    return fetchJson<Molecule[]>(`${API_BASE}/api/molecules`);
+    const response = await fetchJson<MoleculesResponse>(`${API_BASE}/api/molecules`);
+    return response.molecules || [];
 }
 
 export async function getMolecule(id: string): Promise<Molecule> {
@@ -92,8 +100,16 @@ export function getMoleculeSdfUrl(id: string): string {
     return `${API_BASE}/api/molecules/${id}/sdf`;
 }
 
+interface ProteinsResponse {
+    proteins: Protein[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
 export async function getProteins(): Promise<Protein[]> {
-    return fetchJson<Protein[]>(`${API_BASE}/api/proteins`);
+    const response = await fetchJson<ProteinsResponse>(`${API_BASE}/api/proteins`);
+    return response.proteins || [];
 }
 
 export async function getProtein(id: string): Promise<Protein> {
