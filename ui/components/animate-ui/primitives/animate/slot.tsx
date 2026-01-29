@@ -1,7 +1,7 @@
 'use client';
 
 /* eslint-disable react-hooks/static-components */
-import { type HTMLMotionProps,isMotionComponent, motion } from 'motion/react';
+import { type HTMLMotionProps, isMotionComponent, motion } from 'motion/react';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
@@ -18,7 +18,6 @@ type WithAsChild<Base extends object> =
   | (Base & { asChild?: false | undefined });
 
 type SlotProps<T extends HTMLElement = HTMLElement> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   children?: any;
 } & DOMMotionProps<T>;
 

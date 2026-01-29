@@ -1,236 +1,277 @@
 # BioFlow
 
 > **Multimodal Biological Design & Discovery Intelligence Engine**  
-> A low-code workflow platform for unified biological discovery pipelines
+> A full-stack AI platform for unified biological discovery pipelines
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
-![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-red)
-![CUDA](https://img.shields.io/badge/CUDA-11.8-green)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green)
+![Qdrant Cloud](https://img.shields.io/badge/Qdrant-Cloud-red)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)
 ![Team](https://img.shields.io/badge/Team-Lacoste-purple)
+
+🚀 **[Live Demo on Hugging Face Spaces](https://huggingface.co/spaces/vignt97867896/bioflow)**
 
 ---
 
-## Problem Statement
+## 🧬 What is BioFlow?
 
-Biological R&D knowledge is fragmented across disconnected silos:
-- **Textual literature** (papers, lab notes)
-- **3D structural data** (PDB files)
-- **Chemical sequences** (SMILES)
+**BioFlow** is a comprehensive AI-powered platform for drug discovery and biological research. It combines:
 
-Researchers must manually navigate incompatible formats, creating bottlenecks and "blind spots" where critical connections are missed.
+- **Drug-Target Interaction (DTI) Prediction** - Deep learning models for binding affinity prediction
+- **Vector Similarity Search** - Qdrant Cloud-powered semantic search across 23,000+ compounds
+- **3D Molecular Visualization** - Interactive 3D viewers for molecules and proteins
+- **Visual Workflow Builder** - Langflow-powered drag-and-drop pipeline construction
+- **Multi-Agent System** - Generator, Ranker, and Validator agents for compound discovery
 
-## Our Solution
+---
 
-**BioFlow** is a visual workflow engine that unifies biological discovery pipelines. Rather than a single "black box" model, we function as an **intelligent platform** — allowing researchers to chain state-of-the-art open-source biological models into coherent discovery workflows.
-
-### Key Features
+## ✨ Key Features
 
 | Feature | Description |
 |---------|-------------|
-| **Visual Pipeline Builder** | Drag-and-drop node editor for constructing discovery workflows |
-| **DeepPurpose Integration** | Drug-Target Interaction prediction with Morgan + CNN encoding |
-| **Molecule & Protein Visualization** | Interactive 2D SMILES and 3D PDB structure viewing (powered by 3Dmol.js and SmilesDrawer) |
-| **Qdrant Vector Search** | High-dimensional similarity search across 23,531+ compounds |
-| **3D Embedding Explorer** | Real PCA projections of drug-target chemical space |
-| **Validator Agents** | Automated toxicity and novelty checking |
+| **🔬 DTI Prediction** | DeepPurpose Morgan+CNN encoder for drug-target binding affinity |
+| **🔍 Semantic Search** | Qdrant Cloud vector search with MMR diversity sampling |
+| **🧪 Molecule Viewer** | 2D SMILES rendering + 3D molecular structure (3Dmol.js) |
+| **🧬 Protein Viewer** | Interactive PDB structure visualization |
+| **📊 3D Explorer** | Real PCA projections of chemical embedding space |
+| **🤖 AI Agents** | Generator → Ranker → Validator pipeline for discovery |
+| **🔧 Visual Workflows** | Langflow integration for custom pipelines |
+| **☁️ Cloud-Native** | Qdrant Cloud + Hugging Face Spaces deployment |
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
-                         ┌──────────────────────────────────────────┐
-                         │                 BioFlow                  │
-                         │      Visual Pipeline Builder (UI)        │
-                         └─────────────────┬────────────────────────┘
-                                           │
-         ┌─────────────────────────────────┼─────────────────────────────────┐
-         │                                 │                                 │
-         ▼                                 ▼                                 ▼
-┌─────────────────┐             ┌─────────────────┐             ┌─────────────────┐
-│   Data Input    │             │   DeepPurpose   │             │   OpenBioMed    │
-│  SMILES/Protein │────────────▶│   DTI Model     │────────────▶│   Multimodal    │
-│   Sequences     │             │  Morgan + CNN   │             │   Embeddings    │
-└─────────────────┘             └────────┬────────┘             └────────┬────────┘
-                                         │                               │
-                                         └───────────────┬───────────────┘
-                                                         │
-                                                         ▼
-                                              ┌─────────────────┐
-                                              │     Qdrant      │
-                                              │   Vector DB     │
-                                              │  HNSW Indexing  │
-                                              │  23,531 vectors │
-                                              └────────┬────────┘
-                                                       │
-                         ┌─────────────────────────────┼─────────────────────────────┐
-                         │                             │                             │
-                         ▼                             ▼                             ▼
-              ┌─────────────────┐          ┌─────────────────┐          ┌─────────────────┐
-              │ Similarity      │          │   Validator     │          │    Results      │
-              │ Search Agent    │          │   Agent         │          │    Output       │
-              │ Top-K Retrieval │          │ Toxicity/Novelty│          │   Candidates    │
-              └─────────────────┘          └─────────────────┘          └─────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BioFlow Platform                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐  │
+│   │   Next.js 16     │    │   FastAPI        │    │   Qdrant Cloud   │  │
+│   │   Frontend       │◄──►│   Backend        │◄──►│   Vector DB      │  │
+│   │   (TypeScript)   │    │   (Python)       │    │   (23K+ vectors) │  │
+│   └──────────────────┘    └──────────────────┘    └──────────────────┘  │
+│           │                       │                                      │
+│           ▼                       ▼                                      │
+│   ┌──────────────────┐    ┌──────────────────┐                          │
+│   │   Dashboard      │    │   AI Modules     │                          │
+│   │   • Discovery    │    │   • DeepPurpose  │                          │
+│   │   • Explorer     │    │   • OpenBioMed   │                          │
+│   │   • Molecules    │    │   • Encoders     │                          │
+│   │   • Proteins     │    │   • Agents       │                          │
+│   │   • Workflow     │    │   • Search       │                          │
+│   └──────────────────┘    └──────────────────┘                          │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Model Performance
+## 📈 Model Performance
 
-| Dataset | Concordance Index | Pearson | MSE |
-|---------|-------------------|---------|-----|
+| Dataset | Concordance Index | Pearson Correlation | MSE |
+|---------|-------------------|---------------------|-----|
+| **DAVIS** | 0.7914 | 0.5446 | 0.4684 |
 | **KIBA** | 0.7003 | 0.5219 | 0.0008 |
 | **BindingDB_Kd** | 0.8083 | 0.7679 | 0.6668 |
-| **DAVIS** | 0.7914 | 0.5446 | 0.4684 |
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.10+
-- Node.js 18+
-- Docker Desktop
-- CUDA 11.8 (optional, for GPU acceleration)
+- Node.js 18+ (with pnpm)
+- Git
 
 ### 1. Clone & Setup
+
 ```bash
 git clone https://github.com/hamzasammoud11-dotcom/lacoste001.git
 cd lacoste001
 
-# Python environment
+# Create Python environment
 python -m venv .venv
 .venv\Scripts\activate  # Windows
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-pip install DeepPurpose qdrant-client fastapi uvicorn scikit-learn
+# source .venv/bin/activate  # Linux/Mac
+
+# Install Python dependencies
+pip install -r requirements.txt
 ```
 
-### 2. Start Qdrant Vector Database
+### 2. Configure Environment
+
+Create a `.env` file (or copy from template):
+
+```env
+# Qdrant Cloud (Required)
+QDRANT_URL=https://your-cluster.cloud.qdrant.io
+QDRANT_API_KEY=your-api-key
+
+# API Configuration
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+> **Note**: We use **Qdrant Cloud** instead of local Docker for production reliability.
+> Get free credentials at [cloud.qdrant.io](https://cloud.qdrant.io)
+
+### 3. Start Backend
+
 ```bash
-docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant:latest
+python -m uvicorn bioflow.api.server:app --host 0.0.0.0 --port 8000
 ```
 
-### 3. Ingest Data (One-time)
-```bash
-python ingest_qdrant.py
-# Loads KIBA dataset → DeepPurpose embeddings → Qdrant
-# ~23,531 drug-target pairs indexed
-```
+### 4. Start Frontend
 
-### 4. Start Backend API
-```bash
-python -m uvicorn bioflow.api.server:app --host 0.0.0.0 --port 8001
-```
-
-### 5. Start Frontend
 ```bash
 cd ui
 pnpm install
 pnpm dev
-# Open http://localhost:3000
 ```
 
-### 6. Start Langflow (Visual Workflow Builder)
-```bash
-# You can use the provided script
-./run_langflow.bat
-
-# Or manually:
-pip install langflow
-langflow run --host 0.0.0.0 --port 7860
-# Access via http://localhost:3000/workflow (embedded)
-# Or directly at http://localhost:7860
-```
+Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## Visual Workflow Builder (Langflow Integration)
-
-BioFlow integrates **Langflow** as the visual workflow engine, providing a full-screen drag-and-drop pipeline builder accessible from `/workflow`.
-
-### Building a DTI Pipeline in Langflow
-
-1. **Import the Template Flow**:
-   - Open Langflow (`/workflow` or `localhost:7860`)
-   - Click "New Project" → "Import"
-   - Load `langflow/bioflow_dti_pipeline.json`
-
-2. **Configure the Pipeline**:
-   - **Drug Input**: Enter SMILES string (e.g., `CC(=O)Nc1ccc(O)cc1`)
-   - **Target Input**: Enter protein sequence
-   - **API Nodes**: Point to `http://localhost:8001/api/*`
-
-3. **Run the Flow**:
-   - Click "Run" to execute DeepPurpose encoding → Qdrant search → Results
-
----
-
-## Project Structure
+## 📂 Project Structure
 
 ```
-├── config.py              # Shared configuration
-├── ingest_qdrant.py       # ETL: TDC → DeepPurpose → Qdrant
-├── deeppurpose002.py      # Model training script
-├── bioflow/
-│   └── api/
-│       └── server.py      # FastAPI backend
-├── runs/
-│   └── 20260125_104915_KIBA/
-│       ├── model.pt       # Trained model weights
-│       └── config.pkl     # Model configuration
-├── ui/
+bioflow/
+├── .env                    # Environment configuration (Qdrant, API URLs)
+├── config.py               # Shared Python configuration
+├── requirements.txt        # Python dependencies
+│
+├── bioflow/                # Core Python package
+│   ├── api/                # FastAPI backend
+│   │   ├── server.py       # Main API server
+│   │   ├── dti_predictor.py
+│   │   └── qdrant_service.py
+│   ├── agents/             # Multi-agent system
+│   │   ├── generator.py    # Compound generation
+│   │   ├── ranker.py       # Affinity ranking
+│   │   └── validator.py    # Safety validation
+│   ├── core/               # Base classes & orchestration
+│   ├── plugins/            # DeepPurpose, OBM encoders
+│   ├── search/             # Enhanced search (MMR, filters)
+│   └── ingestion/          # Data ingestion pipelines
+│
+├── ui/                     # Next.js 16 Frontend
 │   ├── app/
-│   │   ├── workflow/      # Visual Pipeline Builder
-│   │   ├── explorer/      # 3D Embedding Visualization
-│   │   ├── discovery/     # Drug Discovery Interface
-│   │   └── data/          # Data Browser
-│   └── components/
-└── data/
-    └── kiba.tab           # Cached TDC dataset
+│   │   ├── dashboard/
+│   │   │   ├── discovery/      # Drug discovery interface
+│   │   │   ├── explorer/       # 3D embedding visualization
+│   │   │   ├── molecules-2d/   # SMILES 2D viewer
+│   │   │   ├── molecules-3d/   # 3Dmol.js 3D viewer
+│   │   │   ├── proteins-3d/    # Protein structure viewer
+│   │   │   ├── workflow/       # Visual pipeline builder
+│   │   │   └── data/           # Data browser
+│   │   └── api/            # Next.js API routes (proxy)
+│   └── components/         # Reusable UI components
+│
+├── tests/                  # Test suite
+│   ├── test_agents.py
+│   ├── test_search_api.py
+│   └── stress_test_uc4.py
+│
+├── runs/                   # Model training outputs
+├── data/                   # Cached datasets (KIBA, DAVIS)
+└── docs/                   # Documentation
 ```
 
 ---
 
-## API Endpoints
+## 🔌 API Reference
+
+### Core Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Service health + model metrics |
-| `/api/points` | GET | Get 3D PCA points for visualization |
-| `/api/search` | POST | Similarity search by SMILES/sequence |
+| `/health` | GET | Service health + model status |
+| `/api/points` | GET | 3D PCA embedding coordinates |
+| `/api/search` | POST | Similarity search by SMILES |
+| `/api/molecules` | GET | Browse indexed molecules |
+| `/api/proteins` | GET | Browse indexed proteins |
+| `/api/predict` | POST | DTI binding prediction |
+
+### Agent Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/agents/generate` | POST | Generate candidate molecules |
+| `/api/agents/rank` | POST | Rank by binding affinity |
+| `/api/agents/validate` | POST | Validate safety/novelty |
+| `/api/agents/workflow` | POST | Run full agent pipeline |
 
 ### Example: Search Similar Compounds
+
 ```bash
-curl -X POST "http://localhost:8001/api/search" \
+curl -X POST "http://localhost:8000/api/search" \
   -H "Content-Type: application/json" \
   -d '{"smiles": "CC(=O)Nc1ccc(O)cc1", "top_k": 10}'
 ```
 
 ---
 
-## Qdrant Integration Strategy
+## ☁️ Deployment
 
-### 1. Multimodal Bridge
-Using OpenBioMed for joint embeddings across proteins, molecules, and text — enabling **cross-modal retrieval**.
+### Hugging Face Spaces (Backend)
+The FastAPI backend is deployed on HF Spaces with Docker.
 
-### 2. Dynamic Workflow Memory
-Pipeline nodes store intermediate results in Qdrant collections, enabling agent-to-agent communication.
+### Vercel (Frontend)
+The Next.js frontend can be deployed to Vercel with:
+```bash
+cd ui
+vercel --prod
+```
 
-### 3. High-Dimensional Scalability
-HNSW indexing handles bio-embeddings at scale, keeping similarity searches interactive and real-time.
+### Environment Variables for Production
 
+**Backend (.env)**:
+```env
+QDRANT_URL=https://xxx.cloud.qdrant.io
+QDRANT_API_KEY=your-key
+```
 
-
-## Resources
-
-- [DeepPurpose](https://github.com/kexinhuang12345/DeepPurpose) — DTI Prediction Toolkit
-- [OpenBioMed](https://github.com/PharMolix/OpenBioMed) — Multimodal AI Framework
-- [Qdrant](https://qdrant.tech/) — Vector Database
-- [TDC](https://tdcommons.ai/) — Therapeutics Data Commons
+**Frontend (Vercel Dashboard)**:
+```env
+NEXT_PUBLIC_API_URL=https://your-space.hf.space
+```
 
 ---
 
-## License
+## 🧪 Running Tests
+
+```bash
+# Run all tests
+python -m pytest tests/ -v
+
+# Run specific test
+python tests/test_search_api.py
+
+# Stress test
+python tests/stress_test_uc4.py
+```
+
+---
+
+## 📚 Resources
+
+- [DeepPurpose](https://github.com/kexinhuang12345/DeepPurpose) - DTI Prediction Toolkit
+- [OpenBioMed](https://github.com/PharMolix/OpenBioMed) - Multimodal Bio-AI
+- [Qdrant](https://qdrant.tech/) - Vector Database
+- [3Dmol.js](https://3dmol.csb.pitt.edu/) - Molecular Visualization
+- [Langflow](https://langflow.org/) - Visual LLM Workflows
+
+---
+
+## 👥 Team Lacoste
+
+Built with ❤️ for biological discovery.
+
+---
+
+## 📄 License
 
 MIT License - See [LICENSE](LICENSE) for details.

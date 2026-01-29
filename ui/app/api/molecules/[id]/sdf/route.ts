@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+
 import { API_CONFIG } from '@/config/api.config';
+
+export const dynamic = 'force-dynamic';
 
 // Mock PubChem CIDs for common molecules when backend is unavailable
 const MOCK_PUBCHEM_CIDS: Record<string, number> = {
@@ -15,12 +18,18 @@ const MOCK_PUBCHEM_CIDS: Record<string, number> = {
   water: 962,
 };
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
   const moleculeId = id.toLowerCase();
 
   try {
-    const response = await fetch(`${API_CONFIG.baseUrl}/api/molecules/${id}/sdf`, { cache: 'no-store' });
+    const response = await fetch(
+      `${API_CONFIG.baseUrl}/api/molecules/${id}/sdf`,
+      { cache: 'no-store' },
+    );
     if (response.ok) {
       const text = await response.text();
       return new NextResponse(text, {
@@ -35,7 +44,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   let pubchemCid: number | null = null;
 
   try {
-    const moleculeRes = await fetch(`${API_CONFIG.baseUrl}/api/molecules/${id}`);
+    const moleculeRes = await fetch(
+      `${API_CONFIG.baseUrl}/api/molecules/${id}`,
+    );
     if (moleculeRes.ok) {
       const molecule = await moleculeRes.json();
       pubchemCid = molecule.pubchemCid;
@@ -49,7 +60,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 
   if (!pubchemCid) {
-    return NextResponse.json({ error: 'No PubChem CID available for this molecule' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'No PubChem CID available for this molecule' },
+      { status: 400 },
+    );
   }
 
   try {
@@ -58,12 +72,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     if (!response.ok) {
       const pubchemUrl2D = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${pubchemCid}/record/SDF`;
-      const response2D = await fetch(pubchemUrl2D, { next: { revalidate: 3600 } });
+      const response2D = await fetch(pubchemUrl2D, {
+        next: { revalidate: 3600 },
+      });
 
       if (!response2D.ok) {
         return NextResponse.json(
           { error: 'Failed to fetch SDF from PubChem' },
-          { status: 502 }
+          { status: 502 },
         );
       }
 
@@ -71,7 +87,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       return new NextResponse(sdfText, {
         headers: {
           'Content-Type': 'chemical/x-mdl-sdfile',
-          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+          'Cache-Control':
+            'public, s-maxage=3600, stale-while-revalidate=86400',
         },
       });
     }
@@ -85,8 +102,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     });
   } catch (error) {
     return NextResponse.json(
-      { error: `Failed to fetch SDF: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
+      {
+        error: `Failed to fetch SDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      },
+      { status: 500 },
     );
   }
 }

@@ -1,7 +1,4 @@
 # BioFlow: AI-Powered Drug-Target Interaction Platform
-## Technical Report - January 2026
-
----
 
 ## Table of Contents
 1. [Executive Summary](#executive-summary)
