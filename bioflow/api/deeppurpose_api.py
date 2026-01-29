@@ -333,7 +333,7 @@ async def get_visualization_points(limit: int = 500, view: str = "combined"):
     }
 
 
-@router.get("/stats")
+@router.get("/deeppurpose/stats")
 async def get_collection_stats():
     """Get real statistics from Qdrant collection."""
     if not _init_deeppurpose():

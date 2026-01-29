@@ -1584,6 +1584,8 @@ async def get_stats():
     """Get system statistics for the data page."""
     total_vectors = 0
     collections_info = []
+    molecules_count = 0
+    proteins_count = 0
     
     if qdrant_service:
         try:
@@ -1591,14 +1593,42 @@ async def get_stats():
             for coll in collections:
                 try:
                     stats = qdrant_service.get_collection_stats(coll)
-                    total_vectors += stats.get("points_count", 0)
+                    points = stats.get("points_count", 0)
+                    total_vectors += points
                     collections_info.append(stats)
+                    
+                    # Track by collection type
+                    if "molecule" in coll.lower():
+                        molecules_count += points
+                    elif "protein" in coll.lower():
+                        proteins_count += points
                 except Exception as e:
                     logger.warning(f"Failed to get stats for {coll}: {e}")
         except Exception as e:
             logger.warning(f"Failed to list collections: {e}")
     
+    # Format datasets for frontend
+    datasets = []
+    for coll_stat in collections_info:
+        coll_name = coll_stat.get("name", "unknown")
+        points = coll_stat.get("points_count", 0)
+        datasets.append({
+            "name": coll_name,
+            "type": "molecule" if "molecule" in coll_name.lower() else ("protein" if "protein" in coll_name.lower() else "mixed"),
+            "count": f"{points:,}",
+            "size": f"{(points * 3072) / 1024 / 1024:.1f} MB",  # Estimate based on vector size
+            "updated": "Recently",
+        })
+    
     return {
+        "datasets": datasets,
+        "stats": {
+            "datasets": len(collections_info),
+            "molecules": f"{molecules_count:,}",
+            "proteins": f"{proteins_count:,}",
+            "storage": f"{(total_vectors * 3072) / 1024 / 1024:.1f} MB",
+        },
+        # Also include legacy fields for compatibility
         "total_vectors": total_vectors,
         "collections": collections_info,
         "model_status": "loaded" if model_service else "not_loaded",
