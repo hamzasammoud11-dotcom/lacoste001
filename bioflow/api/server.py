@@ -1111,7 +1111,10 @@ async def get_molecule_sdf(molecule_id: str):
 
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        raise HTTPException(status_code=400, detail="Invalid SMILES")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid SMILES for molecule '{molecule_id}'. Please verify the input."
+        )
 
     mol = Chem.AddHs(mol)
     try:
