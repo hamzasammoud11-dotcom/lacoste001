@@ -14,7 +14,6 @@ import {
   Microscope,
   Settings,
   Sparkles,
-  Terminal,
   User,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -83,16 +82,6 @@ const navMain = [
     title: 'Discovery',
     url: '/dashboard/discovery',
     icon: Microscope,
-    items: [
-      {
-        title: 'Drug Discovery',
-        url: '/dashboard/discovery',
-      },
-      {
-        title: 'Molecule Search',
-        url: '/dashboard/discovery#search',
-      },
-    ],
   },
   {
     title: 'Explorer',
@@ -106,10 +95,6 @@ const navMain = [
       {
         title: '3D Visualization',
         url: '/dashboard/visualization',
-      },
-      {
-        title: 'Predictions',
-        url: '/dashboard/explorer#predictions',
       },
     ],
   },
@@ -132,31 +117,11 @@ const navMain = [
     title: 'Data',
     url: '/dashboard/data',
     icon: BarChart2,
-    items: [
-      {
-        title: 'Datasets',
-        url: '/dashboard/data',
-      },
-      {
-        title: 'Analytics',
-        url: '/dashboard/data#analytics',
-      },
-    ],
   },
   {
     title: 'Settings',
     url: '/dashboard/settings',
     icon: Settings,
-    items: [
-      {
-        title: 'General',
-        url: '/dashboard/settings',
-      },
-      {
-        title: 'Models',
-        url: '/dashboard/settings#models',
-      },
-    ],
   },
 ];
 
@@ -257,26 +222,8 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="mt-auto group-data-[collapsible=icon]:hidden">
-          <SidebarGroupLabel className="flex items-center justify-between">
-            <span>System Status</span>
+          <div className="flex items-center justify-end px-3 py-2">
             <ThemeToggle />
-          </SidebarGroupLabel>
-          <div className="px-3 py-2">
-            <div className="bg-muted/50 rounded-lg border p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <Terminal className="text-muted-foreground h-4 w-4" />
-                <span className="text-xs font-medium">Status</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  System Online
-                </span>
-              </div>
-            </div>
           </div>
         </SidebarGroup>
       </SidebarContent>
