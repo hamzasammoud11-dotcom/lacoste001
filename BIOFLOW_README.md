@@ -194,6 +194,7 @@ export const API_CONFIG = {
 | ChemBERTa | Molecule Encoder | SMILES embeddings |
 | ESM-2 | Protein Encoder | Sequence embeddings |
 | PubMedBERT | Text Encoder | Biomedical text |
+| BiomedCLIP | Image Encoder | Microscopy, gels, spectra embeddings |
 | DeepPurpose | DTI | Binding prediction |
 | GraphMVP | Property | Molecular properties |
 | BioT5 | Generation | Molecule generation |

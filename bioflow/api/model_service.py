@@ -253,6 +253,34 @@ class ModelService:
         except Exception as e:
             raise ModelServiceError(f"Text encoding failed: {e}")
     
+    def encode_image(self, image) -> EncodingResult:
+        """
+        Encode biological image to embedding vector.
+        
+        Args:
+            image: PIL Image, file path, URL, or base64 string
+            
+        Returns:
+            EncodingResult with embedding vector
+            
+        Raises:
+            ModelServiceError: If encoding fails
+        """
+        try:
+            encoder = self._get_obm_encoder()
+            from bioflow.core import Modality
+            result = encoder.encode(image, Modality.IMAGE)
+            return EncodingResult(
+                vector=result.vector.tolist() if hasattr(result.vector, 'tolist') else list(result.vector),
+                modality="image",
+                model_name=encoder.image_model,
+                metadata={"image_encoding": "biomedclip"}
+            )
+        except DependencyError:
+            raise
+        except Exception as e:
+            raise ModelServiceError(f"Image encoding failed: {e}")
+    
     # =========================================================================
     # DTI Prediction
     # =========================================================================

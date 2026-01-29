@@ -158,6 +158,7 @@ L'interface officielle est la **Next.js UI** dans `ui/` (aucun runtime Streamlit
 | Texte | LLaMA (BioMedGPT) | 4096 | Abstracts, notes cliniques |
 | Molécules | GraphMVP GNN | 300 → projeté | SMILES vers graphe |
 | Protéines | ESM-2 | Variable → projeté | Séquences FASTA |
+| Images | BiomedCLIP (ViT-B/16) | 512 → projeté | Microscopy, gels, spectra |
 
 ### Recherches Supportées
 
