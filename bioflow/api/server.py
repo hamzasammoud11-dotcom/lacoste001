@@ -30,6 +30,10 @@ from fastapi.responses import PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
 # Add project root to path
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT_DIR)
@@ -227,6 +231,11 @@ def ensure_image_is_displayable(metadata: Dict[str, Any], content: Optional[str]
 # ============================================================================
 from bioflow.api.model_service import get_model_service, ModelService
 from bioflow.api.qdrant_service import get_qdrant_service, QdrantService
+from bioflow.workflows.ingestion import (
+    generate_sample_molecules,
+    generate_sample_proteins,
+    generate_sample_abstracts,
+)
 
 # DeepPurpose router
 try:
@@ -327,6 +336,12 @@ class IngestAllRequest(BaseModel):
     # PubMed-specific
     email: Optional[str] = None
     api_key: Optional[str] = None
+
+
+class SeedIngestRequest(BaseModel):
+    """Request to ingest built-in sample data."""
+    collection: Optional[str] = None
+    include_images: bool = False
     # ChEMBL-specific
     search_mode: Optional[str] = Field(default=None, description="target | molecule")
 
@@ -779,6 +794,26 @@ async def enhanced_search(request: dict = None):
                     "filters_applied": {},
                     "search_time_ms": 0,
                     "message": "No data ingested yet. Please ingest data first."
+                }
+            # If collections exist but have no points, return early with guidance
+            total_points = 0
+            for coll in existing_collections:
+                try:
+                    stats = qdrant_service.get_collection_stats(coll)
+                    total_points += stats.get("points_count", 0)
+                except Exception:
+                    continue
+            if total_points == 0:
+                return {
+                    "results": [],
+                    "query": query,
+                    "modality": modality,
+                    "total_found": 0,
+                    "returned": 0,
+                    "diversity_score": None,
+                    "filters_applied": {},
+                    "search_time_ms": 0,
+                    "message": "Collections exist but contain no points. Ingest data to enable search."
                 }
         except Exception as e:
             logger.warning(f"Failed to list collections: {e}")
@@ -1753,6 +1788,74 @@ async def ingest_batch(request: BatchIngestRequest):
             duration_ms=round((time.perf_counter() - start) * 1000, 2),
         )
         logger.error(f"Batch ingest failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/ingest/seed")
+async def ingest_seed(request: SeedIngestRequest):
+    """Ingest built-in sample data for quick testing."""
+    request_id = uuid.uuid4().hex[:12]
+    start = time.perf_counter()
+
+    if not qdrant_service:
+        raise HTTPException(status_code=503, detail="Qdrant service not available")
+
+    collection = request.collection
+    results = {"ingested": 0, "failed": 0, "ids": [], "errors": []}
+
+    try:
+        samples = []
+        samples.extend(generate_sample_molecules())
+        samples.extend(generate_sample_proteins())
+        samples.extend(generate_sample_abstracts())
+
+        for item in samples:
+            try:
+                modality = item.get("modality", "text")
+                content = (
+                    item.get("smiles")
+                    or item.get("sequence")
+                    or item.get("content")
+                    or ""
+                )
+                metadata = {k: v for k, v in item.items() if k not in ("smiles", "sequence", "content", "modality")}
+                # Normalize source fields for evidence linking
+                if modality in ("smiles", "molecule"):
+                    metadata.setdefault("source", "chembl")
+                elif modality == "protein":
+                    metadata.setdefault("source", "uniprot")
+                else:
+                    metadata.setdefault("source", "pubmed")
+                metadata.setdefault("source_type", metadata.get("source"))
+
+                result = qdrant_service.ingest(
+                    content=content,
+                    modality=modality,
+                    metadata=metadata,
+                    collection=collection,
+                )
+                results["ingested"] += 1
+                results["ids"].append(result.id)
+            except Exception as e:
+                results["failed"] += 1
+                results["errors"].append(str(e))
+
+        _log_event(
+            "ingest_seed",
+            request_id,
+            ingested=results["ingested"],
+            failed=results["failed"],
+            duration_ms=round((time.perf_counter() - start) * 1000, 2),
+        )
+        return {"success": True, **results}
+    except Exception as e:
+        _log_event(
+            "ingest_seed_error",
+            request_id,
+            error=str(e),
+            duration_ms=round((time.perf_counter() - start) * 1000, 2),
+        )
+        logger.error(f"Seed ingest failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
