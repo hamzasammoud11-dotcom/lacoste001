@@ -1,45 +1,48 @@
-import { AlertCircle, Loader2 } from "lucide-react"
-import { Suspense } from "react"
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { Suspense } from 'react';
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { getExplorerPoints } from "@/lib/explorer-service"
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getExplorerPoints } from '@/lib/api';
+import { ExplorerResponse } from '@/schemas/explorer';
 
-import { ExplorerChart } from "./chart"
-import { ExplorerControls } from "./components"
-import { ExplorerPredictions } from "./predictions"
+import { ExplorerChart } from './chart';
+import { ExplorerControls } from './components';
+import { ExplorerPredictions } from './predictions';
 
 interface ExplorerPageProps {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 function pickParam(v: string | string[] | undefined): string | undefined {
-  if (Array.isArray(v)) return v[0]
-  return v
+  if (Array.isArray(v)) return v[0];
+  return v;
 }
 
-export default async function ExplorerPage({ searchParams }: ExplorerPageProps) {
-  // Await searchParams as required by Next.js 16/15
-  const params = await searchParams
+export default async function ExplorerPage({
+  searchParams,
+}: ExplorerPageProps) {
+  const params = await searchParams;
 
-  const dataset = pickParam(params.dataset) || "DrugBank"
-  const view = pickParam(params.view) || "UMAP"
-  const colorBy = pickParam(params.colorBy) || "Activity"
+  const dataset = pickParam(params.dataset) || 'DrugBank';
+  const view = pickParam(params.view) || 'UMAP';
+  const colorBy = pickParam(params.colorBy) || 'Activity';
 
-  let data: any[] = []
-  let error: string | null = null
+  let data: ExplorerResponse['points'] = [];
+  let error: string | null = null;
   try {
-    const response = await getExplorerPoints(dataset, view, colorBy)
-    data = response.points
+    const response = await getExplorerPoints(dataset, view, colorBy);
+    data = response.points;
   } catch (err) {
-    error = err instanceof Error ? err.message : "Failed to load embeddings"
+    error = err instanceof Error ? err.message : 'Failed to load embeddings';
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto space-y-6 p-6">
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Data Explorer</h1>
         <p className="text-muted-foreground">
-          Visualize binding affinity landscapes and model predictions in 3D space using dimensionality reduction.
+          Visualize binding affinity landscapes and model predictions in 3D
+          space using dimensionality reduction.
         </p>
       </div>
 
@@ -51,7 +54,7 @@ export default async function ExplorerPage({ searchParams }: ExplorerPageProps) 
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         <div className="lg:col-span-1">
           <Suspense fallback={<div>Loading controls...</div>}>
             <ExplorerControls />
@@ -62,8 +65,8 @@ export default async function ExplorerPage({ searchParams }: ExplorerPageProps) 
           <Suspense
             key={`${dataset}-${view}-${colorBy}`}
             fallback={
-              <div className="h-[500px] flex items-center justify-center border rounded-lg bg-muted/10">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="bg-muted/10 flex h-[500px] items-center justify-center rounded-lg border">
+                <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
               </div>
             }
           >
@@ -76,5 +79,5 @@ export default async function ExplorerPage({ searchParams }: ExplorerPageProps) 
         <ExplorerPredictions />
       </div>
     </div>
-  )
+  );
 }

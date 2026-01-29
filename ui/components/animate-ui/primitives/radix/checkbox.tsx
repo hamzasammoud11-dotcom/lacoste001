@@ -1,6 +1,6 @@
 'use client';
 
-import { type HTMLMotionProps,motion, SVGMotionProps } from 'motion/react';
+import { type HTMLMotionProps, motion, SVGMotionProps } from 'motion/react';
 import { Checkbox as CheckboxPrimitive } from 'radix-ui';
 import * as React from 'react';
 

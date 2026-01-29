@@ -19,17 +19,13 @@ declare module 'smiles-drawer' {
 
   export class SmiDrawer {
     constructor(options?: SmiDrawerOptions);
-    draw(
-      tree: unknown,
-      canvas: HTMLCanvasElement | null,
-      theme?: string
-    ): void;
+    draw(tree: unknown, canvas: HTMLCanvasElement | null, theme?: string): void;
   }
 
   export function parse(
     smiles: string,
     successCallback: (tree: unknown) => void,
-    errorCallback: (error: Error) => void
+    errorCallback: (error: Error) => void,
   ): void;
 
   const SmilesDrawer: {

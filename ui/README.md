@@ -6,20 +6,20 @@ This project is the Next.js 16 UI for BioFlow (Shadcn UI, Framer Motion, Tailwin
 
 1. **Install dependencies:**
 
-    ```bash
-    cd ui
-    pnpm install
-    # or
-    npm install
-    ```
+   ```bash
+   cd ui
+   pnpm install
+   # or
+   npm install
+   ```
 
 2. **Run the development server:**
 
-    ```bash
-    pnpm dev
-    # or
-    npm run dev
-    ```
+   ```bash
+   pnpm dev
+   # or
+   npm run dev
+   ```
 
 3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 

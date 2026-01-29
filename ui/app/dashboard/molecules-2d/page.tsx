@@ -6,13 +6,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getMolecules } from '@/lib/visualization-api';
-import type { Molecule } from '@/lib/visualization-types';
+import { getMolecules } from '@/lib/api';
+import type { Molecule } from '@/types/visualization';
 
 // Dynamic import of the 2D viewer to prevent SSR issues
 const Smiles2DViewer = dynamic(
@@ -21,12 +27,14 @@ const Smiles2DViewer = dynamic(
   {
     ssr: false,
     loading: () => <Skeleton className="size-[400px]" />,
-  }
+  },
 );
 
 export default function Molecules2DPage() {
   const [molecules, setMolecules] = useState<Molecule[]>([]);
-  const [selectedMolecule, setSelectedMolecule] = useState<Molecule | null>(null);
+  const [selectedMolecule, setSelectedMolecule] = useState<Molecule | null>(
+    null,
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,11 +47,11 @@ export default function Molecules2DPage() {
         const data = await getMolecules();
         setMolecules(data);
         if (data.length > 0) {
-          setSelectedMolecule(data[0]);
+          setSelectedMolecule(data[0] || null);
         }
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Failed to load molecules'
+          err instanceof Error ? err.message : 'Failed to load molecules',
         );
       } finally {
         setIsLoading(false);
@@ -58,7 +66,7 @@ export default function Molecules2DPage() {
     return molecules.filter(
       (m) =>
         m.name.toLowerCase().includes(query) ||
-        m.smiles.toLowerCase().includes(query)
+        m.smiles.toLowerCase().includes(query),
     );
   }, [molecules, searchQuery]);
 
@@ -69,7 +77,6 @@ export default function Molecules2DPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = selectedMolecule.smiles;
       document.body.appendChild(textArea);
@@ -96,7 +103,6 @@ export default function Molecules2DPage() {
 
   return (
     <div className="flex h-full gap-4 p-4">
-      {/* Left Panel - Molecule List */}
       <Card className="w-80 shrink-0">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Molecules</CardTitle>
@@ -104,7 +110,7 @@ export default function Molecules2DPage() {
         </CardHeader>
         <CardContent className="pb-3">
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
             <Input
               placeholder="Search molecules..."
               className="pl-8"
@@ -123,7 +129,7 @@ export default function Molecules2DPage() {
                 ))}
               </div>
             ) : filteredMolecules.length === 0 ? (
-              <p className="p-4 text-center text-sm text-muted-foreground">
+              <p className="text-muted-foreground p-4 text-center text-sm">
                 No molecules found
               </p>
             ) : (
@@ -132,14 +138,13 @@ export default function Molecules2DPage() {
                   <button
                     key={molecule.id}
                     onClick={() => setSelectedMolecule(molecule)}
-                    className={`w-full rounded-lg p-3 text-left transition-colors hover:bg-accent ${
-                      selectedMolecule?.id === molecule.id
+                    className={`hover:bg-accent w-full rounded-lg p-3 text-left transition-colors ${selectedMolecule?.id === molecule.id
                         ? 'bg-accent'
                         : 'bg-transparent'
-                    }`}
+                      }`}
                   >
                     <div className="font-medium">{molecule.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">
+                    <div className="text-muted-foreground truncate text-xs">
                       {molecule.smiles}
                     </div>
                   </button>
@@ -150,11 +155,9 @@ export default function Molecules2DPage() {
         </ScrollArea>
       </Card>
 
-      {/* Right Panel - Visualization */}
       <div className="flex flex-1 flex-col gap-6">
         {selectedMolecule ? (
           <>
-            {/* Molecule Info Card */}
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -171,7 +174,7 @@ export default function Molecules2DPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-sm">
+                  <code className="bg-muted flex-1 truncate rounded px-2 py-1 text-sm">
                     {selectedMolecule.smiles}
                   </code>
                   <Button
@@ -196,7 +199,6 @@ export default function Molecules2DPage() {
               </CardContent>
             </Card>
 
-            {/* 2D Structure Card */}
             <Card className="flex-1">
               <CardHeader>
                 <CardTitle className="text-lg">2D Structure</CardTitle>
