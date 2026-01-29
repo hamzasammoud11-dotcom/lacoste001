@@ -20,3 +20,4 @@ scanpy==1.10.3
 qdrant-client>=1.7.0
 plotly>=5.18.0
 scikit-learn>=1.3.0
+DeepPurpose>=0.1.5
