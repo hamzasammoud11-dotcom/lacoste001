@@ -900,9 +900,16 @@ async def list_molecules(limit: int = 20, offset: int = 0):
         molecules = []
         for r in results:
             metadata = r.metadata or {}
+            # Ensure smiles is always a string
+            smiles = r.content
+            if not isinstance(smiles, str):
+                smiles = str(smiles) if smiles else ""
+            # Also check metadata for smiles
+            if not smiles:
+                smiles = metadata.get("smiles", "") or metadata.get("SMILES", "") or ""
             molecules.append({
                 "id": r.id,
-                "smiles": r.content,
+                "smiles": smiles,
                 "name": metadata.get("name", metadata.get("title", "Unknown")),
                 "pubchemCid": metadata.get("pubchem_cid", metadata.get("pubchemCid", metadata.get("cid", 0))),
                 "description": metadata.get("description", metadata.get("title", "")),
