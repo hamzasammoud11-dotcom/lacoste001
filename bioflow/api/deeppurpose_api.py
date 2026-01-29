@@ -106,8 +106,30 @@ def _init_deeppurpose():
         # Load weights if available
         model_path = os.path.join(BEST_MODEL_RUN, "model.pt")
         if os.path.exists(model_path):
-            _dp_model.load_pretrained(model_path)
-            logger.info(f"[DeepPurpose] Model loaded from {model_path}")
+            try:
+                # Check if file is a Git LFS pointer (text file starting with "version")
+                with open(model_path, 'rb') as f:
+                    header = f.read(20)
+                if header.startswith(b'version '):
+                    logger.error(f"[DeepPurpose] Model file is a Git LFS pointer, not actual weights: {model_path}")
+                    logger.warning("[DeepPurpose] Deleting corrupt LFS pointer file...")
+                    os.remove(model_path)
+                    logger.warning("[DeepPurpose] Model unavailable - running without pretrained weights")
+                else:
+                    _dp_model.load_pretrained(model_path)
+                    logger.info(f"[DeepPurpose] Model loaded from {model_path}")
+            except Exception as load_err:
+                # Handle "invalid load key" error from PyTorch trying to load text as pickle
+                if "invalid load key" in str(load_err):
+                    logger.error(f"[DeepPurpose] Corrupt model file (Git LFS pointer?): {load_err}")
+                    try:
+                        os.remove(model_path)
+                        logger.warning(f"[DeepPurpose] Deleted corrupt model file: {model_path}")
+                    except Exception:
+                        pass
+                    logger.warning("[DeepPurpose] Model unavailable - running without pretrained weights")
+                else:
+                    raise load_err
         else:
             logger.warning(f"[DeepPurpose] No model.pt at {model_path}")
         
