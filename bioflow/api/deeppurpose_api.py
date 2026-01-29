@@ -70,11 +70,12 @@ def _init_deeppurpose():
         try:
             from bioflow.deeppurpose_config import (
                 BEST_MODEL_RUN, MODEL_CONFIG,
-                QDRANT_HOST, QDRANT_PORT, COLLECTION_NAME
+                QDRANT_URL, QDRANT_HOST, QDRANT_PORT, COLLECTION_NAME
             )
         except ImportError:
             logger.warning("DeepPurpose config not found, using defaults")
             BEST_MODEL_RUN = os.path.join(ROOT_DIR, "bioflow", "runs", "20260125_104915_KIBA")
+            QDRANT_URL = os.getenv("QDRANT_URL")
             QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
             QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
             COLLECTION_NAME = "bio_discovery"
@@ -120,7 +121,10 @@ def _init_deeppurpose():
         
         # Connect to Qdrant
         try:
-            _dp_qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=10)
+            if QDRANT_URL:
+                _dp_qdrant = QdrantClient(url=QDRANT_URL, timeout=10)
+            else:
+                _dp_qdrant = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=10)
             collections = _dp_qdrant.get_collections()
             logger.info(f"[DeepPurpose] Qdrant connected: {[c.name for c in collections.collections]}")
         except Exception as e:

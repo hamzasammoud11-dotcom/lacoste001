@@ -105,7 +105,13 @@ class QdrantService:
         """
         self.model_service = model_service
         self.url = url or os.getenv("QDRANT_URL")
-        self.path = path or os.getenv("QDRANT_PATH", "./qdrant_data")
+        self.path = path or os.getenv("QDRANT_PATH")
+        self.use_embedded = os.getenv("QDRANT_USE_EMBEDDED", "false").lower() in ("1", "true", "yes")
+        if not self.url and not self.path:
+            if self.use_embedded:
+                self.path = "./qdrant_data"
+            else:
+                self.url = "http://localhost:6333"
         self.vector_dim = vector_dim
         self.hnsw_m = int(os.getenv("QDRANT_HNSW_M", "16"))
         self.hnsw_ef_construct = int(os.getenv("QDRANT_HNSW_EF_CONSTRUCT", "128"))

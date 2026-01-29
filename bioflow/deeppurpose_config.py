@@ -22,6 +22,7 @@ MODEL_CONFIG = {
 PREDICTIONS_SOURCE = r"runs\20260125_080409_BindingDB_Kd\predictions_test.csv"
 
 # --- QDRANT CONFIG ---
+QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 COLLECTION_NAME = "bio_discovery"

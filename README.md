@@ -134,7 +134,7 @@ pnpm dev
 ### 6. Start Langflow (Visual Workflow Builder)
 ```bash
 # You can use the provided script
-./run_langflow.bat
+python run_langflow.py
 
 # Or manually:
 pip install langflow
