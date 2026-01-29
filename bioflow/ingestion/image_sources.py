@@ -1,6 +1,6 @@
 """
-BioFlow Image Data Gatherer - PROFESSIONAL DATA SOURCES
-========================================================
+BioFlow Image Sources - Data Fetching for Biomedical Images
+============================================================
 
 Streams biomedical images from THREE high-quality open repositories:
 
@@ -17,21 +17,21 @@ Streams biomedical images from THREE high-quality open repositories:
    - Figure images with captions (image-to-text search)
 
 All images are streamed IN-MEMORY (zero disk usage).
+
+This module follows the same pattern as other ingestors (ChEMBL, PubMed, UniProt)
+by providing data fetching functionality that can be used by ImageIngestor.
 """
-import os
-import sys
+
 import logging
 import time
+import math
 import requests
 import tarfile
-import math
 from typing import Generator, Dict, Any, List, Optional
 from PIL import Image
 from io import BytesIO
 import xml.etree.ElementTree as ET
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- CONFIGURATION ---
@@ -67,7 +67,6 @@ def _get_idr_session() -> requests.Session:
 
 def _fetch_idr_thumbnail(session: requests.Session, image_id: int) -> Optional[Image.Image]:
     """Fetch a public thumbnail image from IDR using authenticated session cookies."""
-    # Use the webclient thumbnail endpoint which is public and stable for IDR
     thumb_url = f"{IDR_BASE_URL}/webclient/render_thumbnail/{image_id}/"
     try:
         resp = session.get(thumb_url, timeout=DEFAULT_TIMEOUT_SECONDS)
@@ -81,6 +80,7 @@ def _fetch_idr_thumbnail(session: requests.Session, image_id: int) -> Optional[I
     except Exception as e:
         logger.warning(f"IDR thumbnail {image_id} error: {type(e).__name__}: {str(e)[:160]}")
         return None
+
 
 def stream_biomedical_images(
     limit: int = 30,
@@ -96,6 +96,15 @@ def stream_biomedical_images(
         limit: Total images to stream
         max_per_type: Max images per source type
         query: Search query to guide image selection (e.g., "kinase", "cancer")
+        strict: If True, raise exceptions on failures
+        
+    Yields:
+        Dictionary containing image data and metadata
+        
+    Example:
+        >>> from bioflow.ingestion.image_sources import stream_biomedical_images
+        >>> for image_data in stream_biomedical_images(limit=10, query="EGFR"):
+        ...     print(image_data['caption'])
     """
     logger.info("📡 Streaming from professional biomedical image repositories...")
     logger.info(f"🎯 Target: {limit} images total, max {max_per_type} per type")
@@ -157,6 +166,7 @@ def stream_biomedical_images(
 
     if strict and total_yielded < limit:
         raise RuntimeError(f"Image streaming strict mode: requested {limit}, yielded {total_yielded}. Breakdown={counts}")
+
 
 # -----------------------------------------------------------------------------
 # SOURCE 1: IDR (Microscopy)
@@ -235,6 +245,7 @@ def _stream_idr_microscopy(limit: int, query: str = "kinase", *, strict: bool = 
         if strict:
             raise RuntimeError("IDR yielded 0 images")
 
+
 # -----------------------------------------------------------------------------
 # SOURCE 2: PubChem (Spectra/Structures)
 # -----------------------------------------------------------------------------
@@ -311,7 +322,8 @@ def _stream_pubchem_spectra(limit: int, query: str = "kinase", *, strict: bool =
     count = 0
     failures: List[str] = []
     for i, cid in enumerate(cids):
-        if count >= limit: break
+        if count >= limit:
+            break
         
         try:
             # Get compound name first
@@ -360,8 +372,9 @@ def _stream_pubchem_spectra(limit: int, query: str = "kinase", *, strict: bool =
         if strict:
             raise RuntimeError("PubChem yielded 0 images")
 
+
 # -----------------------------------------------------------------------------
-# SOURCE 3: PMC Open Access (Gels) - UPDATED
+# SOURCE 3: PMC Open Access (Gels)
 # -----------------------------------------------------------------------------
 def _stream_pmc_gels(limit: int, query: str = "kinase", *, max_total_seconds: int = 300) -> Generator[Dict[str, Any], None, None]:
     """
@@ -418,7 +431,8 @@ def _stream_pmc_gels(limit: int, query: str = "kinase", *, max_total_seconds: in
     # 2. For each article, get the OA extraction URL
     count = 0
     for pmcid in pmc_ids:
-        if count >= limit: break
+        if count >= limit:
+            break
 
         if (time.time() - start_time) > max_total_seconds:
             logger.warning(f"   PMC gel streaming hit time budget ({max_total_seconds}s); stopping early with {count}/{limit} images")
@@ -518,8 +532,3 @@ def _stream_pmc_gels(limit: int, query: str = "kinase", *, max_total_seconds: in
         except Exception as e:
             logger.warning(f"   Error processing {full_pmcid}: {str(e)[:100]}, skipping...")
             continue
-
-if __name__ == "__main__":
-    # Test run
-    for img in stream_biomedical_images(limit=3, max_per_type=1):
-        print(f"Captured: {img['caption']}")

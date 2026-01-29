@@ -130,7 +130,7 @@ def run_image_ingestion(
         batch_size: Images per batch (default: 20 to avoid RAM issues)
     """
     from bioflow.ingestion.image_ingestor import ImageIngestor
-    from scripts.gather_biomedical_images import stream_biomedical_images
+    from bioflow.ingestion.image_sources import stream_biomedical_images
     import time
     
     start_time = time.time()
