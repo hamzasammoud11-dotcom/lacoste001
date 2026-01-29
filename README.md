@@ -21,7 +21,7 @@
 - **Drug-Target Interaction (DTI) Prediction** - Deep learning models for binding affinity prediction
 - **Vector Similarity Search** - Qdrant Cloud-powered semantic search across 23,000+ compounds
 - **3D Molecular Visualization** - Interactive 3D viewers for molecules and proteins
-- **Visual Workflow Builder** - Langflow-powered drag-and-drop pipeline construction
+- **Visual Workflow Builder** - drag-and-drop pipeline construction
 - **Multi-Agent System** - Generator, Ranker, and Validator agents for compound discovery
 
 ---
@@ -36,7 +36,7 @@
 | **🧬 Protein Viewer** | Interactive PDB structure visualization |
 | **📊 3D Explorer** | Real PCA projections of chemical embedding space |
 | **🤖 AI Agents** | Generator → Ranker → Validator pipeline for discovery |
-| **🔧 Visual Workflows** | Langflow integration for custom pipelines |
+| **🔧 Visual Workflows** | Custom pipeline builder |
 | **☁️ Cloud-Native** | Qdrant Cloud + Hugging Face Spaces deployment |
 
 ---
@@ -129,24 +129,6 @@ python -m uvicorn bioflow.api.server:app --host 0.0.0.0 --port 8000
 cd ui
 pnpm install
 pnpm dev
-```
-
-### 5. Start Langflow (Visual Workflow Builder)
-```bash
-# You can use the provided script
-python run_langflow.py
-
-# Or manually:
-pip install langflow
-langflow run --host 0.0.0.0 --port 7860
-# Access via http://localhost:3000/workflow (embedded)
-# Or directly at http://localhost:7860
-```
-
-**Note:** To use a dedicated Python environment for Langflow without installing it in the project venv, set the `LANGFLOW_PYTHON` environment variable to the path of the Python executable that has Langflow installed:
-
-```bash
-LANGFLOW_PYTHON=C:\path\to\python.exe python run_langflow.py
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
@@ -280,7 +262,6 @@ python tests/stress_test_uc4.py
 - [OpenBioMed](https://github.com/PharMolix/OpenBioMed) - Multimodal Bio-AI
 - [Qdrant](https://qdrant.tech/) - Vector Database
 - [3Dmol.js](https://3dmol.csb.pitt.edu/) - Molecular Visualization
-- [Langflow](https://langflow.org/) - Visual LLM Workflows
 
 ---
 
