@@ -154,7 +154,12 @@ class ImageIngestor(BaseIngestor):
                 import uuid
                 image_hash = hashlib.sha256(str(image_data).encode()).hexdigest()
                 image_id = str(uuid.uuid5(uuid.NAMESPACE_OID, image_hash))
-                image_b64 = None # Can't base64 a string path easily without reading it, assume URL or path is handled elsewhere
+                
+                # Check if string is already a base64 data URL
+                if isinstance(image_data, str) and image_data.startswith("data:image"):
+                    image_b64 = image_data  # Already a data URL, use as-is
+                else:
+                    image_b64 = None # File path or URL, handled elsewhere
             
             # Build metadata
             metadata = {

@@ -1,0 +1,1162 @@
+[
+  {
+    "experiment_id": "a48576ac-b515-4283-a379-58614d4bfdb9",
+    "title": "Gefitinib - EGFR (Epidermal Growth Factor Receptor) Assay",
+    "type": "binding_assay",
+    "molecule": "COC1=C(OCCCN2CCOCC2)C=C2C(NC3=CC(Cl)=C(F)C=C3)=NC=NC2=C1",
+    "molecule_name": "Gefitinib",
+    "target": "EGFR (Epidermal Growth Factor Receptor)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.17,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.98
+    },
+    "outcome": "active",
+    "quality_score": 0.98,
+    "description": "Potent EGFR inhibitor (IC50 = 0.17 nM). First-generation TKI approved for NSCLC. ChEMBL26879.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "2eb40e40-c334-4b99-8b1c-b77e9f08f566",
+    "title": "Erlotinib - EGFR (L858R Mutant) Assay",
+    "type": "binding_assay",
+    "molecule": "COCCOC1=C(C=C2C(=C1)C(=NC=N2)NC3=CC=CC(=C3)C#C)OCCOC",
+    "molecule_name": "Erlotinib",
+    "target": "EGFR (L858R Mutant)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 20,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.97
+    },
+    "outcome": "active",
+    "quality_score": 0.97,
+    "description": "Highly potent against EGFR L858R mutant (IC50 < 20 nM). Tarceva. ChEMBL553.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "a0f3c277-d5ed-4dc1-87be-db2d926b62ba",
+    "title": "Afatinib - EGFR (T790M Mutant) Assay",
+    "type": "binding_assay",
+    "molecule": "CN(C)C/C=C/C(=O)NC1=CC2=C(C=C1)N=CN=C2NC3=CC(=C(C=C3)F)Cl",
+    "molecule_name": "Afatinib",
+    "target": "EGFR (T790M Mutant)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.5,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "Irreversible EGFR/HER2 inhibitor. IC50 = 0.5 nM. Gilotrif for NSCLC with EGFR mutations.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "85c6df3f-98a5-49b9-b82d-e68b1955a485",
+    "title": "Osimertinib - EGFR (T790M Resistance Mutant) Assay",
+    "type": "binding_assay",
+    "molecule": "COC1=C(NC2=NC=CC(=N2)C3=CN(C)C4=CC=CC=C34)C=C(NC(=O)C=C)C(=C1)N(C)CCN(C)C",
+    "molecule_name": "Osimertinib",
+    "target": "EGFR (T790M Resistance Mutant)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 1,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.99
+    },
+    "outcome": "active",
+    "quality_score": 0.99,
+    "description": "Third-generation EGFR-TKI targeting T790M resistance mutation. IC50 = 1 nM. Tagrisso.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "c8c92deb-e3f9-4885-9e8b-9dedf988c3d8",
+    "title": "Imatinib - BCR-Abl Tyrosine Kinase Assay",
+    "type": "binding_assay",
+    "molecule": "CN1CCN(CC2=CC=C(C(=O)NC3=CC(C)=C(NC4=NC=CC(=N4)C4=CN=CC=C4)C=C3)C=C2)CC1",
+    "molecule_name": "Imatinib",
+    "target": "BCR-Abl Tyrosine Kinase",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 250,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "First-line CML treatment. IC50 ~ 250 nM against Abl. Gleevec revolutionized CML therapy.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "49829106-f799-4328-a68f-ac7d0df0a139",
+    "title": "Dasatinib - BCR-Abl / Src Kinases Assay",
+    "type": "binding_assay",
+    "molecule": "CC1=NC(=CC(=N1)NC2=NC=C(S2)C(=O)NC3=C(C=CC(=C3)C)C)NC4=CC=C(C=C4)Cl",
+    "molecule_name": "Dasatinib",
+    "target": "BCR-Abl / Src Kinases",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.6,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.96
+    },
+    "outcome": "active",
+    "quality_score": 0.96,
+    "description": "325-fold more potent than imatinib. IC50 = 0.6 nM. Sprycel for imatinib-resistant CML.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "af968364-69cf-476e-81d3-6fe287f29344",
+    "title": "Nilotinib - BCR-Abl (Wild Type) Assay",
+    "type": "binding_assay",
+    "molecule": "CC1=C(C=C(C=C1)NC(=O)C2=CC(=C(C=C2)NC3=NC=CC(=N3)C4=CN=CC=C4)C(F)(F)F)NC5=CC=CC=N5",
+    "molecule_name": "Nilotinib",
+    "target": "BCR-Abl (Wild Type)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 20,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.94
+    },
+    "outcome": "active",
+    "quality_score": 0.94,
+    "description": "10-30x more potent than imatinib. IC50 = 20 nM. Tasigna for CML.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "7393705c-67a1-40dd-af99-52ea7110d6c0",
+    "title": "Ponatinib - BCR-Abl T315I Mutant Assay",
+    "type": "binding_assay",
+    "molecule": "CC1=C(C=C(C=C1)C(=O)NC2=CC=C(C=C2)CN3CCN(CC3)C)C#CC4=CC5=C(C=C4)C(=NN5)NC(=O)C6=CC(=CC=C6)C(F)(F)F",
+    "molecule_name": "Ponatinib",
+    "target": "BCR-Abl T315I Mutant",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.5,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.97
+    },
+    "outcome": "active",
+    "quality_score": 0.97,
+    "description": "Only TKI effective against T315I gatekeeper mutation. IC50 = 0.5 nM. Iclusig.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "8f2d89a2-5da3-4cbc-8cb6-fb80084afa15",
+    "title": "Aspirin - COX-1 (Cyclooxygenase-1) Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC(=O)OC1=CC=CC=C1C(=O)O",
+    "molecule_name": "Aspirin",
+    "target": "COX-1 (Cyclooxygenase-1)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 1700,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.005,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.99
+    },
+    "outcome": "active",
+    "quality_score": 0.99,
+    "description": "Irreversible COX-1 inhibitor (IC50 ~ 1.7 \u00b5M). Acetylsalicylic acid. Most widely used drug.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "d3da2065-d330-4e54-ba52-264222c1e31a",
+    "title": "Ibuprofen - COX-2 Assay",
+    "type": "binding_assay",
+    "molecule": "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",
+    "molecule_name": "Ibuprofen",
+    "target": "COX-2",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 1600,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.01,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.92
+    },
+    "outcome": "active",
+    "quality_score": 0.92,
+    "description": "Non-selective COX inhibitor (IC50 ~ 1.6 \u00b5M for COX-2). Advil/Motrin.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "03aefd6c-78c1-431c-903a-6c3984beff09",
+    "title": "Celecoxib - COX-2 (Selective) Assay",
+    "type": "binding_assay",
+    "molecule": "CC1=CC=C(C=C1)C2=CC(=NN2C3=CC=C(C=C3)S(=O)(=O)N)C(F)(F)F",
+    "molecule_name": "Celecoxib",
+    "target": "COX-2 (Selective)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 40,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.94
+    },
+    "outcome": "active",
+    "quality_score": 0.94,
+    "description": "Selective COX-2 inhibitor. IC50 = 40 nM. Celebrex for arthritis.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "d164d3e8-dbb3-4f79-93db-e80384b571c6",
+    "title": "Naproxen - COX-1/COX-2 Assay",
+    "type": "inhibition_assay",
+    "molecule": "COC1=CC2=CC(=CC=C2C=C1)C(C)C(=O)O",
+    "molecule_name": "Naproxen",
+    "target": "COX-1/COX-2",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 8900,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.01,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.91
+    },
+    "outcome": "active",
+    "quality_score": 0.91,
+    "description": "Non-selective NSAID. IC50 = 8.9 \u00b5M. Aleve for pain and inflammation.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "db67d8d9-adaf-4f0d-8854-d91a0f94971c",
+    "title": "Sorafenib - VEGFR-2 / RAF Kinase Assay",
+    "type": "binding_assay",
+    "molecule": "CNC(=O)C1=NC=CC(=C1)OC2=CC=C(NC(=O)NC3=CC(=C(C=C3)Cl)C(F)(F)F)C=C2",
+    "molecule_name": "Sorafenib",
+    "target": "VEGFR-2 / RAF Kinase",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 6,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.93
+    },
+    "outcome": "active",
+    "quality_score": 0.93,
+    "description": "Multi-kinase inhibitor. IC50 = 6 nM for VEGFR-2. Nexavar for HCC and RCC.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "71a54dbe-6d2f-4ed8-b3cc-43fa741d78ae",
+    "title": "Sunitinib - VEGFR-2 / PDGFR Assay",
+    "type": "binding_assay",
+    "molecule": "CCN(CC)CCNC(=O)C1=C(NC(=C1C)C=C2C3=CC=CC=C3NC2=O)C",
+    "molecule_name": "Sunitinib",
+    "target": "VEGFR-2 / PDGFR",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 9,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "Multi-targeted RTK inhibitor. IC50 = 9 nM. Sutent for RCC and GIST.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "206941ea-e406-4a10-b726-0c7c052da7a9",
+    "title": "Vemurafenib - BRAF V600E Mutant Assay",
+    "type": "binding_assay",
+    "molecule": "CCCS(=O)(=O)NC1=CC=C(C=C1F)C(=O)C2=CNC3=NC=C(C=C23)C4=CC=C(C=C4)Cl",
+    "molecule_name": "Vemurafenib",
+    "target": "BRAF V600E Mutant",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 31,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.96
+    },
+    "outcome": "active",
+    "quality_score": 0.96,
+    "description": "Selective BRAF V600E inhibitor. IC50 = 31 nM. Zelboraf for melanoma.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "3655fd5f-4068-42d0-a214-f84cc3d589bb",
+    "title": "Crizotinib - ALK (Anaplastic Lymphoma Kinase) Assay",
+    "type": "binding_assay",
+    "molecule": "CC(C1=C(C=CC(=C1Cl)F)Cl)OC2=C(N=CC(=C2)C3=CN(N=C3)C4CCNCC4)N",
+    "molecule_name": "Crizotinib",
+    "target": "ALK (Anaplastic Lymphoma Kinase)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 24,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.94
+    },
+    "outcome": "active",
+    "quality_score": 0.94,
+    "description": "ALK inhibitor. IC50 = 24 nM. Xalkori for ALK+ NSCLC.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "d340aa1f-761b-4787-a711-2a4575979930",
+    "title": "Lapatinib - HER2 / EGFR Assay",
+    "type": "binding_assay",
+    "molecule": "CS(=O)(=O)CCNCC1=CC=C(O1)C2=CC3=C(C=C2)N=CN=C3NC4=CC(=C(C=C4)OCC5=CC=CC=C5F)Cl",
+    "molecule_name": "Lapatinib",
+    "target": "HER2 / EGFR",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 10.8,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.93
+    },
+    "outcome": "active",
+    "quality_score": 0.93,
+    "description": "Dual HER2/EGFR inhibitor. IC50 = 10.8 nM for HER2. Tykerb for breast cancer.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "5d29d987-8d56-4524-9463-d5265733ee0c",
+    "title": "Ritonavir - HIV-1 Protease Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC(C)C(NC(=O)N(C)CC1=CSC(=N1)C(C)C)C(=O)NC(CC(O)C(CC2=CC=CC=C2)NC(=O)OCC3=CN=CS3)CC4=CC=CC=C4",
+    "molecule_name": "Ritonavir",
+    "target": "HIV-1 Protease",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.015,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "Potent HIV protease inhibitor. Ki = 15 pM. Also used as pharmacokinetic booster.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "c1b99748-935d-45af-ace1-3122e15d2b5a",
+    "title": "Darunavir - HIV-1 Protease (Drug-Resistant) Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC(C)CN(CC(C(CC1=CC=CC=C1)NC(=O)OC2COC3C2CCO3)O)S(=O)(=O)C4=CC=C(C=C4)N",
+    "molecule_name": "Darunavir",
+    "target": "HIV-1 Protease (Drug-Resistant)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.004,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.97
+    },
+    "outcome": "active",
+    "quality_score": 0.97,
+    "description": "Second-generation PI. Ki = 4.5 pM. Effective against resistant strains. Prezista.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "f3c4101f-c7d0-4bb8-82a7-783ae214e6ff",
+    "title": "Atazanavir - HIV-1 Protease Assay",
+    "type": "inhibition_assay",
+    "molecule": "COC1=CC=C(C=C1)C(=O)NC(C(C)C)C(=O)NC(CC2=CC=CC=C2)C(CN(CC3=CC=C(C=C3)C4=CC=CC=N4)NC(=O)C(C(C)C)NC(=O)OC)O",
+    "molecule_name": "Atazanavir",
+    "target": "HIV-1 Protease",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 2.6,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.94
+    },
+    "outcome": "active",
+    "quality_score": 0.94,
+    "description": "Azapeptide PI. IC50 = 2.6 nM. Once-daily dosing. Reyataz.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "9454605c-8160-42d0-b75f-fec190b34bff",
+    "title": "Lisinopril - ACE (Angiotensin-Converting Enzyme) Assay",
+    "type": "inhibition_assay",
+    "molecule": "NCCCC[C@H](N[C@@H](CCc1ccccc1)C(=O)O)C(=O)N1CCC[C@H]1C(=O)O",
+    "molecule_name": "Lisinopril",
+    "target": "ACE (Angiotensin-Converting Enzyme)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 1.2,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.96
+    },
+    "outcome": "active",
+    "quality_score": 0.96,
+    "description": "ACE inhibitor. IC50 = 1.2 nM. Prinivil/Zestril for hypertension and heart failure.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "93fee204-39a8-4062-9821-e604c6777a7a",
+    "title": "Enalapril - ACE Assay",
+    "type": "inhibition_assay",
+    "molecule": "CCOC(=O)[C@H](CCc1ccccc1)N[C@@H](C)C(=O)N1CCC[C@H]1C(=O)O",
+    "molecule_name": "Enalapril",
+    "target": "ACE",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 1.8,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "Prodrug ACE inhibitor. IC50 = 1.8 nM (enalaprilat). Vasotec.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "8452a302-563a-4c80-822f-c6e5fd479289",
+    "title": "Atorvastatin - HMG-CoA Reductase Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC(C)C1=C(C(=C(N1CCC(CC(CC(=O)O)O)O)C2=CC=C(C=C2)F)C3=CC=CC=C3)C(=O)NC4=CC=CC=C4",
+    "molecule_name": "Atorvastatin",
+    "target": "HMG-CoA Reductase",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 8,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.98
+    },
+    "outcome": "active",
+    "quality_score": 0.98,
+    "description": "Most prescribed statin. IC50 = 8 nM. Lipitor. World's best-selling drug (2003-2007).",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "19e83a8f-3c88-413e-9d8e-e003d45d91b3",
+    "title": "Rosuvastatin - HMG-CoA Reductase Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC(C)C1=NC(=NC(=C1C=CC(CC(CC(=O)O)O)O)C2=CC=C(C=C2)F)N(C)S(=O)(=O)C",
+    "molecule_name": "Rosuvastatin",
+    "target": "HMG-CoA Reductase",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 5,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.97
+    },
+    "outcome": "active",
+    "quality_score": 0.97,
+    "description": "Super-statin. IC50 = 5 nM. Most potent statin. Crestor.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "6717c5a8-492f-422e-b22a-61fbabf18342",
+    "title": "Simvastatin - HMG-CoA Reductase Assay",
+    "type": "inhibition_assay",
+    "molecule": "CCC(C)(C)C(=O)OC1CC(C=C2C1C(C(C=C2)C)CCC3CC(CC(=O)O3)O)C",
+    "molecule_name": "Simvastatin",
+    "target": "HMG-CoA Reductase",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 11,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.94
+    },
+    "outcome": "active",
+    "quality_score": 0.94,
+    "description": "Prodrug statin from fungal origin. IC50 = 11 nM. Zocor.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "e06ffa38-1f94-4b75-924e-567c1afe19e7",
+    "title": "Sildenafil - PDE5 (Phosphodiesterase 5) Assay",
+    "type": "inhibition_assay",
+    "molecule": "CCCC1=NN(C2=C1NC(=NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C",
+    "molecule_name": "Sildenafil",
+    "target": "PDE5 (Phosphodiesterase 5)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 3.5,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.96
+    },
+    "outcome": "active",
+    "quality_score": 0.96,
+    "description": "Selective PDE5 inhibitor. IC50 = 3.5 nM. Viagra/Revatio.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "831225a3-3f89-4fbd-85ef-ca6974d0aac1",
+    "title": "Tadalafil - PDE5 Assay",
+    "type": "inhibition_assay",
+    "molecule": "CN1CC(=O)N2C(C1=O)CC3=C(C2C4=CC5=C(C=C4)OCO5)NC6=CC=CC=C36",
+    "molecule_name": "Tadalafil",
+    "target": "PDE5",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 5,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "Long-acting PDE5 inhibitor. IC50 = 5 nM. Cialis. 36-hour duration.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "0a191965-6e62-4b33-9b9b-1baa7f6900e3",
+    "title": "Omeprazole - H+/K+-ATPase (Gastric Proton Pump) Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC1=CN=C(C(=C1OC)C)CS(=O)C2=NC3=C(N2)C=CC(=C3)OC",
+    "molecule_name": "Omeprazole",
+    "target": "H+/K+-ATPase (Gastric Proton Pump)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.5,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.93
+    },
+    "outcome": "active",
+    "quality_score": 0.93,
+    "description": "Irreversible PPI. IC50 = 0.5 nM. Prilosec. First PPI on market.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "891f11dd-6c62-45db-856d-536970f43143",
+    "title": "Esomeprazole - H+/K+-ATPase Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC1=CN=C(C(=C1OC)C)C[S@@](=O)C2=NC3=C(N2)C=CC(=C3)OC",
+    "molecule_name": "Esomeprazole",
+    "target": "H+/K+-ATPase",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.3,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "S-enantiomer of omeprazole. IC50 = 0.3 nM. Nexium. Better bioavailability.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "0602b5ea-dc95-41cb-ae94-d0600affd61d",
+    "title": "Metoprolol - Beta-1 Adrenergic Receptor Assay",
+    "type": "binding_assay",
+    "molecule": "CC(C)NCC(COC1=CC=C(C=C1)CCOC)O",
+    "molecule_name": "Metoprolol",
+    "target": "Beta-1 Adrenergic Receptor",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 45,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.92
+    },
+    "outcome": "active",
+    "quality_score": 0.92,
+    "description": "Selective beta-1 blocker. Ki = 45 nM. Lopressor. Most prescribed beta-blocker.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "590b3cfe-800d-4d6f-8a32-958d9fafcc71",
+    "title": "Propranolol - Beta Adrenergic Receptors (Non-selective) Assay",
+    "type": "binding_assay",
+    "molecule": "CC(C)NCC(COC1=CC=CC2=CC=CC=C21)O",
+    "molecule_name": "Propranolol",
+    "target": "Beta Adrenergic Receptors (Non-selective)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 2,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.91
+    },
+    "outcome": "active",
+    "quality_score": 0.91,
+    "description": "Non-selective beta-blocker. Ki = 2 nM. Inderal. First beta-blocker developed.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "99ee1415-01cb-4fbb-aaa8-d2d54015a924",
+    "title": "Fluoxetine - SERT (Serotonin Transporter) Assay",
+    "type": "binding_assay",
+    "molecule": "CNCCC(C1=CC=CC=C1)OC2=CC=C(C=C2)C(F)(F)F",
+    "molecule_name": "Fluoxetine",
+    "target": "SERT (Serotonin Transporter)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.9,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.94
+    },
+    "outcome": "active",
+    "quality_score": 0.94,
+    "description": "First SSRI. Ki = 0.9 nM for SERT. Prozac. Revolutionary antidepressant.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "9128fbb1-4780-4f80-9464-a849d812dd5c",
+    "title": "Sertraline - SERT Assay",
+    "type": "binding_assay",
+    "molecule": "CNC1CCC(C2=CC=CC=C12)C3=CC(=C(C=C3)Cl)Cl",
+    "molecule_name": "Sertraline",
+    "target": "SERT",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.3,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.93
+    },
+    "outcome": "active",
+    "quality_score": 0.93,
+    "description": "Highly selective SSRI. Ki = 0.3 nM. Zoloft. Most prescribed antidepressant.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "0386db32-c539-45fb-93cc-1d4aa943017a",
+    "title": "Escitalopram - SERT Assay",
+    "type": "binding_assay",
+    "molecule": "CN(C)CCCC1(C2=CC=C(C=C2)C#N)OCC3=CC(=CC=C31)F",
+    "molecule_name": "Escitalopram",
+    "target": "SERT",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 1.1,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.96
+    },
+    "outcome": "active",
+    "quality_score": 0.96,
+    "description": "S-enantiomer of citalopram. Ki = 1.1 nM. Lexapro. Best tolerated SSRI.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "e78c6504-0e86-4c59-9c1b-2ad6a2fcb4c0",
+    "title": "Tofacitinib - JAK1/JAK3 Assay",
+    "type": "binding_assay",
+    "molecule": "CC1=C(C=C(C=C1)C2=NC(=NC=C2)N3CCC(CC3)NC4=NC=CC=N4)C#N",
+    "molecule_name": "Tofacitinib",
+    "target": "JAK1/JAK3",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 3.2,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "First oral JAK inhibitor. IC50 = 3.2 nM for JAK3. Xeljanz for RA.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "232806a8-c495-4f5f-91a3-858c4a35d5ce",
+    "title": "Ruxolitinib - JAK1/JAK2 Assay",
+    "type": "binding_assay",
+    "molecule": "CC(C)NC(=O)C1=CC(=NN1C2=NC=C(C=C2)C#N)C3CCNCC3",
+    "molecule_name": "Ruxolitinib",
+    "target": "JAK1/JAK2",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 3.3,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "binding_assay",
+      "quality_score": 0.96
+    },
+    "outcome": "active",
+    "quality_score": 0.96,
+    "description": "JAK1/2 inhibitor. IC50 = 3.3 nM for JAK2. Jakafi for myelofibrosis.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "b68a4a90-a6b5-40f4-a850-9e0cd60eeb42",
+    "title": "Ciprofloxacin - DNA Gyrase / Topoisomerase IV Assay",
+    "type": "inhibition_assay",
+    "molecule": "C1CC1N2C=C(C(=O)C3=CC(=C(C=C32)N4CCNCC4)F)C(=O)O",
+    "molecule_name": "Ciprofloxacin",
+    "target": "DNA Gyrase / Topoisomerase IV",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 250,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.93
+    },
+    "outcome": "active",
+    "quality_score": 0.93,
+    "description": "Fluoroquinolone antibiotic. IC50 = 0.25 \u00b5M. Cipro. Broad-spectrum activity.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "656e462c-e496-4deb-a0f0-a8d44d8bd7d8",
+    "title": "Linezolid - 50S Ribosomal Subunit (23S rRNA) Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC(=O)NCC1=CC=C(O1)N2CCOCC2N3C=C(C=N3)C4=CC=C(C=C4)F",
+    "molecule_name": "Linezolid",
+    "target": "50S Ribosomal Subunit (23S rRNA)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 2100,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.95
+    },
+    "outcome": "active",
+    "quality_score": 0.95,
+    "description": "Oxazolidinone antibiotic. MIC = 2.1 \u00b5M for MRSA. Zyvox. Last-resort antibiotic.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "8c1c90c1-a540-47a4-8978-9798506bb981",
+    "title": "Warfarin - VKORC1 (Vitamin K Epoxide Reductase) Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC(=O)CC(C1=CC=CC=C1)C2=C(C3=CC=CC=C3OC2=O)O",
+    "molecule_name": "Warfarin",
+    "target": "VKORC1 (Vitamin K Epoxide Reductase)",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 250,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.92
+    },
+    "outcome": "active",
+    "quality_score": 0.92,
+    "description": "Anticoagulant. IC50 ~ 250 nM for VKORC1. Coumadin. Most widely used oral anticoagulant.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  },
+  {
+    "experiment_id": "7313603a-0536-4f18-bea9-3fa8dc3876d3",
+    "title": "Rivaroxaban - Factor Xa Assay",
+    "type": "inhibition_assay",
+    "molecule": "CC1=NC(=C(S1)C(=O)NCC2=CC=C(C=C2)N3CCOCC3=O)C4=CC=C(C=C4)Cl",
+    "molecule_name": "Rivaroxaban",
+    "target": "Factor Xa",
+    "measurements": [
+      {
+        "name": "IC50",
+        "value": 0.4,
+        "unit": "nM"
+      },
+      {
+        "name": "p_value",
+        "value": 0.0001,
+        "unit": ""
+      }
+    ],
+    "conditions": {
+      "assay_type": "inhibition_assay",
+      "quality_score": 0.97
+    },
+    "outcome": "active",
+    "quality_score": 0.97,
+    "description": "Direct Factor Xa inhibitor. Ki = 0.4 nM. Xarelto. DOAC for AF and DVT prophylaxis.",
+    "source": "ChEMBL/PubChem",
+    "date": "2026-01-30"
+  }
+]

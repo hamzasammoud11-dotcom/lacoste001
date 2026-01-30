@@ -1,6 +1,6 @@
 [
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\aspirin_structure.png",
+    "image": "aspirin_structure.png",
     "image_type": "spectra",
     "description": "Aspirin (acetylsalicylic acid) 2D chemical structure",
     "modality": "molecule",
@@ -14,7 +14,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\ibuprofen_structure.png",
+    "image": "ibuprofen_structure.png",
     "image_type": "spectra",
     "description": "Ibuprofen 2D chemical structure",
     "modality": "molecule",
@@ -28,7 +28,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\metformin_structure.png",
+    "image": "metformin_structure.png",
     "image_type": "spectra",
     "description": "Metformin 2D chemical structure - diabetes drug",
     "modality": "molecule",
@@ -42,7 +42,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\atorvastatin_structure.png",
+    "image": "atorvastatin_structure.png",
     "image_type": "spectra",
     "description": "Atorvastatin 2D chemical structure - cholesterol drug (Lipitor)",
     "modality": "molecule",
@@ -56,7 +56,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\omeprazole_structure.png",
+    "image": "omeprazole_structure.png",
     "image_type": "spectra",
     "description": "Omeprazole 2D chemical structure - proton pump inhibitor",
     "modality": "molecule",
@@ -70,7 +70,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\sildenafil_structure.png",
+    "image": "sildenafil_structure.png",
     "image_type": "spectra",
     "description": "Sildenafil 2D chemical structure - PDE5 inhibitor (Viagra)",
     "modality": "molecule",
@@ -84,7 +84,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\sorafenib_structure.png",
+    "image": "sorafenib_structure.png",
     "image_type": "spectra",
     "description": "Sorafenib 2D structure - kinase inhibitor cancer drug",
     "modality": "molecule",
@@ -99,7 +99,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\gefitinib_structure.png",
+    "image": "gefitinib_structure.png",
     "image_type": "spectra",
     "description": "Gefitinib 2D structure - EGFR tyrosine kinase inhibitor",
     "modality": "molecule",
@@ -114,7 +114,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\imatinib_structure.png",
+    "image": "imatinib_structure.png",
     "image_type": "spectra",
     "description": "Imatinib 2D structure - BCR-ABL tyrosine kinase inhibitor (Gleevec)",
     "modality": "molecule",
@@ -129,7 +129,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\amlodipine_structure.png",
+    "image": "amlodipine_structure.png",
     "image_type": "spectra",
     "description": "Amlodipine 2D structure - calcium channel blocker",
     "modality": "molecule",
@@ -144,7 +144,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\dna_helix_1bna.png",
+    "image": "dna_helix_1bna.png",
     "image_type": "xray",
     "description": "B-DNA crystal structure (PDB: 1BNA)",
     "modality": "protein",
@@ -157,7 +157,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\hemoglobin_4hhb.png",
+    "image": "hemoglobin_4hhb.png",
     "image_type": "xray",
     "description": "Human hemoglobin structure (PDB: 4HHB)",
     "modality": "protein",
@@ -171,7 +171,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\hemoglobin_oxygenated.png",
+    "image": "hemoglobin_oxygenated.png",
     "image_type": "xray",
     "description": "Oxygenated hemoglobin structure",
     "modality": "protein",
@@ -184,7 +184,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\nucleosome_1aoi.png",
+    "image": "nucleosome_1aoi.png",
     "image_type": "xray",
     "description": "Nucleosome core particle structure (PDB: 1AOI)",
     "modality": "protein",
@@ -197,7 +197,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\src_kinase_2src.png",
+    "image": "src_kinase_2src.png",
     "image_type": "xray",
     "description": "SRC tyrosine kinase structure (PDB: 2SRC)",
     "modality": "protein",
@@ -211,7 +211,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\egfr_kinase.png",
+    "image": "egfr_kinase.png",
     "image_type": "xray",
     "description": "EGFR tyrosine kinase domain with gefitinib",
     "modality": "protein",
@@ -225,7 +225,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\abl_kinase_imatinib.png",
+    "image": "abl_kinase_imatinib.png",
     "image_type": "xray",
     "description": "ABL kinase in complex with imatinib (Gleevec)",
     "modality": "protein",
@@ -239,7 +239,7 @@
     }
   },
   {
-    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\egfr_erlotinib.png",
+    "image": "egfr_erlotinib.png",
     "image_type": "xray",
     "description": "EGFR kinase with erlotinib (Tarceva)",
     "modality": "protein",

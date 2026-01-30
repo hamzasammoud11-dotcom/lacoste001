@@ -13,10 +13,17 @@ import json
 import time
 import json
 import time
+import base64
 import requests
+import asyncio
+import platform
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from contextlib import asynccontextmanager
+
+# Fix Windows asyncio issues - must be done before any FastAPI imports
+if platform.system() == "Windows":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import PlainTextResponse
@@ -29,6 +36,169 @@ sys.path.insert(0, ROOT_DIR)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+# Data directory for resolving relative paths
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+
+def convert_image_path_to_base64(image_value: Any) -> Optional[str]:
+    r"""
+    AGGRESSIVE MODE: Convert a local file path to a base64 data URL.
+    
+    Browsers block local file paths (e.g., C:\Users...), so we MUST convert
+    all local images to base64 data URLs for them to display in the UI.
+    
+    Logic:
+    1. If it starts with 'http', return as-is (browser can load it)
+    2. If already a data URL, return as-is
+    3. Otherwise, treat as local file path:
+       - Normalize Windows paths (\ -> /)
+       - Try absolute path first
+       - Try relative to data/ folder
+       - Try just the filename in data/images/
+    4. If file not found, return None (don't send broken paths)
+    
+    Returns the image as a data URL if successful, or None if conversion fails.
+    """
+    if not image_value:
+        return None
+    
+    if not isinstance(image_value, str):
+        return None
+    
+    image_value = image_value.strip()
+    
+    # HTTP/HTTPS URL - return as-is (browser can load it)
+    if image_value.startswith('http://') or image_value.startswith('https://'):
+        return image_value
+    
+    # Already a data URL - return as-is
+    if image_value.startswith('data:'):
+        return image_value
+    
+    # --- AGGRESSIVE LOCAL FILE HANDLING ---
+    
+    # Normalize path separators (Windows -> Unix style for consistency)
+    normalized_path = image_value.replace('\\', '/')
+    
+    # List of paths to try, in order of priority
+    paths_to_try = []
+    
+    # 1. Try the path as-is (might be absolute)
+    paths_to_try.append(image_value)
+    paths_to_try.append(normalized_path)
+    
+    # 2. If it looks like an absolute Windows path, try it
+    if len(image_value) > 2 and image_value[1] == ':':
+        paths_to_try.append(image_value)
+    
+    # 3. Try relative to project root
+    paths_to_try.append(os.path.join(ROOT_DIR, normalized_path))
+    
+    # 4. Try relative to data/ folder
+    paths_to_try.append(os.path.join(DATA_DIR, normalized_path))
+    
+    # 5. Try in data/images/ folder
+    paths_to_try.append(os.path.join(DATA_DIR, "images", normalized_path))
+    
+    # 6. Try just the filename in various locations
+    filename = os.path.basename(normalized_path)
+    paths_to_try.append(os.path.join(DATA_DIR, filename))
+    paths_to_try.append(os.path.join(DATA_DIR, "images", filename))
+    paths_to_try.append(os.path.join(ROOT_DIR, filename))
+    
+    # 7. Handle paths that start with 'data/' or './data/'
+    if normalized_path.startswith('data/') or normalized_path.startswith('./data/'):
+        clean_path = normalized_path.lstrip('./').lstrip('data/')
+        paths_to_try.append(os.path.join(DATA_DIR, clean_path))
+        paths_to_try.append(os.path.join(DATA_DIR, "images", clean_path))
+    
+    # Try each path
+    for path in paths_to_try:
+        if not path:
+            continue
+        try:
+            if os.path.isfile(path):
+                with open(path, 'rb') as f:
+                    image_bytes = f.read()
+                
+                # Detect MIME type from extension
+                ext = os.path.splitext(path)[1].lower()
+                mime_types = {
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.png': 'image/png',
+                    '.gif': 'image/gif',
+                    '.bmp': 'image/bmp',
+                    '.tiff': 'image/tiff',
+                    '.tif': 'image/tiff',
+                    '.webp': 'image/webp',
+                    '.svg': 'image/svg+xml',
+                }
+                mime_type = mime_types.get(ext, 'image/png')
+                
+                base64_str = base64.b64encode(image_bytes).decode('utf-8')
+                logger.debug(f"Successfully converted image to base64: {path}")
+                return f"data:{mime_type};base64,{base64_str}"
+        except Exception as e:
+            logger.debug(f"Could not read image from {path}: {e}")
+            continue
+    
+    # File not found anywhere - return None (don't send broken path to browser)
+    logger.warning(f"Image file not found, tried multiple paths for: {image_value}")
+    return None
+
+
+def ensure_image_is_displayable(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    r"""
+    Ensure the 'image' field in metadata is a displayable format (data URL or HTTP URL).
+    
+    CRITICAL: Browsers cannot display local file paths like C:\Users\...
+    This function converts ALL local image paths to base64 data URLs.
+    
+    Checks both 'image' and 'image_path' fields in metadata.
+    """
+    if not metadata:
+        return metadata
+    
+    # Create a copy to avoid modifying original
+    metadata = dict(metadata)
+    
+    # Check 'image' field
+    image_value = metadata.get('image')
+    if image_value:
+        converted = convert_image_path_to_base64(image_value)
+        if converted:
+            metadata['image'] = converted
+        else:
+            # Remove broken path - better to show nothing than broken image
+            metadata['image'] = None
+    
+    # Also check 'image_path' field (some records use this)
+    image_path = metadata.get('image_path')
+    if image_path:
+        converted = convert_image_path_to_base64(image_path)
+        if converted:
+            # Store as 'image' for consistency
+            metadata['image'] = converted
+            metadata['image_path'] = None  # Clear the local path
+        else:
+            metadata['image_path'] = None
+    
+    # Check 'thumbnail' field too
+    thumbnail = metadata.get('thumbnail')
+    if thumbnail:
+        converted = convert_image_path_to_base64(thumbnail)
+        if converted:
+            metadata['thumbnail'] = converted
+        else:
+            metadata['thumbnail'] = None
+    
+    return metadata
 
 # ============================================================================
 # Service Imports
@@ -605,6 +775,12 @@ async def enhanced_search(request: dict = None):
         )
         
         payload = response.to_dict()
+        
+        # Ensure image paths are converted to base64 for UI display
+        for result in payload.get("results", []):
+            if result.get("modality") == "image" and result.get("metadata"):
+                result["metadata"] = ensure_image_is_displayable(result["metadata"])
+        
         _log_event(
             "search",
             request_id,
@@ -697,7 +873,15 @@ async def search_image(request: ImageSearchRequest):
         )
 
         logger.info(f"[{request_id}] Image search returned {response.returned} results")
-        return response.to_dict()
+        
+        payload = response.to_dict()
+        
+        # Ensure image paths are converted to base64 for UI display
+        for result in payload.get("results", []):
+            if result.get("metadata"):
+                result["metadata"] = ensure_image_is_displayable(result["metadata"])
+        
+        return payload
 
     except Exception as e:
         logger.error(f"[{request_id}] Image search failed: {e}", exc_info=True)
@@ -858,9 +1042,12 @@ async def find_neighbors(request: NeighborRequest):
         else:
             all_neighbors = all_neighbors[:request.top_k]
         
-        # Remove vectors from response
+        # Remove vectors from response and ensure images are displayable
         for n in all_neighbors:
             n.pop("vector", None)
+            # Convert local image paths to base64 for UI display
+            if n.get("modality") == "image" and n.get("metadata"):
+                n["metadata"] = ensure_image_is_displayable(n["metadata"])
         
         # Group by modality for faceted navigation
         facets = {}
@@ -914,7 +1101,7 @@ async def suggest_design_variants(request: DesignVariantRequest):
         # Search with high diversity (low lambda)
         lambda_param = 1.0 - request.diversity
         
-        response = search_service.enhanced_search(
+        response = search_service.search(
             query=request.reference,
             modality=modality,
             top_k=request.num_variants * 3,  # Get more for filtering

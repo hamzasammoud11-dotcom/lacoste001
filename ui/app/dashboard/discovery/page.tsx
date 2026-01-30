@@ -14,6 +14,7 @@ import {
   Maximize2,
   Microscope,
   Search,
+  Sparkles,
   Upload,
   X,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ import {
   Checkbox,
   CheckboxIndicator,
 } from '@/components/animate-ui/primitives/radix/checkbox';
+import { DesignAssistantModal } from '@/components/dashboard/design/design-assistant-modal';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -67,6 +69,29 @@ export default function DiscoveryPage() {
   const [neighborResults, setNeighborResults] = React.useState<any>(null);
   const [isLoadingNeighbors, setIsLoadingNeighbors] = React.useState(false);
   const [selectedItemId, setSelectedItemId] = React.useState<string | null>(null);
+  const [selectedItemName, setSelectedItemName] = React.useState<string | null>(null);
+
+  // Design assistant state
+  const [designModalOpen, setDesignModalOpen] = React.useState(false);
+  const [designSourceItem, setDesignSourceItem] = React.useState<string>('');
+  const [designSourceModality, setDesignSourceModality] = React.useState<'molecule' | 'protein' | 'auto'>('auto');
+  const [designSourceName, setDesignSourceName] = React.useState<string>('');
+
+  const handleSuggestVariants = (result: SearchResult) => {
+    // Get the content to use as source for variants
+    const content = result.metadata?.smiles || result.content || '';
+    const modality = result.modality === 'drug' || result.modality === 'molecule' 
+      ? 'molecule' 
+      : result.modality === 'target' || result.modality === 'protein'
+        ? 'protein'
+        : 'auto';
+    const name = result.metadata?.name as string || '';
+    
+    setDesignSourceItem(content);
+    setDesignSourceModality(modality);
+    setDesignSourceName(name);
+    setDesignModalOpen(true);
+  };
 
   const getApiType = (uiType: string, query: string): string => {
     const looksLikeSmiles = /^[A-Za-z0-9@+\-\[\]\(\)\\\/=#$.]+$/.test(
@@ -125,9 +150,10 @@ export default function DiscoveryPage() {
   };
 
   // Explore neighbors handler
-  const handleExploreNeighbors = async (itemId: string) => {
+  const handleExploreNeighbors = async (itemId: string, itemName?: string) => {
     setIsLoadingNeighbors(true);
     setSelectedItemId(itemId);
+    setSelectedItemName(itemName || null);
     try {
       const response = await searchNeighbors({
         item_id: itemId,
@@ -740,21 +766,37 @@ export default function DiscoveryPage() {
                           {result.score.toFixed(3)}
                         </div>
                       </div>
-                      {/* Explore Neighbors Button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleExploreNeighbors(result.id)}
-                        disabled={isLoadingNeighbors && selectedItemId === result.id}
-                        className="text-xs"
-                      >
-                        {isLoadingNeighbors && selectedItemId === result.id ? (
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                        ) : (
-                          <Compass className="mr-1 h-3 w-3" />
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        {/* Suggest Variants Button - Only for molecules and proteins */}
+                        {(result.modality === 'drug' || result.modality === 'molecule' || 
+                          result.modality === 'target' || result.modality === 'protein') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSuggestVariants(result)}
+                            className="text-xs border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-600"
+                          >
+                            <Sparkles className="mr-1 h-3 w-3" />
+                            Suggest Variants
+                          </Button>
                         )}
-                        Explore Neighbors
-                      </Button>
+                        {/* Explore Neighbors Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleExploreNeighbors(result.id, result.metadata?.name as string || result.metadata?.smiles as string || result.content?.slice(0, 30))}
+                          disabled={isLoadingNeighbors && selectedItemId === result.id}
+                          className="text-xs"
+                        >
+                          {isLoadingNeighbors && selectedItemId === result.id ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : (
+                            <Compass className="mr-1 h-3 w-3" />
+                          )}
+                          Explore Neighbors
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -833,7 +875,7 @@ export default function DiscoveryPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleExploreNeighbors(result.id)}
+                              onClick={() => handleExploreNeighbors(result.id, result.metadata?.description as string || result.metadata?.caption as string || `Image ${i + 1}`)}
                               disabled={isLoadingNeighbors && selectedItemId === result.id}
                               className="w-full mt-3 text-xs"
                             >
@@ -884,7 +926,7 @@ export default function DiscoveryPage() {
       {neighborResults && (
         <div className="animate-in slide-in-from-bottom-4 space-y-4 duration-300">
           <SectionHeader
-            title={`Neighbors of ${selectedItemId?.slice(0, 8)}... (${neighborResults.total_found} found)`}
+            title={`Neighbors of ${selectedItemName || selectedItemId?.slice(0, 8) + '...'} (${neighborResults.total_found} found)`}
             icon={<Compass className="h-5 w-5 text-blue-500" />}
           />
           
@@ -916,17 +958,50 @@ export default function DiscoveryPage() {
                     </span>
                   </div>
                   <div className="text-sm font-medium truncate">
-                    {neighbor.metadata?.name || neighbor.metadata?.title || `Neighbor ${i + 1}`}
+                    {neighbor.metadata?.name || neighbor.metadata?.title || neighbor.metadata?.description || `Neighbor ${i + 1}`}
                   </div>
-                  <div className="text-muted-foreground text-xs truncate mt-1">
-                    {neighbor.content?.slice(0, 80)}
-                    {neighbor.content?.length > 80 ? '...' : ''}
-                  </div>
+                  {/* Render image if modality is image */}
+                  {neighbor.modality === 'image' ? (
+                    <div className="mt-2">
+                      {(() => {
+                        const base64Img = neighbor.metadata?.image;
+                        const directUrl = neighbor.metadata?.thumbnail_url || neighbor.metadata?.url;
+                        if (typeof base64Img === 'string' && base64Img.startsWith('data:')) {
+                          return (
+                            <img 
+                              src={base64Img} 
+                              alt={neighbor.metadata?.description || 'Neighbor image'}
+                              className="w-full h-24 object-cover rounded"
+                            />
+                          );
+                        }
+                        if (typeof directUrl === 'string' && directUrl.startsWith('http')) {
+                          return (
+                            <img 
+                              src={directUrl} 
+                              alt={neighbor.metadata?.description || 'Neighbor image'}
+                              className="w-full h-24 object-cover rounded"
+                            />
+                          );
+                        }
+                        return (
+                          <div className="w-full h-24 bg-muted rounded flex items-center justify-center">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground text-xs truncate mt-1">
+                      {neighbor.content?.slice(0, 80)}
+                      {neighbor.content?.length > 80 ? '...' : ''}
+                    </div>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
                     className="mt-2 w-full text-xs"
-                    onClick={() => handleExploreNeighbors(neighbor.id)}
+                    onClick={() => handleExploreNeighbors(neighbor.id, neighbor.metadata?.name || neighbor.metadata?.title || neighbor.metadata?.description)}
                   >
                     <Compass className="mr-1 h-3 w-3" />
                     Explore from here
@@ -950,6 +1025,15 @@ export default function DiscoveryPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Design Assistant Modal */}
+      <DesignAssistantModal
+        isOpen={designModalOpen}
+        onClose={() => setDesignModalOpen(false)}
+        sourceItem={designSourceItem}
+        sourceModality={designSourceModality}
+        sourceName={designSourceName}
+      />
     </div>
   );
 }
