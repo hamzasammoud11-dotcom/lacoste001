@@ -37,7 +37,7 @@ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = '16rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
-const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
+// Keyboard shortcut removed - sidebar always stays expanded
 
 type SidebarContextProps = {
   state: 'expanded' | 'collapsed';
@@ -86,26 +86,31 @@ function SidebarProvider({
     [setOpenProp, open],
   );
 
+  // Toggle is disabled - sidebar always stays expanded
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-  }, [isMobile, setOpen, setOpenMobile]);
+    // Only toggle on mobile for sheet behavior, desktop stays expanded always
+    if (isMobile) {
+      setOpenMobile((open) => !open);
+    }
+    // Desktop: do nothing - always expanded
+  }, [isMobile, setOpenMobile]);
 
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
-      ) {
-        event.preventDefault();
-        toggleSidebar();
-      }
-    };
+  // Keyboard shortcut disabled - scientists don't want hidden navigation
+  // React.useEffect(() => {
+  //   const handleKeyDown = (event: KeyboardEvent) => {
+  //     if (
+  //       event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+  //       (event.metaKey || event.ctrlKey)
+  //     ) {
+  //       event.preventDefault();
+  //       toggleSidebar();
+  //     }
+  //   };
+  //   window.addEventListener('keydown', handleKeyDown);
+  //   return () => window.removeEventListener('keydown', handleKeyDown);
+  // }, [toggleSidebar]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSidebar]);
-
-  const state = open ? 'expanded' : 'collapsed';
+  const state = 'expanded' as const; // Always expanded on desktop
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({

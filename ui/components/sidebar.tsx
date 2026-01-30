@@ -3,7 +3,6 @@
 import {
   BadgeCheck,
   Bell,
-  ChevronRight,
   ChevronsUpDown,
   Compass,
   CreditCard,
@@ -43,11 +42,6 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '@/components/animate-ui/components/radix/sidebar';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/animate-ui/primitives/radix/collapsible';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -161,12 +155,11 @@ export function AppSidebar() {
           <SidebarMenu>
             {navMain.map((item) => {
               // For items without children, match exact URL or prefix
-              // For items with children, only expand but don't highlight parent
+              // For items with children, only highlight sub-items not parent
               const hasChildren = item.items && item.items.length > 0;
               const isExactMatch = pathname === item.url;
               const isPrefixMatch = pathname?.startsWith(item.url + '/');
               const isActive = hasChildren ? false : (isExactMatch || isPrefixMatch);
-              const shouldExpand = isExactMatch || isPrefixMatch;
 
               if (!item.items || item.items.length === 0) {
                 return (
@@ -185,41 +178,33 @@ export function AppSidebar() {
                 );
               }
 
+              // Items with sub-items: show parent as non-clickable label, always show sub-items
               return (
-                <Collapsible
-                  key={item.title}
-                  asChild
-                  defaultOpen={shouldExpand}
-                  className="group/collapsible"
-                >
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        tooltip={item.title}
-                      >
-                        {item.icon && <item.icon />}
-                        <span>{item.title}</span>
-                        <ChevronRight className="ml-auto transition-transform duration-300 group-data-[state=open]/collapsible:rotate-90" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {item.items?.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={pathname === subItem.url}
-                            >
-                              <Link href={subItem.url}>
-                                <span>{subItem.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
+                <SidebarMenuItem key={item.title}>
+                  {/* Parent item - just a label, not clickable */}
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    className="cursor-default hover:bg-transparent"
+                  >
+                    {item.icon && <item.icon />}
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                  {/* Sub-items always visible */}
+                  <SidebarMenuSub>
+                    {item.items?.map((subItem) => (
+                      <SidebarMenuSubItem key={subItem.title}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={pathname === subItem.url}
+                        >
+                          <Link href={subItem.url}>
+                            <span>{subItem.title}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
               );
             })}
           </SidebarMenu>
