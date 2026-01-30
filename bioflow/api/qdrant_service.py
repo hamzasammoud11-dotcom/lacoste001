@@ -105,6 +105,7 @@ class QdrantService:
         """
         self.model_service = model_service
         self.url = url or os.getenv("QDRANT_URL")
+        self.api_key = os.getenv("QDRANT_API_KEY")  # For Qdrant Cloud auth
         self.path = path or os.getenv("QDRANT_PATH", "./qdrant_data")
         self.vector_dim = vector_dim
         self.hnsw_m = int(os.getenv("QDRANT_HNSW_M", "16"))
@@ -143,8 +144,13 @@ class QdrantService:
             from qdrant_client import QdrantClient
             
             if self.url:
-                self._client = QdrantClient(url=self.url)
-                logger.info(f"Connected to Qdrant at {self.url}")
+                # For Qdrant Cloud, include API key
+                if self.api_key:
+                    self._client = QdrantClient(url=self.url, api_key=self.api_key)
+                    logger.info(f"Connected to Qdrant Cloud at {self.url[:50]}...")
+                else:
+                    self._client = QdrantClient(url=self.url)
+                    logger.info(f"Connected to Qdrant at {self.url}")
             else:
                 self._client = QdrantClient(path=self.path)
                 logger.info(f"Using local Qdrant at {self.path}")

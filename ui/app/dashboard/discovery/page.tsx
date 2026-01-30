@@ -40,11 +40,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { search, searchByImage, searchNeighbors, searchExperiments, getExperimentalImages, QueryValidation, ExperimentalImage } from '@/lib/api';
+import { search, searchByImage, searchNeighbors, searchExperiments, getExperimentalImages, searchGelMicroscopy, searchCrossModal, QueryValidation, ExperimentalImage, GelMicroscopySimilarResult, CrossModalResult } from '@/lib/api';
 import { SearchResult } from '@/schemas/search';
 import { Smiles2DViewer } from '@/components/visualization/smiles-2d-viewer';
 
-type SearchMode = 'text' | 'image' | 'experiment' | 'gallery';
+type SearchMode = 'text' | 'image' | 'experiment' | 'gallery' | 'sequence' | 'cross-modal';
 
 // Error state for invalid queries (HTTP 400)
 interface InvalidQueryError {
@@ -92,6 +92,31 @@ export default function DiscoveryPage() {
   const [galleryImages, setGalleryImages] = React.useState<ExperimentalImage[]>([]);
   const [galleryFilter, setGalleryFilter] = React.useState<'all' | 'gel' | 'microscopy'>('all');
   const [isLoadingGallery, setIsLoadingGallery] = React.useState(false);
+  
+  // Gallery similarity search state
+  const [galleryUploadedImage, setGalleryUploadedImage] = React.useState<string | null>(null);
+  const [galleryImageFileName, setGalleryImageFileName] = React.useState<string>('');
+  const [gallerySimilarResults, setGallerySimilarResults] = React.useState<GelMicroscopySimilarResult[]>([]);
+  const [isSearchingGallery, setIsSearchingGallery] = React.useState(false);
+  const [galleryOutcomeFilter, setGalleryOutcomeFilter] = React.useState<string>('');
+  const [galleryCellLineFilter, setGalleryCellLineFilter] = React.useState<string>('');
+  const [galleryTreatmentFilter, setGalleryTreatmentFilter] = React.useState<string>('');
+  const [galleryViewMode, setGalleryViewMode] = React.useState<'browse' | 'search'>('browse');
+  const [selectedGalleryImage, setSelectedGalleryImage] = React.useState<ExperimentalImage | GelMicroscopySimilarResult | null>(null);
+
+  // Sequence search state
+  const [sequenceQuery, setSequenceQuery] = React.useState('');
+  const [sequenceType, setSequenceType] = React.useState<'protein' | 'dna' | 'rna' | 'auto'>('auto');
+  
+  // Cross-modal search state
+  const [crossModalCompound, setCrossModalCompound] = React.useState('');
+  const [crossModalSequence, setCrossModalSequence] = React.useState('');
+  const [crossModalText, setCrossModalText] = React.useState('');
+  const [crossModalImage, setCrossModalImage] = React.useState<string | null>(null);
+  const [crossModalTargetModalities, setCrossModalTargetModalities] = React.useState<string[]>(['all']);
+  const [crossModalResults, setCrossModalResults] = React.useState<CrossModalResult[]>([]);
+  const [isSearchingCrossModal, setIsSearchingCrossModal] = React.useState(false);
+  const [crossModalValidationWarnings, setCrossModalValidationWarnings] = React.useState<string[]>([]);
 
   // Design assistant state
   const [designModalOpen, setDesignModalOpen] = React.useState(false);
@@ -175,7 +200,13 @@ export default function DiscoveryPage() {
   const loadGalleryImages = React.useCallback(async () => {
     setIsLoadingGallery(true);
     try {
-      const response = await getExperimentalImages({ type: galleryFilter, limit: 30 });
+      const response = await getExperimentalImages({ 
+        type: galleryFilter, 
+        limit: 30,
+        outcome: galleryOutcomeFilter || undefined,
+        cell_line: galleryCellLineFilter || undefined,
+        treatment: galleryTreatmentFilter || undefined,
+      });
       setGalleryImages(response.images);
     } catch (err) {
       console.error('Failed to load gallery images:', err);
@@ -183,13 +214,80 @@ export default function DiscoveryPage() {
     } finally {
       setIsLoadingGallery(false);
     }
-  }, [galleryFilter]);
+  }, [galleryFilter, galleryOutcomeFilter, galleryCellLineFilter, galleryTreatmentFilter]);
+
+  // Gallery image upload handlers
+  const handleGalleryFileUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file (PNG, JPG, etc.)');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setGalleryUploadedImage(base64);
+      setGalleryImageFileName(file.name);
+      setError(null);
+      setGalleryViewMode('search');
+    };
+    reader.onerror = () => {
+      setError('Failed to read file');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearGalleryUploadedImage = () => {
+    setGalleryUploadedImage(null);
+    setGalleryImageFileName('');
+    setGallerySimilarResults([]);
+    setGalleryViewMode('browse');
+  };
+
+  // Search for similar biological images
+  const handleGallerySimilaritySearch = async () => {
+    if (!galleryUploadedImage) return;
+    
+    setIsSearchingGallery(true);
+    setError(null);
+    
+    try {
+      const response = await searchGelMicroscopy({
+        image: galleryUploadedImage,
+        image_type: galleryFilter === 'all' ? undefined : (galleryFilter === 'gel' ? 'gel' : 'microscopy'),
+        outcome: galleryOutcomeFilter || undefined,
+        cell_line: galleryCellLineFilter || undefined,
+        treatment: galleryTreatmentFilter || undefined,
+        top_k: 12,
+        use_mmr: true,
+      });
+      
+      setGallerySimilarResults(response.results);
+      
+      if (response.results.length === 0) {
+        setError('No similar experiments found. Try adjusting filters or uploading a different image.');
+      }
+    } catch (err) {
+      console.error('Gallery search failed:', err);
+      setError(err instanceof Error ? err.message : 'Search failed');
+      setGallerySimilarResults([]);
+    } finally {
+      setIsSearchingGallery(false);
+    }
+  };
+
+  // Auto-search when image is uploaded
+  React.useEffect(() => {
+    if (galleryUploadedImage && galleryViewMode === 'search') {
+      handleGallerySimilaritySearch();
+    }
+  }, [galleryUploadedImage]);
 
   React.useEffect(() => {
-    if (searchMode === 'gallery') {
+    if (searchMode === 'gallery' && galleryViewMode === 'browse') {
       loadGalleryImages();
     }
-  }, [searchMode, galleryFilter, loadGalleryImages]);
+  }, [searchMode, galleryFilter, galleryOutcomeFilter, galleryCellLineFilter, galleryTreatmentFilter, loadGalleryImages, galleryViewMode]);
 
   // Explore neighbors handler
   const handleExploreNeighbors = async (itemId: string, itemName?: string) => {
@@ -216,8 +314,13 @@ export default function DiscoveryPage() {
     if (searchMode === 'text' && !query.trim()) return;
     if (searchMode === 'image' && !uploadedImage) return;
     if (searchMode === 'experiment' && !query.trim()) return;
+    if (searchMode === 'sequence' && !sequenceQuery.trim()) return;
+    if (searchMode === 'cross-modal' && !crossModalCompound && !crossModalSequence && !crossModalText && !crossModalImage) return;
 
     setIsSearching(true);
+    if (searchMode === 'cross-modal') {
+      setIsSearchingCrossModal(true);
+    }
     setStep(1);
     setError(null);
     setResults([]);
@@ -225,6 +328,8 @@ export default function DiscoveryPage() {
     setQueryWarning(null);
     setQueryValidation(null);
     setInvalidQueryError(null);  // Clear invalid query error
+    setCrossModalResults([]);
+    setCrossModalValidationWarnings([]);
 
     try {
       setStep(1);
@@ -283,6 +388,51 @@ export default function DiscoveryPage() {
             },
           })),
         };
+      } else if (searchMode === 'sequence') {
+        // Sequence search (protein/DNA/RNA)
+        data = await search({
+          query: sequenceQuery.trim(),
+          type: sequenceType === 'protein' || sequenceType === 'auto' ? 'protein' : 'text',
+          limit: 10,
+        });
+      } else if (searchMode === 'cross-modal') {
+        // Cross-modal search combining multiple query types
+        const crossModalResponse = await searchCrossModal({
+          compound: crossModalCompound || undefined,
+          sequence: crossModalSequence || undefined,
+          text: crossModalText || undefined,
+          image: crossModalImage || undefined,
+          target_modalities: crossModalTargetModalities,
+          top_k: 10,
+          use_mmr: true,
+          diversity: 0.3,
+        });
+        
+        // Convert to SearchResult format
+        data = {
+          results: crossModalResponse.results.map((r) => ({
+            id: r.id,
+            score: r.score,
+            content: r.content,
+            modality: r.modality,
+            metadata: {
+              ...r.metadata,
+              query_source: r.query_source,
+              connection: r.connection,
+            },
+          })),
+          message: crossModalResponse.message,
+        };
+        
+        // Also store the raw cross-modal results for enhanced display
+        setCrossModalResults(crossModalResponse.results);
+        
+        // Store validation warnings if any
+        if (crossModalResponse.validation_warnings && crossModalResponse.validation_warnings.length > 0) {
+          setCrossModalValidationWarnings(crossModalResponse.validation_warnings);
+        } else {
+          setCrossModalValidationWarnings([]);
+        }
       } else {
         // Text search (original)
         const apiType = getApiType(searchType, query);
@@ -398,6 +548,7 @@ export default function DiscoveryPage() {
       }
     } finally {
       setIsSearching(false);
+      setIsSearchingCrossModal(false);
     }
   };
 
@@ -436,15 +587,23 @@ export default function DiscoveryPage() {
               <Button
                 variant={searchMode === 'text' ? 'default' : 'outline'}
                 onClick={() => setSearchMode('text')}
-                className="flex-1 min-w-[140px]"
+                className="flex-1 min-w-[120px]"
               >
                 <Search className="mr-2 h-4 w-4" />
                 Text / SMILES
               </Button>
               <Button
+                variant={searchMode === 'sequence' ? 'default' : 'outline'}
+                onClick={() => setSearchMode('sequence')}
+                className="flex-1 min-w-[120px]"
+              >
+                <span className="mr-2 font-mono text-sm">🧬</span>
+                Sequence
+              </Button>
+              <Button
                 variant={searchMode === 'image' ? 'default' : 'outline'}
                 onClick={() => setSearchMode('image')}
-                className="flex-1 min-w-[140px]"
+                className="flex-1 min-w-[120px]"
               >
                 <ImageIcon className="mr-2 h-4 w-4" />
                 Structure Image
@@ -452,7 +611,7 @@ export default function DiscoveryPage() {
               <Button
                 variant={searchMode === 'experiment' ? 'default' : 'outline'}
                 onClick={() => setSearchMode('experiment')}
-                className="flex-1 min-w-[140px]"
+                className="flex-1 min-w-[120px]"
               >
                 <Beaker className="mr-2 h-4 w-4" />
                 Experiment
@@ -460,10 +619,18 @@ export default function DiscoveryPage() {
               <Button
                 variant={searchMode === 'gallery' ? 'default' : 'outline'}
                 onClick={() => setSearchMode('gallery')}
-                className="flex-1 min-w-[140px]"
+                className="flex-1 min-w-[120px]"
               >
                 <Microscope className="mr-2 h-4 w-4" />
                 Gels & Microscopy
+              </Button>
+              <Button
+                variant={searchMode === 'cross-modal' ? 'default' : 'outline'}
+                onClick={() => setSearchMode('cross-modal')}
+                className="flex-1 min-w-[140px]"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Cross-Modal
               </Button>
             </div>
           </div>
@@ -471,8 +638,27 @@ export default function DiscoveryPage() {
           {/* Gallery Mode Content */}
           {searchMode === 'gallery' && (
             <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Label>Filter by type:</Label>
+              {/* View Mode Toggle */}
+              <div className="flex items-center justify-between border-b pb-4">
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={galleryViewMode === 'browse' ? 'default' : 'outline'}
+                    onClick={() => { setGalleryViewMode('browse'); clearGalleryUploadedImage(); }}
+                  >
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    Browse Gallery
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={galleryViewMode === 'search' ? 'default' : 'outline'}
+                    onClick={() => setGalleryViewMode('search')}
+                  >
+                    <Search className="mr-2 h-4 w-4" />
+                    Find Similar
+                  </Button>
+                </div>
+                
                 <div className="flex gap-2">
                   <Button
                     size="sm"
@@ -496,80 +682,418 @@ export default function DiscoveryPage() {
                     Microscopy
                   </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={loadGalleryImages}
-                  disabled={isLoadingGallery}
-                >
-                  {isLoadingGallery ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
-                </Button>
               </div>
 
-              {/* Gallery Grid */}
-              {isLoadingGallery ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              {/* Faceted Filters */}
+              <div className="grid grid-cols-3 gap-4 p-3 bg-muted/30 rounded-lg">
+                <div>
+                  <Label className="text-xs mb-1 block">Outcome</Label>
+                  <Select value={galleryOutcomeFilter || '__any__'} onValueChange={(v) => setGalleryOutcomeFilter(v === '__any__' ? '' : v)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Any outcome" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__any__">Any outcome</SelectItem>
+                      <SelectItem value="positive">Positive</SelectItem>
+                      <SelectItem value="negative">Negative</SelectItem>
+                      <SelectItem value="inconclusive">Inconclusive</SelectItem>
+                      <SelectItem value="dose_dependent">Dose-dependent</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              ) : galleryImages.length === 0 ? (
-                <div className="bg-muted/50 rounded-lg p-8 text-center">
-                  <Microscope className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-semibold mb-2">No Experimental Images Found</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    No gel or microscopy images are currently in the data corpus.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Images can be ingested from IDR (microscopy), PMC Open Access (western blots), 
-                    or uploaded directly via the Image search mode.
-                  </p>
+                <div>
+                  <Label className="text-xs mb-1 block">Cell Line</Label>
+                  <Select value={galleryCellLineFilter || '__any__'} onValueChange={(v) => setGalleryCellLineFilter(v === '__any__' ? '' : v)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Any cell line" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__any__">Any cell line</SelectItem>
+                      <SelectItem value="HeLa">HeLa</SelectItem>
+                      <SelectItem value="A549">A549</SelectItem>
+                      <SelectItem value="MCF7">MCF7</SelectItem>
+                      <SelectItem value="HEK293">HEK293</SelectItem>
+                      <SelectItem value="PC3">PC3</SelectItem>
+                      <SelectItem value="U2OS">U2OS</SelectItem>
+                      <SelectItem value="HCT116">HCT116</SelectItem>
+                      <SelectItem value="A431">A431</SelectItem>
+                      <SelectItem value="H1975">H1975</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {galleryImages.map((img, idx) => (
-                    <div key={img.id || idx} className="group relative rounded-lg border bg-card overflow-hidden">
-                      <div className="aspect-square">
-                        {img.metadata?.image?.startsWith('data:') ? (
-                          <ExpandableImage 
-                            src={img.metadata.image} 
-                            alt={img.metadata?.description || 'Experimental image'} 
-                            caption={img.metadata?.caption || img.metadata?.description}
-                          />
-                        ) : img.metadata?.thumbnail_url ? (
-                          <ExpandableImage 
-                            src={img.metadata.thumbnail_url} 
-                            alt={img.metadata?.description || 'Experimental image'} 
-                            caption={img.metadata?.caption || img.metadata?.description}
-                          />
+                <div>
+                  <Label className="text-xs mb-1 block">Treatment</Label>
+                  <Select value={galleryTreatmentFilter || '__any__'} onValueChange={(v) => setGalleryTreatmentFilter(v === '__any__' ? '' : v)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Any treatment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__any__">Any treatment</SelectItem>
+                      <SelectItem value="Gefitinib">Gefitinib (EGFR)</SelectItem>
+                      <SelectItem value="Imatinib">Imatinib (BCR-ABL)</SelectItem>
+                      <SelectItem value="Sorafenib">Sorafenib (VEGFR/RAF)</SelectItem>
+                      <SelectItem value="Erlotinib">Erlotinib (EGFR)</SelectItem>
+                      <SelectItem value="Dasatinib">Dasatinib (SRC/ABL)</SelectItem>
+                      <SelectItem value="Rapamycin">Rapamycin (mTOR)</SelectItem>
+                      <SelectItem value="DMSO">DMSO (Control)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Search Mode: Upload Image to Find Similar */}
+              {galleryViewMode === 'search' && (
+                <div className="space-y-4">
+                  {/* Upload Section */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-1">
+                      <Label className="mb-2 block font-medium">Upload Your Image</Label>
+                      <div
+                        className={`min-h-[200px] rounded-lg border-2 border-dashed p-4 transition-colors flex items-center justify-center ${
+                          galleryUploadedImage ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : 'border-muted-foreground/25 hover:border-primary/50'
+                        }`}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files[0];
+                          if (file) handleGalleryFileUpload(file);
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                      >
+                        {galleryUploadedImage ? (
+                          <div className="relative w-full">
+                            <img
+                              src={galleryUploadedImage}
+                              alt="Query"
+                              className="w-full h-[180px] object-contain rounded"
+                            />
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              className="absolute top-1 right-1 h-6 w-6"
+                              onClick={clearGalleryUploadedImage}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                            <p className="text-xs text-center mt-2 text-muted-foreground">{galleryImageFileName}</p>
+                          </div>
                         ) : (
-                          <div className="h-full flex items-center justify-center bg-muted">
-                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          <div className="text-center">
+                            <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground mb-2">
+                              Drop a Western blot or microscopy image here
+                            </p>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              id="gallery-image-upload"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleGalleryFileUpload(file);
+                              }}
+                            />
+                            <Button variant="outline" size="sm" asChild>
+                              <label htmlFor="gallery-image-upload" className="cursor-pointer">
+                                Select Image
+                              </label>
+                            </Button>
                           </div>
                         )}
                       </div>
-                      <div className="p-2">
-                        <span className={`inline-block text-xs px-2 py-0.5 rounded mb-1 ${
-                          img.metadata?.image_type === 'gel' 
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' 
-                            : img.metadata?.image_type === 'microscopy' || img.metadata?.image_type === 'fluorescence'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-                              : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-                        }`}>
-                          {img.metadata?.image_type === 'gel' ? 'Western Blot/Gel' : 
-                           img.metadata?.image_type === 'fluorescence' ? 'Fluorescence' : 
-                           img.metadata?.image_type || 'Image'}
-                        </span>
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {img.metadata?.description || img.content}
-                        </p>
-                        {img.metadata?.experiment_type && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {img.metadata.experiment_type}
-                          </p>
-                        )}
+                      
+                      {galleryUploadedImage && (
+                        <Button
+                          className="w-full mt-2"
+                          onClick={handleGallerySimilaritySearch}
+                          disabled={isSearchingGallery}
+                        >
+                          {isSearchingGallery ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Searching...
+                            </>
+                          ) : (
+                            <>
+                              <Search className="mr-2 h-4 w-4" />
+                              Find Similar Experiments
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Similar Results */}
+                    <div className="lg:col-span-2">
+                      <Label className="mb-2 block font-medium">
+                        Similar Experiments {gallerySimilarResults.length > 0 && `(${gallerySimilarResults.length} found)`}
+                      </Label>
+                      
+                      {isSearchingGallery ? (
+                        <div className="flex items-center justify-center py-12 border rounded-lg bg-muted/20">
+                          <div className="text-center">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">Searching for similar experiments...</p>
+                          </div>
+                        </div>
+                      ) : gallerySimilarResults.length === 0 ? (
+                        <div className="flex items-center justify-center py-12 border rounded-lg bg-muted/20">
+                          <div className="text-center">
+                            <Microscope className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">
+                              {galleryUploadedImage 
+                                ? "No similar experiments found. Try adjusting filters."
+                                : "Upload an image to find similar experiments"}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2">
+                          {gallerySimilarResults.map((result, idx) => (
+                            <div
+                              key={result.id || idx}
+                              className="group relative rounded-lg border bg-card overflow-hidden hover:ring-2 hover:ring-primary transition-all cursor-pointer"
+                              onClick={() => setSelectedGalleryImage(result)}
+                            >
+                              <div className="aspect-video relative">
+                                {result.image ? (
+                                  <img
+                                    src={result.image}
+                                    alt={result.experiment_type || 'Experiment'}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full flex items-center justify-center bg-muted">
+                                    <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                                  </div>
+                                )}
+                                {/* Similarity badge */}
+                                <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded">
+                                  {(result.similarity * 100).toFixed(0)}% match
+                                </div>
+                              </div>
+                              <div className="p-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                    result.image_type === 'gel' || result.image_type === 'western_blot'
+                                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
+                                      : 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                                  }`}>
+                                    {result.image_type === 'western_blot' ? 'Western Blot' : result.image_type}
+                                  </span>
+                                  {result.outcome && (
+                                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                      result.outcome === 'positive' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' :
+                                      result.outcome === 'negative' ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300' :
+                                      'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300'
+                                    }`}>
+                                      {result.outcome}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs font-medium truncate">{result.experiment_id}</p>
+                                {result.cell_line && (
+                                  <p className="text-xs text-muted-foreground">{result.cell_line}</p>
+                                )}
+                                {result.treatment && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {result.treatment} {result.concentration}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Selected Image Detail Panel */}
+                  {selectedGalleryImage && 'similarity' in selectedGalleryImage && (
+                    <div className="border rounded-lg p-4 bg-card mt-4">
+                      <div className="flex items-start justify-between mb-4">
+                        <h3 className="font-semibold">Experiment Details</h3>
+                        <Button size="sm" variant="ghost" onClick={() => setSelectedGalleryImage(null)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                          {selectedGalleryImage.image && (
+                            <img
+                              src={selectedGalleryImage.image}
+                              alt="Experiment"
+                              className="w-full rounded-lg border"
+                            />
+                          )}
+                        </div>
+                        <div className="space-y-2 lg:col-span-2">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div><span className="text-muted-foreground">Experiment ID:</span></div>
+                            <div className="font-medium">{selectedGalleryImage.experiment_id}</div>
+                            
+                            <div><span className="text-muted-foreground">Type:</span></div>
+                            <div className="font-medium">{selectedGalleryImage.experiment_type}</div>
+                            
+                            <div><span className="text-muted-foreground">Cell Line:</span></div>
+                            <div className="font-medium">{selectedGalleryImage.cell_line || 'N/A'}</div>
+                            
+                            <div><span className="text-muted-foreground">Treatment:</span></div>
+                            <div className="font-medium">{selectedGalleryImage.treatment} {selectedGalleryImage.concentration}</div>
+                            
+                            <div><span className="text-muted-foreground">Target Protein:</span></div>
+                            <div className="font-medium">{selectedGalleryImage.target_protein || 'N/A'}</div>
+                            
+                            <div><span className="text-muted-foreground">Outcome:</span></div>
+                            <div className="font-medium capitalize">{selectedGalleryImage.outcome}</div>
+                            
+                            <div><span className="text-muted-foreground">Similarity:</span></div>
+                            <div className="font-medium">{(selectedGalleryImage.similarity * 100).toFixed(1)}%</div>
+                            
+                            {selectedGalleryImage.magnification && (
+                              <>
+                                <div><span className="text-muted-foreground">Magnification:</span></div>
+                                <div className="font-medium">{selectedGalleryImage.magnification}</div>
+                              </>
+                            )}
+                          </div>
+                          
+                          {selectedGalleryImage.notes && (
+                            <div className="mt-3 pt-3 border-t">
+                              <span className="text-sm text-muted-foreground">Notes:</span>
+                              <p className="text-sm mt-1">{selectedGalleryImage.notes}</p>
+                            </div>
+                          )}
+                          
+                          {selectedGalleryImage.protocol && (
+                            <div className="mt-2">
+                              <span className="text-sm text-muted-foreground">Protocol:</span>
+                              <p className="text-xs mt-1 text-muted-foreground">{selectedGalleryImage.protocol}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
+              )}
+
+              {/* Browse Mode: Gallery Grid */}
+              {galleryViewMode === 'browse' && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={loadGalleryImages}
+                      disabled={isLoadingGallery}
+                    >
+                      {isLoadingGallery ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {galleryImages.length} images
+                    </span>
+                  </div>
+
+                  {/* Gallery Grid */}
+                  {isLoadingGallery ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : galleryImages.length === 0 ? (
+                    <div className="bg-muted/50 rounded-lg p-8 text-center">
+                      <Microscope className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="font-semibold mb-2">No Experimental Images Found</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        No gel or microscopy images are currently in the data corpus.
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Run these commands to generate and ingest biological images:
+                      </p>
+                      <div className="bg-black/80 rounded p-3 text-left text-xs font-mono text-green-400 mb-4">
+                        <p>python generate_biological_images.py</p>
+                        <p>python ingest_biological_images.py</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Or switch to &quot;Find Similar&quot; mode to upload your own image.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {galleryImages.map((img, idx) => (
+                        <div 
+                          key={img.id || idx} 
+                          className="group relative rounded-lg border bg-card overflow-hidden hover:ring-2 hover:ring-primary transition-all cursor-pointer"
+                          onClick={() => {
+                            // Use this image as search query
+                            if (img.metadata?.image) {
+                              setGalleryUploadedImage(img.metadata.image);
+                              setGalleryImageFileName(img.metadata?.experiment_id || `Image ${idx + 1}`);
+                              setGalleryViewMode('search');
+                            }
+                          }}
+                        >
+                          <div className="aspect-square relative">
+                            {img.metadata?.image?.startsWith('data:') ? (
+                              <img 
+                                src={img.metadata.image} 
+                                alt={img.metadata?.description || 'Experimental image'}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : img.metadata?.thumbnail_url ? (
+                              <img 
+                                src={img.metadata.thumbnail_url} 
+                                alt={img.metadata?.description || 'Experimental image'}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="h-full flex items-center justify-center bg-muted">
+                                <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            )}
+                            {/* Hover overlay */}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-medium">Find Similar</span>
+                            </div>
+                          </div>
+                          <div className="p-2">
+                            <div className="flex items-center gap-1 mb-1">
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                img.metadata?.image_type === 'gel' || img.metadata?.image_type === 'western_blot'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' 
+                                  : img.metadata?.image_type === 'microscopy' || img.metadata?.image_type === 'fluorescence'
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                              }`}>
+                                {img.metadata?.image_type === 'gel' ? 'Gel' : 
+                                 img.metadata?.image_type === 'western_blot' ? 'Western Blot' :
+                                 img.metadata?.image_type === 'fluorescence' ? 'Fluorescence' : 
+                                 img.metadata?.image_type || 'Image'}
+                              </span>
+                              {img.metadata?.outcome && (
+                                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                  img.metadata.outcome === 'positive' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50' :
+                                  img.metadata.outcome === 'negative' ? 'bg-red-100 text-red-800 dark:bg-red-900/50' :
+                                  'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50'
+                                }`}>
+                                  {img.metadata.outcome}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-medium truncate">{img.metadata?.experiment_id || ''}</p>
+                            {img.metadata?.cell_line && (
+                              <p className="text-xs text-muted-foreground">{img.metadata.cell_line}</p>
+                            )}
+                            {img.metadata?.treatment && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {img.metadata.treatment}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -700,6 +1224,169 @@ export default function DiscoveryPage() {
                         step={0.1}
                         className="mt-2"
                       />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sequence Search Input */}
+              {searchMode === 'sequence' && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🧬</span>
+                    <div>
+                      <p className="font-medium">Sequence Search</p>
+                      <p className="text-sm text-muted-foreground">Search by DNA, RNA, or protein sequence</p>
+                    </div>
+                  </div>
+                  <Textarea
+                    placeholder="Enter sequence (e.g., MKTAYIAKQRQISFVKSH... for protein, ATGCATGC... for DNA)"
+                    className="min-h-[120px] font-mono text-sm"
+                    value={sequenceQuery}
+                    onChange={(e) => setSequenceQuery(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Select value={sequenceType} onValueChange={(v) => setSequenceType(v as any)}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Sequence type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto-detect</SelectItem>
+                        <SelectItem value="protein">Protein</SelectItem>
+                        <SelectItem value="dna">DNA</SelectItem>
+                        <SelectItem value="rna">RNA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground self-center">
+                      {sequenceQuery.length > 0 && (
+                        <span className="font-mono">{sequenceQuery.length} residues/bases</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Cross-Modal Search Input */}
+              {searchMode === 'cross-modal' && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-6 w-6 text-primary" />
+                    <div>
+                      <p className="font-medium">Cross-Modal Search</p>
+                      <p className="text-sm text-muted-foreground">Combine compound, sequence, text, or image to find related experiments</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {/* Compound Input */}
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <FlaskConical className="h-3 w-3" />
+                        Compound (SMILES)
+                      </Label>
+                      <Textarea
+                        placeholder="e.g., CC(=O)Nc1ccc(O)cc1"
+                        className="h-16 font-mono text-sm"
+                        value={crossModalCompound}
+                        onChange={(e) => setCrossModalCompound(e.target.value)}
+                      />
+                    </div>
+                    
+                    {/* Sequence Input */}
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <span className="font-mono">🧬</span>
+                        Sequence (Protein/DNA)
+                      </Label>
+                      <Textarea
+                        placeholder="e.g., MKTAYIAKQRQISFVKSH..."
+                        className="h-16 font-mono text-sm"
+                        value={crossModalSequence}
+                        onChange={(e) => setCrossModalSequence(e.target.value)}
+                      />
+                    </div>
+                    
+                    {/* Text Input */}
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <Search className="h-3 w-3" />
+                        Text Query
+                      </Label>
+                      <Textarea
+                        placeholder="e.g., EGFR inhibitor binding assay"
+                        className="h-12 text-sm"
+                        value={crossModalText}
+                        onChange={(e) => setCrossModalText(e.target.value)}
+                      />
+                    </div>
+                    
+                    {/* Image Input */}
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <ImageIcon className="h-3 w-3" />
+                        Image (optional)
+                      </Label>
+                      {crossModalImage ? (
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                          <img src={crossModalImage} alt="Cross-modal query" className="h-12 w-12 object-cover rounded" />
+                          <span className="text-xs text-muted-foreground flex-1">Image uploaded</span>
+                          <Button size="sm" variant="ghost" onClick={() => setCrossModalImage(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="border-2 border-dashed rounded-lg p-3 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            id="cross-modal-image-upload"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  setCrossModalImage(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          <label htmlFor="cross-modal-image-upload" className="cursor-pointer">
+                            <ImageIcon className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+                            <span className="text-xs text-muted-foreground">Click to upload gel/microscopy image</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Target Modalities */}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Find results of type:</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {['all', 'molecule', 'protein', 'text', 'image', 'experiment'].map((mod) => (
+                          <Button
+                            key={mod}
+                            size="sm"
+                            variant={crossModalTargetModalities.includes(mod) ? 'default' : 'outline'}
+                            onClick={() => {
+                              if (mod === 'all') {
+                                setCrossModalTargetModalities(['all']);
+                              } else {
+                                const newMods = crossModalTargetModalities.filter(m => m !== 'all');
+                                if (newMods.includes(mod)) {
+                                  setCrossModalTargetModalities(newMods.filter(m => m !== mod));
+                                } else {
+                                  setCrossModalTargetModalities([...newMods, mod]);
+                                }
+                              }
+                            }}
+                            className="h-7 text-xs"
+                          >
+                            {mod === 'all' ? 'All' : mod.charAt(0).toUpperCase() + mod.slice(1)}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1456,6 +2143,141 @@ export default function DiscoveryPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Cross-Modal Results Section */}
+      {searchMode === 'cross-modal' && crossModalResults.length > 0 && (
+        <div className="animate-in slide-in-from-bottom-4 space-y-4 duration-500">
+          <SectionHeader
+            title={`Cross-Modal Results (${crossModalResults.length} matches)`}
+            icon={<Sparkles className="h-5 w-5 text-purple-500" />}
+          />
+
+          {/* Cross-Modal Explanation */}
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-lg p-4 border border-purple-200/50 dark:border-purple-800/50">
+            <div className="flex items-start gap-3">
+              <div className="bg-purple-100 dark:bg-purple-900/50 rounded-full p-2">
+                <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-1">
+                  Cross-Modal Search Results
+                </h4>
+                <p className="text-xs text-purple-700 dark:text-purple-300">
+                  Results found by combining multiple query types (compound, sequence, text, image).
+                  Each result shows the <strong>modality</strong> (data type) and <strong>source modality</strong> (which query matched it).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Validation Warnings */}
+          {crossModalValidationWarnings.length > 0 && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                    Input Validation Warnings
+                  </h4>
+                  <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                    {crossModalValidationWarnings.map((warning, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-amber-500">•</span>
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 italic">
+                    Search was performed, but some inputs may have been treated as text instead of their intended type.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {crossModalResults.map((result, idx) => (
+              <Card key={result.id || idx} className="hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        result.modality === 'compound' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' :
+                        result.modality === 'protein' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' :
+                        result.modality === 'experiment' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300' :
+                        result.modality === 'image' ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300' :
+                        'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                      }`}>
+                        {result.modality}
+                      </span>
+                      {result.source_modality && result.source_modality !== result.modality && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
+                          via {result.source_modality}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {(result.score * 100).toFixed(0)}% match
+                    </span>
+                  </div>
+
+                  {/* Content preview */}
+                  {result.content && (
+                    <div className={`text-xs mb-2 p-2 rounded bg-muted/50 ${
+                      result.modality === 'compound' || result.modality === 'protein' ? 'font-mono' : ''
+                    }`}>
+                      {result.content.slice(0, 100)}
+                      {result.content.length > 100 && '...'}
+                    </div>
+                  )}
+
+                  {/* Metadata */}
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    {result.metadata?.name && (
+                      <p className="font-medium text-foreground">{result.metadata.name}</p>
+                    )}
+                    {result.metadata?.description && (
+                      <p>{result.metadata.description.slice(0, 80)}{result.metadata.description.length > 80 && '...'}</p>
+                    )}
+                    {result.metadata?.target && (
+                      <p>Target: <span className="text-foreground">{result.metadata.target}</span></p>
+                    )}
+                    {result.metadata?.experiment_type && (
+                      <p>Experiment: <span className="text-foreground">{result.metadata.experiment_type}</span></p>
+                    )}
+                  </div>
+
+                  {/* Related items indicator */}
+                  {result.related_items && result.related_items.length > 0 && (
+                    <div className="mt-2 pt-2 border-t">
+                      <span className="text-xs text-purple-600 dark:text-purple-400">
+                        {result.related_items.length} related items
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Cross-Modal Searching State */}
+      {isSearchingCrossModal && (
+        <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center text-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-purple-600 dark:text-purple-400" />
+              <div>
+                <h3 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">Searching Across Modalities...</h3>
+                <p className="text-sm text-purple-700 dark:text-purple-300">
+                  Combining compound, sequence, text, and image queries to find relevant results.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {step === 4 && results.length === 0 && !error && !invalidQueryError && (

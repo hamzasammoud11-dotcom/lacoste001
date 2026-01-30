@@ -435,21 +435,28 @@ export interface ExperimentalImage {
     content: string;
     modality: string;
     metadata: {
-        image_type: 'gel' | 'microscopy' | 'fluorescence' | 'spectra';
+        image_type: 'gel' | 'western_blot' | 'microscopy' | 'fluorescence' | 'spectra';
         description?: string;
         caption?: string;
         image?: string; // base64
         thumbnail_url?: string;
         url?: string;
         source?: string;
+        experiment_id?: string;
         experiment_type?: string;
+        outcome?: string;
         target_protein?: string;
         cell_line?: string;
         treatment?: string;
+        treatment_target?: string;
+        concentration?: string;
+        conditions?: Record<string, unknown>;
         magnification?: string;
+        microscope?: string;
         protocol?: string;
         notes?: string;
         quality_score?: number;
+        experiment_date?: string;
         [key: string]: unknown;
     };
 }
@@ -460,10 +467,158 @@ export interface ExperimentalImage {
 export async function getExperimentalImages(params?: {
     type?: 'gel' | 'microscopy' | 'all';
     limit?: number;
+    outcome?: string;
+    cell_line?: string;
+    treatment?: string;
 }): Promise<{ images: ExperimentalImage[]; count: number; type: string }> {
     const queryParams = new URLSearchParams();
     if (params?.type) queryParams.set('type', params.type);
     if (params?.limit) queryParams.set('limit', params.limit.toString());
+    if (params?.outcome) queryParams.set('outcome', params.outcome);
+    if (params?.cell_line) queryParams.set('cell_line', params.cell_line);
+    if (params?.treatment) queryParams.set('treatment', params.treatment);
     
     return fetchJson(`/api/images?${queryParams.toString()}`);
+}
+
+/**
+ * Result from gel/microscopy similarity search
+ */
+export interface GelMicroscopySimilarResult {
+    id: string;
+    experiment_id: string;
+    image_type: string;
+    similarity: number;
+    outcome: string;
+    conditions: Record<string, unknown>;
+    cell_line: string;
+    treatment: string;
+    concentration: string;
+    target_protein: string;
+    notes: string;
+    protocol: string;
+    experiment_type: string;
+    magnification: string;
+    quality_score: number | null;
+    experiment_date: string;
+    image?: string; // base64
+}
+
+export interface GelMicroscopySearchResponse {
+    results: GelMicroscopySimilarResult[];
+    query_image_type: string | null;
+    total_found: number;
+    returned: number;
+    filters_applied: Record<string, unknown>;
+    message: string;
+}
+
+/**
+ * Search for similar biological images (gels, microscopy)
+ * 
+ * Use Case 4: Upload a Western blot or microscopy image and find
+ * experiments with similar visual patterns.
+ */
+export async function searchGelMicroscopy(params: {
+    image: string; // base64 data URL
+    image_type?: 'gel' | 'western_blot' | 'microscopy' | 'fluorescence';
+    outcome?: string;
+    cell_line?: string;
+    treatment?: string;
+    top_k?: number;
+    use_mmr?: boolean;
+}): Promise<GelMicroscopySearchResponse> {
+    return fetchJson('/api/search/gel-microscopy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+    });
+}
+
+/**
+ * Get available filter options for the gallery
+ */
+export interface ImageFilterOptions {
+    image_types: string[];
+    outcomes: string[];
+    cell_lines: string[];
+    treatments: string[];
+}
+
+export async function getImageFilterOptions(): Promise<ImageFilterOptions> {
+    return fetchJson('/api/images/filters');
+}
+
+
+// --- CROSS-MODAL SEARCH ---
+
+export interface CrossModalSearchParams {
+    compound?: string;    // SMILES string
+    sequence?: string;    // DNA/RNA/protein sequence
+    text?: string;        // Text query
+    image?: string;       // Base64 encoded image
+    target_modalities?: string[];  // molecule, protein, text, image, experiment, all
+    top_k?: number;
+    use_mmr?: boolean;
+    diversity?: number;
+}
+
+export interface CrossModalResult {
+    id: string;
+    score: number;
+    content: string;
+    modality: string;
+    query_source: string;
+    source_modality?: string;
+    connection: string;
+    related_items?: Array<{ id: string; modality: string; score: number }>;
+    metadata: {
+        source?: string;
+        experiment_id?: string;
+        image_type?: string;
+        image?: string;
+        name?: string;
+        description?: string;
+        target?: string;
+        experiment_type?: string;
+        [key: string]: unknown;
+    };
+}
+
+export interface CrossModalSearchResponse {
+    results: CrossModalResult[];
+    query_info: Record<string, unknown>;
+    total_found: number;
+    returned: number;
+    target_modalities: string[];
+    message: string;
+    validation_warnings?: string[];
+}
+
+/**
+ * Cross-modal search: combine compound, sequence, text, or image to find related experiments.
+ * 
+ * Use Case 4: "Show me experiments that used THIS compound with THIS gel result"
+ * 
+ * Examples:
+ * - Search by compound: { compound: "CCO" }
+ * - Search by sequence: { sequence: "MKTAYIAK..." }
+ * - Search by text: { text: "EGFR inhibitor" }
+ * - Combined: { compound: "CCO", text: "binding assay" }
+ */
+export async function searchCrossModal(params: CrossModalSearchParams): Promise<CrossModalSearchResponse> {
+    return fetchJson('/api/search/cross-modal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            compound: params.compound,
+            sequence: params.sequence,
+            text: params.text,
+            image: params.image,
+            target_modalities: params.target_modalities ?? ['all'],
+            top_k: params.top_k ?? 10,
+            use_mmr: params.use_mmr ?? true,
+            diversity: params.diversity ?? 0.3,
+        }),
+    });
 }

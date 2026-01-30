@@ -3352,6 +3352,750 @@ async def compute_similarity(query: str, candidates: str, modality: str = "molec
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================================================
+# Use Case 4: Gels & Microscopy - Gallery and Visual Similarity Search
+# ============================================================================
+
+class GelMicroscopySearchRequest(BaseModel):
+    """Request for gel/microscopy image similarity search."""
+    image: str = Field(..., description="Image as base64 data URL or file path")
+    image_type: Optional[str] = Field(default=None, description="Filter by type: gel, western_blot, microscopy, fluorescence")
+    outcome: Optional[str] = Field(default=None, description="Filter by outcome: positive, negative, inconclusive")
+    cell_line: Optional[str] = Field(default=None, description="Filter by cell line")
+    treatment: Optional[str] = Field(default=None, description="Filter by treatment/drug")
+    top_k: int = Field(default=10, ge=1, le=50, description="Number of results")
+    use_mmr: bool = Field(default=True, description="Apply MMR diversification")
+
+
+@app.get("/api/images")
+async def get_experimental_images(
+    type: str = "all",
+    limit: int = 30,
+    outcome: Optional[str] = None,
+    cell_line: Optional[str] = None,
+    treatment: Optional[str] = None,
+):
+    """
+    Get experimental images (gels, microscopy) for gallery display.
+    
+    This is the backend for the "Gels & Microscopy" tab in the UI.
+    
+    Args:
+        type: Filter by image type - 'all', 'gel', 'microscopy'
+        limit: Maximum number of images to return
+        outcome: Filter by experimental outcome
+        cell_line: Filter by cell line
+        treatment: Filter by treatment/drug
+        
+    Returns:
+        Gallery of experimental images with metadata
+    """
+    request_id = uuid.uuid4().hex[:8]
+    logger.info(f"[{request_id}] Gallery request: type={type}, limit={limit}")
+    
+    if not qdrant_service:
+        logger.warning(f"[{request_id}] Qdrant not available")
+        return {
+            "images": [],
+            "count": 0,
+            "type": type,
+            "message": "Database not available"
+        }
+    
+    try:
+        client = qdrant_service._get_client()
+        from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
+        
+        # Try biological_images collection first, then fall back to bioflow_memory
+        collections_to_try = ["biological_images", "bioflow_memory"]
+        
+        all_images = []
+        
+        for collection_name in collections_to_try:
+            try:
+                # Check if collection exists
+                collections = client.get_collections().collections
+                collection_names = [c.name for c in collections]
+                if collection_name not in collection_names:
+                    logger.debug(f"[{request_id}] Collection {collection_name} does not exist")
+                    continue
+                
+                # Build filter conditions using proper Qdrant models
+                must_conditions = []
+                
+                # Type filter - use MatchAny for OR conditions
+                if type == "gel":
+                    must_conditions.append(
+                        FieldCondition(
+                            key="image_type",
+                            match=MatchAny(any=["gel", "western_blot"])
+                        )
+                    )
+                elif type == "microscopy":
+                    must_conditions.append(
+                        FieldCondition(
+                            key="image_type",
+                            match=MatchAny(any=["microscopy", "fluorescence", "brightfield"])
+                        )
+                    )
+                else:
+                    # All biological image types
+                    must_conditions.append(
+                        FieldCondition(
+                            key="image_type",
+                            match=MatchAny(any=["gel", "western_blot", "microscopy", "fluorescence", "brightfield"])
+                        )
+                    )
+                
+                # Outcome filter
+                if outcome:
+                    must_conditions.append(
+                        FieldCondition(key="outcome", match=MatchValue(value=outcome))
+                    )
+                
+                # Cell line filter  
+                if cell_line:
+                    must_conditions.append(
+                        FieldCondition(key="cell_line", match=MatchValue(value=cell_line))
+                    )
+                
+                # Treatment filter
+                if treatment:
+                    must_conditions.append(
+                        FieldCondition(key="treatment", match=MatchValue(value=treatment))
+                    )
+                
+                # Build the filter object
+                scroll_filter = Filter(must=must_conditions) if must_conditions else None
+                
+                logger.info(f"[{request_id}] Scrolling {collection_name} with filter: {scroll_filter}")
+                
+                scroll_result = client.scroll(
+                    collection_name=collection_name,
+                    limit=limit,
+                    scroll_filter=scroll_filter,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                
+                points = scroll_result[0] if scroll_result else []
+                
+                for point in points:
+                    payload = point.payload or {}
+                    
+                    # Skip if not a biological image
+                    img_type = payload.get("image_type", "")
+                    if img_type not in ["gel", "western_blot", "microscopy", "fluorescence", "brightfield"]:
+                        continue
+                    
+                    # Get image data - try multiple sources
+                    image_data = payload.get("image") or payload.get("content")
+                    image_path = payload.get("image_path") or payload.get("file_path")
+                    
+                    # If we have a file path but no image data, load from file
+                    if not image_data and image_path:
+                        image_data = convert_image_path_to_base64(image_path)
+                    elif image_data:
+                        # Ensure image is displayable
+                        image_data = convert_image_path_to_base64(image_data) or image_data
+                    
+                    all_images.append({
+                        "id": str(point.id),
+                        "score": 1.0,  # No similarity score for gallery
+                        "content": payload.get("description", "") or payload.get("notes", ""),
+                        "modality": "image",
+                        "metadata": {
+                            "image_type": img_type,
+                            "image": image_data,
+                            "description": payload.get("description", "") or payload.get("notes", ""),
+                            "caption": payload.get("caption", ""),
+                            "experiment_id": payload.get("experiment_id", ""),
+                            "experiment_type": payload.get("experiment_type", ""),
+                            "outcome": payload.get("outcome", ""),
+                            "quality_score": payload.get("quality_score"),
+                            # Cell/treatment info
+                            "cell_line": payload.get("cell_line", ""),
+                            "treatment": payload.get("treatment", ""),
+                            "treatment_target": payload.get("treatment_target", ""),
+                            "concentration": payload.get("concentration", ""),
+                            "conditions": payload.get("conditions", {}),
+                            # Protein/target info
+                            "target_protein": payload.get("target_protein", ""),
+                            "target_mw": payload.get("target_mw", ""),
+                            "protein": payload.get("protein", ""),
+                            # Microscopy-specific
+                            "staining": payload.get("staining", ""),
+                            "magnification": payload.get("magnification", ""),
+                            "microscope": payload.get("microscope", ""),
+                            "cell_count": payload.get("cell_count"),
+                            # Gel-specific
+                            "gel_percentage": payload.get("gel_percentage", ""),
+                            "num_lanes": payload.get("num_lanes"),
+                            # Protocol & notes
+                            "protocol": payload.get("protocol", ""),
+                            "notes": payload.get("notes", ""),
+                            # Dates
+                            "experiment_date": payload.get("experiment_date", ""),
+                            "source": payload.get("source", ""),
+                        }
+                    })
+                
+                if all_images:
+                    logger.info(f"[{request_id}] Found {len(all_images)} images in {collection_name}")
+                    break  # Found images, stop searching
+                    
+            except Exception as e:
+                logger.debug(f"[{request_id}] Collection {collection_name}: {e}")
+                continue
+        
+        # Sort by quality score (highest first)
+        all_images.sort(key=lambda x: x.get("metadata", {}).get("quality_score") or 0, reverse=True)
+        
+        # Limit results
+        all_images = all_images[:limit]
+        
+        logger.info(f"[{request_id}] Returning {len(all_images)} images")
+        
+        return {
+            "images": all_images,
+            "count": len(all_images),
+            "type": type,
+        }
+        
+    except Exception as e:
+        logger.error(f"[{request_id}] Gallery error: {e}", exc_info=True)
+        return {
+            "images": [],
+            "count": 0,
+            "type": type,
+            "error": str(e)
+        }
+
+
+@app.post("/api/search/gel-microscopy")
+async def search_gel_microscopy(request: GelMicroscopySearchRequest):
+    """
+    Visual similarity search for biological images (gels, microscopy).
+    
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ USE CASE 4: "Multimodal similarity search for experiments/candidates"  │
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
+    │                                                                         │
+    │ WHAT THIS ENDPOINT DOES:                                               │
+    │                                                                         │
+    │ 1. User uploads a Western blot or microscopy image                     │
+    │ 2. System extracts CLIP embedding (visual features)                    │
+    │ 3. System searches Qdrant for similar experimental images              │
+    │ 4. Returns: experiments with similar visual patterns                   │
+    │                                                                         │
+    │ Example use cases:                                                     │
+    │ - "Find experiments with similar gel band patterns"                    │
+    │ - "Show me microscopy images with similar cell morphology"             │
+    │ - "What other treatments showed this apoptosis pattern?"               │
+    │                                                                         │
+    │ Supported image types:                                                 │
+    │ - Western blots                                                        │
+    │ - SDS-PAGE gels                                                        │
+    │ - Fluorescence microscopy                                              │
+    │ - Brightfield microscopy                                               │
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    request_id = uuid.uuid4().hex[:8]
+    logger.info(f"[{request_id}] Gel/Microscopy search: type_filter={request.image_type}, top_k={request.top_k}")
+    
+    if not qdrant_service:
+        raise HTTPException(status_code=503, detail="Qdrant service not available")
+    
+    try:
+        search_service = get_enhanced_search_service()
+        
+        # Build filter for biological image types
+        filters = {}
+        
+        if request.image_type:
+            if request.image_type in ["gel", "western_blot"]:
+                filters["image_type"] = ["gel", "western_blot"]
+            elif request.image_type in ["microscopy", "fluorescence"]:
+                filters["image_type"] = ["microscopy", "fluorescence"]
+            else:
+                filters["image_type"] = request.image_type
+        
+        if request.outcome:
+            filters["outcome"] = request.outcome
+        if request.cell_line:
+            filters["cell_line"] = request.cell_line
+        if request.treatment:
+            filters["treatment"] = request.treatment
+        
+        # Search using image embedding
+        # Try biological_images collection first
+        collections_to_try = ["biological_images", "bioflow_memory"]
+        
+        for collection in collections_to_try:
+            try:
+                response = search_service.search(
+                    query=request.image,
+                    modality="image",
+                    collection=collection,
+                    top_k=request.top_k,
+                    use_mmr=request.use_mmr,
+                    lambda_param=0.7,
+                    filters=filters
+                )
+                
+                if response.returned > 0:
+                    logger.info(f"[{request_id}] Found {response.returned} results in {collection}")
+                    break
+            except Exception as e:
+                logger.debug(f"[{request_id}] Collection {collection}: {e}")
+                continue
+        else:
+            # No results found in any collection
+            return {
+                "results": [],
+                "query_image_type": request.image_type,
+                "total_found": 0,
+                "returned": 0,
+                "message": "No similar biological images found. Try uploading a different image or adjust filters.",
+                "filters_applied": filters
+            }
+        
+        # Process results
+        results = []
+        for r in response.to_dict().get("results", []):
+            metadata = r.get("metadata", {})
+            
+            # Ensure image is displayable
+            metadata = ensure_image_is_displayable(metadata, r.get("content"))
+            
+            results.append({
+                "id": r.get("id"),
+                "experiment_id": metadata.get("experiment_id", ""),
+                "image_type": metadata.get("image_type", "unknown"),
+                "similarity": round(r.get("score", 0), 3),
+                "outcome": metadata.get("outcome", ""),
+                "conditions": metadata.get("conditions", {}),
+                "cell_line": metadata.get("cell_line", ""),
+                "treatment": metadata.get("treatment", ""),
+                "concentration": metadata.get("concentration", ""),
+                "target_protein": metadata.get("target_protein", ""),
+                "notes": metadata.get("notes", ""),
+                "protocol": metadata.get("protocol", ""),
+                "experiment_type": metadata.get("experiment_type", ""),
+                "magnification": metadata.get("magnification", ""),
+                "quality_score": metadata.get("quality_score"),
+                "experiment_date": metadata.get("experiment_date", ""),
+                "image": metadata.get("image"),  # base64 for display
+            })
+        
+        return {
+            "results": results,
+            "query_image_type": request.image_type,
+            "total_found": response.total_found,
+            "returned": len(results),
+            "filters_applied": filters,
+            "collection": collection,
+            "message": f"Found {len(results)} similar experiments" if results else "No matching experiments found"
+        }
+        
+    except Exception as e:
+        logger.error(f"[{request_id}] Gel/microscopy search error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class CrossModalSearchRequest(BaseModel):
+    """Request for cross-modal search combining multiple query types."""
+    compound: Optional[str] = Field(default=None, description="SMILES string of compound")
+    sequence: Optional[str] = Field(default=None, description="DNA/RNA/protein sequence")
+    text: Optional[str] = Field(default=None, description="Text query")
+    image: Optional[str] = Field(default=None, description="Base64 encoded image")
+    target_modalities: List[str] = Field(default=["all"], description="Target modalities: molecule, protein, text, image, experiment, all")
+    top_k: int = Field(default=10, ge=1, le=100)
+    use_mmr: bool = Field(default=True)
+    diversity: float = Field(default=0.3, ge=0.0, le=1.0)
+
+
+@app.post("/api/search/cross-modal")
+async def cross_modal_search(request: CrossModalSearchRequest):
+    """
+    Cross-modal search: combine compound, sequence, text, or image to find related experiments.
+    
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ USE CASE 4: "Show me experiments that used THIS compound with THIS     │
+    │             gel result" - Connect compounds to experimental evidence   │
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
+    │                                                                         │
+    │ WHAT THIS ENDPOINT DOES:                                               │
+    │                                                                         │
+    │ 1. Accepts multiple query modalities (compound, sequence, text, image) │
+    │ 2. VALIDATES each query type (SMILES, sequence, image)                 │
+    │ 3. Encodes each query into embedding space                             │
+    │ 4. Performs combined vector search across all collections              │
+    │ 5. Returns unified results linking compounds to experiments            │
+    │                                                                         │
+    │ Example use cases:                                                     │
+    │ - "Find experiments where Gefitinib was used" (compound)               │
+    │ - "Show gel results for EGFR protein" (sequence + text)                │
+    │ - "What experiments show similar patterns?" (image)                    │
+    │ - Combined: "Compound X + EGFR target → show binding assay gels"       │
+    └─────────────────────────────────────────────────────────────────────────┘
+    """
+    request_id = uuid.uuid4().hex[:8]
+    logger.info(f"[{request_id}] Cross-modal search: compound={bool(request.compound)}, sequence={bool(request.sequence)}, text={bool(request.text)}, image={bool(request.image)}")
+    
+    if not qdrant_service:
+        raise HTTPException(status_code=503, detail="Qdrant service not available")
+    
+    # Ensure at least one query type is provided
+    if not any([request.compound, request.sequence, request.text, request.image]):
+        raise HTTPException(status_code=400, detail="At least one query type (compound, sequence, text, or image) is required")
+    
+    try:
+        search_service = get_enhanced_search_service()
+        
+        all_results = []
+        query_info = {}
+        validation_warnings = []
+        
+        # =====================================================================
+        # VALIDATION STEP 1: Validate compound (SMILES)
+        # =====================================================================
+        if request.compound:
+            smiles_validation = validate_smiles_query(request.compound)
+            query_info["compound"] = request.compound
+            query_info["compound_validation"] = {
+                "is_valid": smiles_validation["is_valid_smiles"],
+                "query_type": smiles_validation["query_type"],
+                "warning": smiles_validation["warning"]
+            }
+            
+            if not smiles_validation["is_valid_smiles"]:
+                warning_msg = f"Compound '{request.compound[:30]}...' is not a valid SMILES structure"
+                if smiles_validation["query_type"] == "protein":
+                    warning_msg = f"The compound input looks like a protein sequence. Use the 'sequence' field instead."
+                elif smiles_validation["query_type"] == "noise":
+                    warning_msg = f"The compound input '{request.compound[:20]}' appears to be noise/gibberish."
+                validation_warnings.append(warning_msg)
+                logger.warning(f"[{request_id}] Invalid SMILES: {request.compound[:50]}")
+            else:
+                # Add molecular info to response
+                query_info["compound_info"] = smiles_validation.get("mol_info", {})
+        
+        # =====================================================================
+        # VALIDATION STEP 2: Validate sequence (protein/DNA/RNA)
+        # =====================================================================
+        if request.sequence:
+            seq = request.sequence.strip().upper()
+            query_info["sequence"] = seq[:50] + "..." if len(seq) > 50 else seq
+            
+            # Detect sequence type
+            dna_chars = set("ACGT")
+            rna_chars = set("ACGU")
+            amino_acids = set("ACDEFGHIKLMNPQRSTVWY")
+            seq_chars = set(c for c in seq if c.isalpha())
+            
+            if seq_chars <= dna_chars and len(seq) >= 10:
+                seq_type = "dna"
+                is_valid = len(seq) >= 10
+            elif seq_chars <= rna_chars and len(seq) >= 10:
+                seq_type = "rna"
+                is_valid = len(seq) >= 10
+            elif seq_chars <= amino_acids and len(seq) >= 10:
+                seq_type = "protein"
+                is_valid = len(seq) >= 10
+            else:
+                seq_type = "unknown"
+                is_valid = False
+                
+            query_info["sequence_validation"] = {
+                "is_valid": is_valid,
+                "sequence_type": seq_type,
+                "length": len(seq)
+            }
+            
+            if not is_valid:
+                if len(seq) < 10:
+                    warning_msg = f"Sequence too short ({len(seq)} chars). Minimum 10 characters required."
+                else:
+                    warning_msg = f"Unrecognized sequence type. Contains invalid characters for DNA/RNA/protein."
+                validation_warnings.append(warning_msg)
+                logger.warning(f"[{request_id}] Invalid sequence: {seq[:50]}")
+        
+        # =====================================================================
+        # VALIDATION STEP 3: Validate image (base64)
+        # =====================================================================
+        if request.image:
+            query_info["image"] = True
+            
+            # Check if it's a valid base64 image
+            is_valid_image = False
+            image_type = None
+            
+            if request.image.startswith("data:image/"):
+                # Data URL format
+                try:
+                    header, data = request.image.split(",", 1)
+                    if "image/png" in header:
+                        image_type = "png"
+                    elif "image/jpeg" in header or "image/jpg" in header:
+                        image_type = "jpeg"
+                    elif "image/gif" in header:
+                        image_type = "gif"
+                    elif "image/webp" in header:
+                        image_type = "webp"
+                    
+                    # Verify it can be decoded
+                    import base64
+                    decoded = base64.b64decode(data)
+                    if len(decoded) > 100:  # At least 100 bytes
+                        is_valid_image = True
+                except Exception as e:
+                    logger.warning(f"[{request_id}] Image decode error: {e}")
+            else:
+                # Raw base64 - try to decode
+                try:
+                    import base64
+                    decoded = base64.b64decode(request.image)
+                    if len(decoded) > 100:
+                        is_valid_image = True
+                        image_type = "unknown"
+                except Exception as e:
+                    logger.warning(f"[{request_id}] Raw base64 decode error: {e}")
+            
+            query_info["image_validation"] = {
+                "is_valid": is_valid_image,
+                "image_type": image_type
+            }
+            
+            if not is_valid_image:
+                validation_warnings.append("The provided image could not be decoded. Ensure it's a valid base64-encoded image.")
+                logger.warning(f"[{request_id}] Invalid image data")
+        
+        # =====================================================================
+        # SEARCH EXECUTION
+        # =====================================================================
+        
+        # Search by compound (SMILES) - only if valid
+        if request.compound and query_info.get("compound_validation", {}).get("is_valid", False):
+            try:
+                response = search_service.search(
+                    query=request.compound,
+                    modality="smiles",
+                    top_k=request.top_k,
+                    use_mmr=request.use_mmr,
+                    lambda_param=1.0 - request.diversity,
+                )
+                for r in response.to_dict().get("results", []):
+                    r["query_source"] = "compound"
+                    r["source_modality"] = "smiles"
+                    all_results.append(r)
+            except Exception as e:
+                logger.warning(f"[{request_id}] Compound search failed: {e}")
+        elif request.compound and not query_info.get("compound_validation", {}).get("is_valid", False):
+            # Search as text instead of SMILES if invalid
+            logger.info(f"[{request_id}] Searching invalid SMILES as text: {request.compound[:30]}")
+            try:
+                response = search_service.search(
+                    query=request.compound,
+                    modality="text",
+                    top_k=request.top_k,
+                    use_mmr=request.use_mmr,
+                    lambda_param=1.0 - request.diversity,
+                )
+                for r in response.to_dict().get("results", []):
+                    r["query_source"] = "compound_as_text"
+                    r["source_modality"] = "text"
+                    all_results.append(r)
+            except Exception as e:
+                logger.warning(f"[{request_id}] Compound-as-text search failed: {e}")
+        
+        # Search by sequence (protein/DNA/RNA) - only if valid
+        if request.sequence and query_info.get("sequence_validation", {}).get("is_valid", False):
+            try:
+                seq_type = query_info["sequence_validation"]["sequence_type"]
+                modality = "protein" if seq_type == "protein" else "text"
+                
+                response = search_service.search(
+                    query=request.sequence,
+                    modality=modality,
+                    top_k=request.top_k,
+                    use_mmr=request.use_mmr,
+                    lambda_param=1.0 - request.diversity,
+                )
+                for r in response.to_dict().get("results", []):
+                    r["query_source"] = "sequence"
+                    r["source_modality"] = seq_type
+                    all_results.append(r)
+            except Exception as e:
+                logger.warning(f"[{request_id}] Sequence search failed: {e}")
+        elif request.sequence and not query_info.get("sequence_validation", {}).get("is_valid", False):
+            # Still try text search with invalid sequence
+            logger.info(f"[{request_id}] Searching invalid sequence as text")
+            try:
+                response = search_service.search(
+                    query=request.sequence,
+                    modality="text",
+                    top_k=request.top_k,
+                    use_mmr=request.use_mmr,
+                    lambda_param=1.0 - request.diversity,
+                )
+                for r in response.to_dict().get("results", []):
+                    r["query_source"] = "sequence_as_text"
+                    r["source_modality"] = "text"
+                    all_results.append(r)
+            except Exception as e:
+                logger.warning(f"[{request_id}] Sequence-as-text search failed: {e}")
+        
+        # Search by text (always valid)
+        if request.text:
+            query_info["text"] = request.text
+            try:
+                response = search_service.search(
+                    query=request.text,
+                    modality="text",
+                    top_k=request.top_k,
+                    use_mmr=request.use_mmr,
+                    lambda_param=1.0 - request.diversity,
+                )
+                for r in response.to_dict().get("results", []):
+                    r["query_source"] = "text"
+                    r["source_modality"] = "text"
+                    all_results.append(r)
+            except Exception as e:
+                logger.warning(f"[{request_id}] Text search failed: {e}")
+        
+        # Search by image - only if valid
+        if request.image and query_info.get("image_validation", {}).get("is_valid", False):
+            try:
+                response = search_service.search(
+                    query=request.image,
+                    modality="image",
+                    top_k=request.top_k,
+                    use_mmr=request.use_mmr,
+                    lambda_param=1.0 - request.diversity,
+                )
+                for r in response.to_dict().get("results", []):
+                    r["query_source"] = "image"
+                    r["source_modality"] = "image"
+                    all_results.append(r)
+            except Exception as e:
+                logger.warning(f"[{request_id}] Image search failed: {e}")
+        
+        # Merge and deduplicate results by ID
+        seen_ids = set()
+        merged_results = []
+        for r in sorted(all_results, key=lambda x: x.get("score", 0), reverse=True):
+            rid = r.get("id")
+            if rid and rid not in seen_ids:
+                seen_ids.add(rid)
+                
+                # Filter by target modalities
+                result_modality = r.get("metadata", {}).get("modality", r.get("modality", "unknown"))
+                if "all" not in request.target_modalities:
+                    if result_modality not in request.target_modalities:
+                        continue
+                
+                # Enrich with connection explanation
+                r["connection"] = f"Connected via {r.get('query_source', 'search')}"
+                
+                # Ensure images are displayable
+                if r.get("metadata", {}).get("image_type"):
+                    r["metadata"] = ensure_image_is_displayable(r.get("metadata", {}), r.get("content"))
+                
+                merged_results.append(r)
+                
+                if len(merged_results) >= request.top_k:
+                    break
+        
+        logger.info(f"[{request_id}] Cross-modal search found {len(merged_results)} unique results")
+        
+        # Build response with validation info
+        response_data = {
+            "results": merged_results,
+            "query_info": query_info,
+            "total_found": len(all_results),
+            "returned": len(merged_results),
+            "target_modalities": request.target_modalities,
+            "message": f"Found {len(merged_results)} cross-modal matches"
+        }
+        
+        # Add validation warnings if any
+        if validation_warnings:
+            response_data["validation_warnings"] = validation_warnings
+            response_data["message"] = f"Found {len(merged_results)} results (with {len(validation_warnings)} validation warnings)"
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"[{request_id}] Cross-modal search error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/images/filters")
+async def get_image_filters():
+    """
+    Get available filter options for the gallery.
+    
+    Returns unique values for:
+    - image_type
+    - outcome  
+    - cell_line
+    - treatment
+    """
+    if not qdrant_service:
+        return {
+            "image_types": ["gel", "western_blot", "microscopy", "fluorescence"],
+            "outcomes": ["positive", "negative", "inconclusive", "dose_dependent"],
+            "cell_lines": [],
+            "treatments": []
+        }
+    
+    try:
+        client = qdrant_service._get_client()
+        
+        # Collect unique values from biological_images collection
+        cell_lines = set()
+        treatments = set()
+        
+        for collection in ["biological_images", "bioflow_memory"]:
+            try:
+                scroll_result = client.scroll(
+                    collection_name=collection,
+                    limit=500,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                
+                for point in scroll_result[0]:
+                    payload = point.payload or {}
+                    img_type = payload.get("image_type", "")
+                    
+                    # Only include biological images
+                    if img_type in ["gel", "western_blot", "microscopy", "fluorescence"]:
+                        if payload.get("cell_line"):
+                            cell_lines.add(payload["cell_line"])
+                        if payload.get("treatment"):
+                            treatments.add(payload["treatment"])
+            except:
+                continue
+        
+        return {
+            "image_types": ["gel", "western_blot", "microscopy", "fluorescence"],
+            "outcomes": ["positive", "negative", "inconclusive", "dose_dependent"],
+            "cell_lines": sorted(list(cell_lines)),
+            "treatments": sorted(list(treatments))
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get filter options: {e}")
+        return {
+            "image_types": ["gel", "western_blot", "microscopy", "fluorescence"],
+            "outcomes": ["positive", "negative", "inconclusive", "dose_dependent"],
+            "cell_lines": [],
+            "treatments": []
+        }
+
+
 @app.get("/api/collections")
 async def list_collections():
     """List all vector collections."""
