@@ -159,3 +159,16 @@ cython_debug/
 *.txt
 !requirements.txt
 *.pth
+.venv/
+qdrant_data/
+logs/
+tmp/
+_benchmark_mmr.log
+_benchmark_search.log
+_run_tests.log
+_stress_test.log
+server.log
+stress_test_report.json
+langflow/
+langflow_local_backup/
+temp_langflow/
