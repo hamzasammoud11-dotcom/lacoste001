@@ -15,6 +15,15 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
     const response = await fetch(url, options);
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
+        // For 400 errors, include the full error details for proper handling
+        if (response.status === 400) {
+            const errorMessage = error.detail?.message || error.detail || error.error || `HTTP ${response.status}`;
+            const err = new Error(errorMessage);
+            (err as any).status = 400;
+            (err as any).code = error.detail?.error || error.error || 'BAD_REQUEST';
+            (err as any).details = error.detail;
+            throw err;
+        }
         throw new Error(error.error || error.detail || `HTTP ${response.status}`);
     }
     return response.json();
@@ -131,7 +140,34 @@ export function getProteinPdbUrl(id: string): string {
 // --- DISCOVERY & SEARCH ---
 
 /**
+ * Query validation result from SMILES/protein detection.
+ */
+export interface QueryValidation {
+    detected_type: 'smiles' | 'protein' | 'text' | 'noise' | 'invalid_smiles' | 'error';
+    is_valid_smiles: boolean;
+    is_protein_like: boolean;
+}
+
+/**
+ * Search response with optional query validation and warnings.
+ */
+export interface SearchResponse {
+    results: SearchResult[];
+    query?: string;
+    modality?: string;
+    total_found?: number;
+    returned?: number;
+    diversity_score?: number | null;
+    query_validation?: QueryValidation;
+    warning?: string;
+    message?: string;
+    detail?: string;
+    suggestion?: string;
+}
+
+/**
  * General search across modalities.
+ * Returns query validation info to warn about invalid queries (e.g., "aaa" is not valid SMILES).
  */
 export async function search(params: {
     query: string;
@@ -141,7 +177,7 @@ export async function search(params: {
     top_k?: number;
     use_mmr?: boolean;
     include_images?: boolean;
-}): Promise<{ results: SearchResult[] }> {
+}): Promise<SearchResponse> {
     return fetchJson(`${API_BASE}/api/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -216,7 +252,38 @@ export async function batchIngest(items: any[]): Promise<{ ingested: number }> {
 // --- IMAGE SEARCH (Use Case 4) ---
 
 /**
- * Search by image - encodes image and finds similar items.
+ * Image search response with structure detection info.
+ */
+export interface ImageSearchResponse {
+    results: SearchResult[];
+    query?: string;
+    modality?: string;
+    total_found?: number;
+    returned?: number;
+    message?: string;
+    detail?: string;
+    suggestion?: string;
+    // OCSR (Optical Chemical Structure Recognition) metadata
+    ocsr_attempted?: boolean;
+    ocsr_success?: boolean;
+    ocsr_method?: string;
+    ocsr_confidence?: number;
+    extracted_smiles?: string;
+    ocsr_message?: string;
+    ocsr_details?: Record<string, unknown>;
+    search_mode?: 'embedding' | 'smiles';
+}
+
+/**
+ * Search by image - with OCSR (Optical Chemical Structure Recognition).
+ * 
+ * WHAT THIS DOES:
+ * 1. Attempts to extract SMILES from the image using OCSR
+ * 2. If successful, searches by the extracted SMILES (structural search)
+ * 3. If OCSR fails, falls back to image embedding search
+ * 
+ * Returns empty results with detailed message if no structure detected.
+ * The message explains WHY (e.g., "3D ball-and-stick models need 2D conversion")
  */
 export async function searchByImage(params: {
     image: string; // base64 encoded image
@@ -224,7 +291,8 @@ export async function searchByImage(params: {
     top_k?: number;
     use_mmr?: boolean;
     lambda_param?: number;
-}): Promise<{ results: SearchResult[] }> {
+    try_ocsr?: boolean; // Attempt OCSR extraction (default: true)
+}): Promise<ImageSearchResponse> {
     return fetchJson(`${API_BASE}/api/search/image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -234,6 +302,7 @@ export async function searchByImage(params: {
             top_k: params.top_k || 20,
             use_mmr: params.use_mmr ?? true,
             lambda_param: params.lambda_param || 0.7,
+            try_ocsr: params.try_ocsr ?? true,
         }),
     });
 }
@@ -303,6 +372,10 @@ export async function searchExperiments(params: {
         target: string;
         molecule: string;
         description: string;
+        // Unstructured data (Jury Requirement D.5: Scientific Traceability)
+        notes?: string;      // Lab notes excerpt
+        abstract?: string;   // Paper abstract excerpt  
+        protocol?: string;   // Experimental protocol
         evidence_links: Array<{ source: string; identifier: string; url: string }>;
     }>;
     total_found: number;

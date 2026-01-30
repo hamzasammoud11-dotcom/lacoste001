@@ -31,18 +31,32 @@ export const SearchResultSchema = z.object({
             value: z.number(),
             unit: z.string(),
         })).optional(),
-        conditions: z.record(z.unknown()).optional(),
+        conditions: z.record(z.string(), z.unknown()).optional(),
         target: z.string().optional(),
         molecule: z.string().optional(),
+        // Unstructured data fields (Jury Requirement D.5: Scientific Traceability)
         protocol: z.string().optional(),
+        notes: z.string().optional(),     // Lab notes excerpt
+        abstract: z.string().optional(),   // Paper abstract excerpt
+        // Priority scoring (Jury Requirement: Priority ≠ Similarity)
+        priority_score: z.number().optional(),
+        // Evidence & Justification (Jury Requirement D.4)
+        justification: z.string().optional(),
+        evidence_links: z.array(z.object({
+            source: z.string(),
+            identifier: z.string(),
+            url: z.string(),
+        })).optional(),
     }).catchall(z.unknown()).optional(),
     citation: z.string().optional(),
     evidence_links: z.array(z.object({
         source: z.string(),
         identifier: z.string(),
         url: z.string(),
-        label: z.string(),
+        label: z.string().optional(),
     })).optional(),
+    // Cross-modal connection explanation (Addresses "Black Box" critique)
+    connection_explanation: z.string().optional(),
 });
 
 export type SearchResult = z.infer<typeof SearchResultSchema>;

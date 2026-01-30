@@ -26,8 +26,9 @@ if platform.system() == "Windows":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # Add project root to path
@@ -36,6 +37,156 @@ sys.path.insert(0, ROOT_DIR)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# SMILES Validation - Uses ONLY RDKit as source of truth
+# ============================================================================
+
+def validate_smiles_query(query: str) -> dict:
+    """
+    Validate if a query string is a valid SMILES structure.
+    
+    CRITICAL: Uses ONLY RDKit.Chem.MolFromSmiles() as the source of truth.
+    No regex guessing - if RDKit can parse it, it's valid SMILES.
+    
+    Returns a dict with:
+    - is_valid_smiles: bool - True if RDKit can parse it
+    - is_protein_like: bool - True if looks like protein sequence
+    - query_type: str - 'smiles', 'protein', 'text', or 'noise'
+    - warning: str or None - Warning message if query is suspicious
+    - mol_info: dict or None - Molecule info if valid (MW, LogP, etc.)
+    """
+    if not query or not isinstance(query, str):
+        return {
+            "is_valid_smiles": False,
+            "is_protein_like": False,
+            "query_type": "text",
+            "warning": None,
+            "mol_info": None
+        }
+    
+    query = query.strip()
+    
+    if not query:
+        return {
+            "is_valid_smiles": False,
+            "is_protein_like": False,
+            "query_type": "text",
+            "warning": None,
+            "mol_info": None
+        }
+    
+    # Check for obvious noise FIRST (before even trying RDKit)
+    # - All same character repeated (except single valid atom symbols like C, N, O)
+    # - Less than 2 unique characters AND length > 2
+    unique_chars = set(query.lower())
+    valid_single_atoms = {'c', 'n', 'o', 's', 'p', 'f', 'i', 'b'}  # Single-letter atom symbols
+    
+    is_obvious_noise = False
+    if len(query) >= 3:
+        # For longer strings, check for repetitive patterns
+        if len(unique_chars) <= 1:
+            is_obvious_noise = True
+        elif len(unique_chars) == 2 and ' ' in unique_chars:
+            is_obvious_noise = True
+    elif len(query) == 1:
+        # Single character - only valid if it's a valid atom symbol
+        if query.upper() not in {'C', 'N', 'O', 'S', 'P', 'F', 'I', 'B'}:
+            is_obvious_noise = True
+    # Note: 2-char strings go through RDKit validation
+    
+    if is_obvious_noise:
+        return {
+            "is_valid_smiles": False,
+            "is_protein_like": False,
+            "query_type": "noise",
+            "warning": f"Query '{query}' appears to be noise/gibberish.",
+            "mol_info": None
+        }
+    
+    # Check if it looks like a protein sequence (20+ chars, only amino acid letters)
+    amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
+    query_upper = query.upper()
+    is_protein_like = (
+        len(query) > 20 and 
+        all(c in amino_acids for c in query_upper) and
+        not any(c.isdigit() for c in query)  # Proteins don't have digits
+    )
+    
+    if is_protein_like:
+        return {
+            "is_valid_smiles": False,
+            "is_protein_like": True,
+            "query_type": "protein",
+            "warning": None,
+            "mol_info": None
+        }
+    
+    # =========================================================================
+    # CRITICAL: Use RDKit as the ONLY source of truth for SMILES validation
+    # =========================================================================
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Descriptors, rdMolDescriptors
+        
+        # Try to parse as SMILES - this is the ONLY validation that matters
+        mol = Chem.MolFromSmiles(query)
+        
+        if mol is not None:
+            # Valid SMILES! Extract molecular properties for scoring
+            try:
+                mol_info = {
+                    "molecular_weight": Descriptors.MolWt(mol),
+                    "logp": Descriptors.MolLogP(mol),
+                    "num_atoms": mol.GetNumAtoms(),
+                    "num_heavy_atoms": mol.GetNumHeavyAtoms(),
+                    "num_rings": rdMolDescriptors.CalcNumRings(mol),
+                    "num_rotatable_bonds": rdMolDescriptors.CalcNumRotatableBonds(mol),
+                    "tpsa": Descriptors.TPSA(mol),
+                    "num_hbd": rdMolDescriptors.CalcNumHBD(mol),
+                    "num_hba": rdMolDescriptors.CalcNumHBA(mol),
+                }
+            except Exception as e:
+                logger.warning(f"Could not compute molecular descriptors: {e}")
+                mol_info = {"molecular_weight": 0, "logp": 0}
+            
+            return {
+                "is_valid_smiles": True,
+                "is_protein_like": False,
+                "query_type": "smiles",
+                "warning": None,
+                "mol_info": mol_info
+            }
+        else:
+            # RDKit could not parse it - NOT a valid SMILES
+            return {
+                "is_valid_smiles": False,
+                "is_protein_like": False,
+                "query_type": "invalid_smiles",
+                "warning": f"'{query[:30]}' is not a valid SMILES structure (RDKit parse failed).",
+                "mol_info": None
+            }
+            
+    except ImportError:
+        # RDKit not available - cannot validate, treat as text
+        logger.warning("RDKit not available for SMILES validation")
+        return {
+            "is_valid_smiles": False,
+            "is_protein_like": False,
+            "query_type": "text",
+            "warning": "RDKit unavailable - cannot validate SMILES.",
+            "mol_info": None
+        }
+    except Exception as e:
+        logger.error(f"SMILES validation error: {e}")
+        return {
+            "is_valid_smiles": False,
+            "is_protein_like": False,
+            "query_type": "error",
+            "warning": f"Validation error: {str(e)}",
+            "mol_info": None
+        }
 
 
 # ============================================================================
@@ -415,6 +566,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files for images - CRITICAL: Browsers cannot access local file paths
+# This serves ../data/images as /static/images
+IMAGES_DIR = os.path.join(DATA_DIR, "images")
+if os.path.isdir(IMAGES_DIR):
+    app.mount("/static/images", StaticFiles(directory=IMAGES_DIR), name="static_images")
+    logger.info(f"✅ Static images mounted: /static/images -> {IMAGES_DIR}")
+else:
+    logger.warning(f"⚠️ Images directory not found: {IMAGES_DIR}")
+
 # Include DeepPurpose router if available
 if HAS_DEEPPURPOSE_API:
     app.include_router(deeppurpose_router)
@@ -764,6 +924,43 @@ async def enhanced_search(request: dict = None):
         }
         modality = type_to_modality.get(modality, modality)
         
+        # CRITICAL: Validate query to prevent garbage-in-garbage-out (Jury D.2)
+        query_validation = validate_smiles_query(query)
+        query_warning = query_validation.get("warning")
+        detected_query_type = query_validation.get("query_type")
+        
+        # CRITICAL FIX: If user requested molecule/drug search but query is invalid SMILES,
+        # Return JSON 400 response - NOT an exception that crashes the worker
+        if modality in ["molecule", "drug"] and not query_validation["is_valid_smiles"]:
+            if detected_query_type in ["noise", "invalid_smiles"]:
+                # STRICT MODE: Return clean JSON 400 Bad Request
+                error_msg = (
+                    f"Invalid SMILES: '{query[:50]}' is not a valid chemical structure. "
+                    f"Please provide a valid SMILES string (e.g., 'CC(=O)Nc1ccc(O)cc1' for acetaminophen)."
+                )
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": "INVALID_SMILES",
+                        "message": error_msg,
+                        "query": query[:100],
+                        "detected_type": detected_query_type,
+                        "suggestion": "Use 'Properties (Text Search)' mode for keyword-based queries."
+                    }
+                )
+            elif detected_query_type == "text":
+                # Also reject - user explicitly chose molecule search
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": "NOT_A_SMILES",
+                        "message": f"'{query[:50]}' is plain text, not a SMILES structure.",
+                        "query": query[:100],
+                        "detected_type": detected_query_type,
+                        "suggestion": "Switch to 'Properties (Text Search)' mode for text queries."
+                    }
+                )
+        
         # Check if any collections exist first
         try:
             existing_collections = qdrant_service.list_collections()
@@ -797,6 +994,15 @@ async def enhanced_search(request: dict = None):
         )
         
         payload = response.to_dict()
+        
+        # Add query validation info to response (Jury D.2 compliance)
+        payload["query_validation"] = {
+            "detected_type": detected_query_type,
+            "is_valid_smiles": query_validation["is_valid_smiles"],
+            "is_protein_like": query_validation["is_protein_like"],
+        }
+        if query_warning:
+            payload["warning"] = query_warning
         
         # Ensure image paths are converted to base64 for UI display
         for result in payload.get("results", []):
@@ -858,45 +1064,171 @@ async def hybrid_search(request: HybridSearchRequest):
 class ImageSearchRequest(BaseModel):
     """Request for image similarity search."""
     image: str = Field(..., description="Image file path, URL, or base64 encoded string")
-    image_type: str = Field(default="other", description="Type of image: microscopy, gel, spectra, xray, other")
+    image_type: str = Field(default="other", description="Type of image: microscopy, gel, spectra, xray, molecule, other")
     collection: Optional[str] = Field(default=None, description="Target collection")
     top_k: int = Field(default=10, ge=1, le=100, description="Number of results")
     use_mmr: bool = Field(default=True, description="Apply MMR diversification")
     lambda_param: float = Field(default=0.7, ge=0.0, le=1.0, description="MMR lambda")
     filters: Optional[Dict[str, Any]] = Field(default=None, description="Search filters")
+    try_ocsr: bool = Field(default=True, description="Attempt OCSR (Optical Chemical Structure Recognition) for molecule images")
 
 
 @app.post("/api/search/image")
 async def search_image(request: ImageSearchRequest):
     """
-    Image similarity search.
+    Image similarity search with OCSR (Optical Chemical Structure Recognition).
 
-    Find similar biological images (microscopy, gels, spectra).
-    Supports query-by-image and cross-modal search.
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ WHAT THIS ENDPOINT DOES (Jury Requirement: "Your AI is blind")         │
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
+    │                                                                         │
+    │ 1. OCSR ATTEMPT: Try to extract SMILES from image using:               │
+    │    - DECIMER (deep learning, best accuracy)                            │
+    │    - MolScribe (transformer-based)                                     │
+    │    - Template matching (heuristics)                                    │
+    │                                                                         │
+    │ 2. If OCSR succeeds → Search by extracted SMILES (chemical search)     │
+    │                                                                         │
+    │ 3. If OCSR fails → Fall back to embedding similarity search            │
+    │    (but with HONEST error message explaining WHY it failed)            │
+    │                                                                         │
+    │ KNOWN LIMITATIONS (we're honest about these):                          │
+    │ - 3D ball-and-stick models need 2D projection first                    │
+    │ - Hand-drawn structures have lower accuracy                            │
+    │ - Blurry or low-resolution images may fail                             │
+    │                                                                         │
+    │ Install DECIMER for best results: pip install decimer                  │
+    └─────────────────────────────────────────────────────────────────────────┘
     """
     request_id = uuid.uuid4().hex[:12]
-    logger.info(f"[{request_id}] Image search request: image_type={request.image_type}, top_k={request.top_k}")
+    logger.info(f"[{request_id}] Image search request: image_type={request.image_type}, top_k={request.top_k}, try_ocsr={request.try_ocsr}")
+    
+    # Minimum similarity threshold for image matches
+    MIN_SIMILARITY_THRESHOLD = 0.6  # Lowered to allow more exploratory results
+    
+    ocsr_result = None
+    search_mode = "embedding"  # Default
+    extracted_smiles = None
+    
     try:
         if not qdrant_service:
             raise HTTPException(status_code=503, detail="Qdrant service not available")
 
         search_service = get_enhanced_search_service()
-        logger.info(f"[{request_id}] Calling search service with modality=image")
         
-        # Use 'search' method (not 'enhanced_search' which doesn't exist)
-        response = search_service.search(
-            query=request.image,
-            modality="image",
-            collection=request.collection,
-            top_k=request.top_k,
-            use_mmr=request.use_mmr,
-            lambda_param=request.lambda_param,
-            filters=request.filters or {}
-        )
+        # ─────────────────────────────────────────────────────────────────────
+        # STEP 1: Try OCSR if enabled (extract SMILES from image)
+        # ─────────────────────────────────────────────────────────────────────
+        if request.try_ocsr and request.image_type in ("molecule", "other", "structure"):
+            try:
+                from bioflow.plugins.encoders.ocsr_engine import recognize_structure_from_image
+                
+                logger.info(f"[{request_id}] Attempting OCSR on uploaded image...")
+                ocsr_result = recognize_structure_from_image(request.image)
+                
+                if ocsr_result.success and ocsr_result.smiles:
+                    extracted_smiles = ocsr_result.smiles
+                    search_mode = "smiles"
+                    logger.info(f"[{request_id}] OCSR SUCCESS: Extracted SMILES = {extracted_smiles}")
+                else:
+                    logger.info(f"[{request_id}] OCSR failed: {ocsr_result.error}")
+            except ImportError:
+                logger.debug(f"[{request_id}] OCSR engine not available")
+            except Exception as e:
+                logger.warning(f"[{request_id}] OCSR error: {e}")
+        
+        # ─────────────────────────────────────────────────────────────────────
+        # STEP 2: Perform search based on mode
+        # ─────────────────────────────────────────────────────────────────────
+        if search_mode == "smiles" and extracted_smiles:
+            # Search by extracted SMILES (chemical/structural search)
+            logger.info(f"[{request_id}] Searching by extracted SMILES: {extracted_smiles}")
+            response = search_service.search(
+                query=extracted_smiles,
+                modality="molecule",  # Search molecule collection
+                collection=request.collection,
+                top_k=request.top_k,
+                use_mmr=request.use_mmr,
+                lambda_param=request.lambda_param,
+                filters=request.filters or {}
+            )
+        else:
+            # Fall back to image embedding search
+            logger.info(f"[{request_id}] Falling back to image embedding search")
+            response = search_service.search(
+                query=request.image,
+                modality="image",
+                collection=request.collection,
+                top_k=request.top_k,
+                use_mmr=request.use_mmr,
+                lambda_param=request.lambda_param,
+                filters=request.filters or {}
+            )
 
-        logger.info(f"[{request_id}] Image search returned {response.returned} results")
+        logger.info(f"[{request_id}] Search returned {response.returned} results")
         
         payload = response.to_dict()
+        
+        # Filter low-confidence results
+        original_results = payload.get("results", [])
+        filtered_results = [r for r in original_results if r.get("score", 0) >= MIN_SIMILARITY_THRESHOLD]
+        
+        # ─────────────────────────────────────────────────────────────────────
+        # STEP 3: Build response with HONEST feedback
+        # ─────────────────────────────────────────────────────────────────────
+        
+        # Add OCSR metadata to response
+        ocsr_metadata = {}
+        if ocsr_result:
+            ocsr_metadata = {
+                "ocsr_attempted": True,
+                "ocsr_success": ocsr_result.success,
+                "ocsr_method": ocsr_result.method.value if ocsr_result.method else None,
+                "ocsr_confidence": ocsr_result.confidence,
+                "extracted_smiles": extracted_smiles,
+            }
+            if ocsr_result.error:
+                ocsr_metadata["ocsr_message"] = ocsr_result.error
+            if ocsr_result.metadata:
+                ocsr_metadata["ocsr_details"] = ocsr_result.metadata
+        
+        if len(original_results) > 0 and len(filtered_results) == 0:
+            # Had results but all below threshold
+            logger.info(f"[{request_id}] All {len(original_results)} results below threshold {MIN_SIMILARITY_THRESHOLD}")
+            
+            # Provide SPECIFIC feedback based on OCSR result
+            if ocsr_result and not ocsr_result.success:
+                message = ocsr_result.error or "Could not recognize chemical structure in image."
+                suggestion = "Try uploading a clear 2D structure diagram, or enter the molecule name/SMILES directly."
+                # Include any OCR findings
+                if hasattr(ocsr_result, 'extracted_text') and ocsr_result.extracted_text:
+                    message += f" (Found text: '{ocsr_result.extracted_text[:50]}...')"
+                if hasattr(ocsr_result, 'formula') and ocsr_result.formula:
+                    suggestion = f"Detected formula '{ocsr_result.formula}' - try searching for it by name."
+            else:
+                message = "No similar structures found in the database."
+                suggestion = "Try a different image or use text/SMILES search."
+            
+            return {
+                "results": [],
+                "query": "[image]",
+                "modality": "image",
+                "total_found": 0,
+                "returned": 0,
+                "search_mode": search_mode,
+                "message": message,
+                "suggestion": suggestion,
+                **ocsr_metadata
+            }
+        
+        payload["results"] = filtered_results
+        payload["returned"] = len(filtered_results)
+        payload["search_mode"] = search_mode
+        payload.update(ocsr_metadata)
+        
+        # Add success message if OCSR worked
+        if extracted_smiles:
+            payload["message"] = f"Structure recognized! Searching for molecules similar to: {extracted_smiles}"
         
         # Ensure image paths are converted to base64 for UI display
         for result in payload.get("results", []):
@@ -915,21 +1247,53 @@ async def search_image(request: ImageSearchRequest):
 # ============================================================================
 
 class NeighborRequest(BaseModel):
-    """Request for guided neighbor exploration."""
+    """
+    Request for guided neighbor exploration.
+    
+    NEIGHBORS vs VARIANTS - Important Distinction:
+    
+    **Explore Neighbors** (this endpoint):
+    - Uses VECTOR SPACE PROXIMITY (embedding cosine similarity)
+    - Finds items semantically related in the learned representation space
+    - Cross-modal: Can find proteins related to molecules, text related to images
+    - Good for: Discovering unexpected connections, exploring the knowledge graph
+    
+    **Suggest Variants** (/api/design/variants):
+    - Uses STRUCTURAL SIMILARITY (Tanimoto + pharmacophore features)
+    - Finds chemically similar compounds with meaningful modifications
+    - Same-modal: Molecule → molecules, protein → proteins
+    - Good for: Drug design, lead optimization, SAR analysis
+    """
     item_id: str = Field(..., description="ID of the item to find neighbors for")
     collection: Optional[str] = Field(default=None, description="Collection containing the item")
     top_k: int = Field(default=20, ge=1, le=100, description="Number of neighbors")
-    include_cross_modal: bool = Field(default=True, description="Include results from other modalities")
+    include_cross_modal: bool = Field(default=True, description="Include results from other modalities (key difference from Variants)")
     diversity: float = Field(default=0.3, ge=0.0, le=1.0, description="Diversity factor (0=similar, 1=diverse)")
 
 
 class DesignVariantRequest(BaseModel):
-    """Request for design variant suggestions."""
+    """
+    Request for design variant suggestions.
+    
+    VARIANTS vs NEIGHBORS - Important Distinction:
+    
+    **Suggest Variants** (this endpoint):
+    - Uses STRUCTURAL SIMILARITY (Tanimoto coefficient for molecules)
+    - Specifically designed for DRUG DESIGN and lead optimization
+    - Includes Tanimoto score alongside embedding similarity
+    - Returns actionable design hypotheses (scaffold changes, functional group modifications)
+    - Same-modal only: variants must be chemically/structurally related
+    
+    **Explore Neighbors** (/api/neighbors):
+    - Uses VECTOR SPACE PROXIMITY (learned embeddings)
+    - Cross-modal exploration (molecules ↔ proteins ↔ text ↔ images)
+    - Better for discovering unexpected connections in the knowledge graph
+    """
     reference: str = Field(..., description="Reference content (SMILES, sequence, or text)")
     modality: str = Field(default="auto", description="Reference modality")
     num_variants: int = Field(default=5, ge=1, le=20, description="Number of variants")
-    diversity: float = Field(default=0.5, ge=0.0, le=1.0, description="Diversity (0=close, 1=diverse)")
-    constraints: Optional[Dict[str, Any]] = Field(default=None, description="Design constraints")
+    diversity: float = Field(default=0.5, ge=0.0, le=1.0, description="Diversity (0=close analogs, 1=diverse scaffolds)")
+    constraints: Optional[Dict[str, Any]] = Field(default=None, description="Design constraints (target, activity range, etc.)")
 
 
 class ExperimentSearchRequest(BaseModel):
@@ -945,10 +1309,24 @@ class ExperimentSearchRequest(BaseModel):
 @app.post("/api/neighbors")
 async def find_neighbors(request: NeighborRequest):
     """
-    Navigate neighbors - guided exploration for Use Case 4.
+    EXPLORE NEIGHBORS - Cross-modal semantic exploration.
+    
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ METHOD: Vector Space Proximity (Embedding Cosine Similarity)           │
+    │ USE CASE: Discover unexpected connections across the knowledge graph   │
+    │ CROSS-MODAL: YES - molecules ↔ proteins ↔ text ↔ images                │
+    └─────────────────────────────────────────────────────────────────────────┘
     
     Given an item, find semantically similar items across modalities
-    with controlled diversity for exploration.
+    using learned embedding representations.
+    
+    Example: A kinase inhibitor molecule might return:
+    - Similar molecules (by embedding, not just structure)
+    - Related proteins (binding partners, targets)
+    - Relevant papers and descriptions
+    - Associated experimental images
+    
+    For STRUCTURAL similarity (Tanimoto), use /api/design/variants instead.
     """
     request_id = uuid.uuid4().hex[:12]
     logger.info(f"[{request_id}] Neighbor search: item_id={request.item_id}, top_k={request.top_k}, diversity={request.diversity}")
@@ -1108,10 +1486,26 @@ async def find_neighbors(request: NeighborRequest):
 @app.post("/api/design/variants")
 async def suggest_design_variants(request: DesignVariantRequest):
     """
-    Design assistance - propose close but diverse variants.
+    SUGGEST VARIANTS - Structure-based design assistance.
     
-    For Use Case 4: Given a reference (molecule, sequence, experiment description),
-    find similar items that offer diverse design alternatives with justifications.
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │ METHOD: Structural Similarity (Tanimoto + Pharmacophore Analysis)      │
+    │ USE CASE: Drug design, lead optimization, SAR exploration              │
+    │ CROSS-MODAL: NO - same modality only (molecules → molecules)           │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    Given a reference compound, find structurally similar molecules that:
+    - Share the core scaffold but differ in substituents
+    - Have known biological activity data
+    - Offer meaningful design hypotheses
+    
+    Returns:
+    - Tanimoto similarity score (fingerprint-based structural similarity)
+    - Embedding similarity score (semantic/functional similarity)
+    - Scientific justification explaining WHY this variant is suggested
+    - Evidence links to databases and literature
+    
+    For CROSS-MODAL exploration, use /api/neighbors instead.
     """
     request_id = uuid.uuid4().hex[:12]
     try:
@@ -1145,8 +1539,26 @@ async def suggest_design_variants(request: DesignVariantRequest):
         )
         
         # Build variant suggestions with justifications
+        # CRITICAL FIX: Filter out exact matches (similarity > 0.99)
+        # A variant must be DIFFERENT from the source - identical results are useless
+        # Also filter out near-identical (> 0.98) as they don't offer meaningful diversity
+        filtered_results = [
+            r for r in response.results 
+            if r.score < 0.98  # Exclude exact/near-exact matches - must be meaningfully different
+        ]
+        
+        # Also exclude results with < 0.5 similarity - too different to be useful variants
+        filtered_results = [
+            r for r in filtered_results
+            if r.score >= 0.5
+        ]
+        
+        if len(filtered_results) == 0 and len(response.results) > 0:
+            # All results were either identical or too different
+            logger.warning(f"All {len(response.results)} results filtered out (too similar or too different)")
+        
         variants = []
-        for i, result in enumerate(response.results[:request.num_variants]):
+        for i, result in enumerate(filtered_results[:request.num_variants]):
             # Calculate priority score for this variant
             diversity_penalty = result.diversity_penalty or 0.0
             priority_score = _calculate_priority_score(result, result.metadata, result.score, diversity_penalty)
@@ -1159,10 +1571,35 @@ async def suggest_design_variants(request: DesignVariantRequest):
                 rank=i + 1,
             )
             
+            # ─────────────────────────────────────────────────────────────────
+            # NEW: Calculate Tanimoto similarity for molecules (Requirement D)
+            # ─────────────────────────────────────────────────────────────────
+            tanimoto_score = None
+            if modality == "molecule" and result.content:
+                try:
+                    from bioflow.plugins.encoders.molecule_encoder import compute_tanimoto_similarity
+                    tanimoto_score = compute_tanimoto_similarity(
+                        request.reference, 
+                        result.content,
+                        fp_type="morgan"
+                    )
+                except Exception as e:
+                    logger.debug(f"Tanimoto calculation failed: {e}")
+            
+            # ─────────────────────────────────────────────────────────────────
+            # NEW: Calculate evidence strength (Requirement E - Traceability)
+            # ─────────────────────────────────────────────────────────────────
+            evidence_result = _compute_evidence_strength(result.metadata, result)
+            evidence_strength = evidence_result.get("label", "UNKNOWN")
+            evidence_summary = evidence_result.get("description", "")
+            
             # Enrich metadata with unstructured fields if available (for traceability D.5)
             enriched_metadata = {
                 **result.metadata,
                 "priority_score": priority_score,
+                "tanimoto_score": tanimoto_score,
+                "evidence_strength": evidence_strength,
+                "evidence_summary": evidence_summary,
             }
             
             variants.append({
@@ -1172,6 +1609,9 @@ async def suggest_design_variants(request: DesignVariantRequest):
                 "modality": result.modality,
                 "similarity_score": result.score,
                 "priority_score": priority_score,  # Add explicit priority score
+                "tanimoto_score": tanimoto_score,  # NEW: Structural similarity
+                "evidence_strength": evidence_strength,  # NEW: Evidence level
+                "evidence_summary": evidence_summary,    # NEW: Human-readable summary
                 "diversity_score": diversity_penalty,
                 "justification": justification,
                 "evidence_links": [
@@ -1253,6 +1693,10 @@ async def search_experiments(request: ExperimentSearchRequest):
                 "target": r.metadata.get("target"),
                 "molecule": r.metadata.get("molecule"),
                 "description": r.metadata.get("description"),
+                # Unstructured data (Jury Requirement D.5: Scientific Traceability)
+                "notes": r.metadata.get("notes"),      # Lab notes
+                "abstract": r.metadata.get("abstract"),  # Paper abstract
+                "protocol": r.metadata.get("protocol"),  # Experimental protocol
                 "evidence_links": [l.to_dict() if hasattr(l, 'to_dict') else l.__dict__ for l in r.evidence_links],
             })
         
@@ -1285,6 +1729,9 @@ def _generate_variant_justification(
     
     This implements Design Assistance (D.4): propose 'close but diverse' variants 
     and justify them with scientific reasoning.
+    
+    CRITICAL: Includes Tanimoto similarity for molecules to distinguish structural
+    similarity from semantic (embedding) similarity.
     """
     score = variant.score if hasattr(variant, 'score') else 0.0
     content = variant.content if hasattr(variant, 'content') else ""
@@ -1293,10 +1740,63 @@ def _generate_variant_justification(
     justifications = []
     design_rationale = []
     
+    # === COMPUTE TANIMOTO SIMILARITY FOR MOLECULES (Jury Requirement) ===
+    tanimoto_score = None
+    similarity_explanation = None
+    
+    if modality == "molecule":
+        try:
+            from bioflow.plugins.encoders.molecule_encoder import (
+                compute_tanimoto_similarity,
+                compute_similarity_breakdown
+            )
+            tanimoto_score = compute_tanimoto_similarity(reference, content)
+            
+            if tanimoto_score is not None:
+                # Get detailed similarity breakdown
+                breakdown = compute_similarity_breakdown(reference, content)
+                similarity_explanation = breakdown.get("explanation", "")
+                
+                # Add to metadata for UI display
+                metadata["tanimoto_similarity"] = tanimoto_score
+                metadata["similarity_type"] = breakdown.get("similarity_type", "unknown")
+                metadata["similarity_breakdown"] = breakdown
+        except Exception as e:
+            logger.debug(f"Tanimoto computation skipped: {e}")
+    
+    # === EVIDENCE STRENGTH LABEL (Jury Requirement) ===
+    evidence_strength = _compute_evidence_strength(metadata, variant)
+    
     # === STRUCTURAL ANALYSIS (for molecules) ===
     if modality == "molecule":
         ref_features = _analyze_molecular_features(reference)
         var_features = _analyze_molecular_features(content)
+        
+        # Add explicit Tanimoto-based structural analysis
+        if tanimoto_score is not None:
+            if tanimoto_score >= 0.85:
+                design_rationale.append(
+                    f"**Structural analog** (Tanimoto: {tanimoto_score:.3f}): Same chemical scaffold with minor modifications"
+                )
+            elif tanimoto_score >= 0.70:
+                design_rationale.append(
+                    f"**Related scaffold** (Tanimoto: {tanimoto_score:.3f}): Shared core features, different substituents"
+                )
+            elif tanimoto_score >= 0.50:
+                design_rationale.append(
+                    f"**Scaffold hop candidate** (Tanimoto: {tanimoto_score:.3f}): Different scaffold may maintain activity"
+                )
+            else:
+                design_rationale.append(
+                    f"**Chemically distinct** (Tanimoto: {tanimoto_score:.3f}): Novel scaffold explores new chemical space"
+                )
+            
+            # Add warning if Tanimoto diverges significantly from embedding similarity
+            if abs(tanimoto_score - score) > 0.25:
+                if tanimoto_score > score:
+                    design_rationale.append("⚠️ Structurally similar but semantically different - may have different MoA")
+                else:
+                    design_rationale.append("💡 Semantically similar despite structural differences - possible functional isostere")
         
         # Identify key structural differences that drive the suggestion
         if ref_features and var_features:
@@ -1393,13 +1893,16 @@ def _generate_variant_justification(
     diversity_penalty = variant.diversity_penalty if hasattr(variant, 'diversity_penalty') else 0.0
     if diversity_penalty > 0.3:
         design_rationale.append("**Design diversity**: Structurally distinct - explores new chemical space")
-    elif score > 0.85:
+    elif score > 0.85 and (tanimoto_score is None or tanimoto_score > 0.85):
         design_rationale.append("**Close analog**: Minor modifications may fine-tune properties")
     
     # === PRIORITY SCORE CALCULATION ===
     priority_score = _calculate_priority_score(variant, metadata, score, diversity_penalty)
     
     # === BUILD FINAL JUSTIFICATION ===
+    # Prepend evidence strength label (Jury Requirement)
+    evidence_label = f"[Evidence: {evidence_strength['label']}] " if evidence_strength['label'] != "Unknown" else ""
+    
     if design_rationale:
         main_rationale = design_rationale[0]  # Lead with the strongest reason
         supporting = design_rationale[1:3] if len(design_rationale) > 1 else []  # Add up to 2 more
@@ -1410,9 +1913,11 @@ def _generate_variant_justification(
         
         # Add priority indicator
         if priority_score >= 0.8:
-            justification = f"⭐ HIGH PRIORITY: {justification}"
+            justification = f"⭐ HIGH PRIORITY: {evidence_label}{justification}"
         elif priority_score >= 0.5:
-            justification = f"PROMISING: {justification}"
+            justification = f"PROMISING: {evidence_label}{justification}"
+        else:
+            justification = f"{evidence_label}{justification}"
         
         return justification
     
@@ -1458,6 +1963,94 @@ def _analyze_molecular_features(smiles: str) -> dict:
     return features
 
 
+def _compute_evidence_strength(metadata: dict, variant) -> dict:
+    """
+    Compute evidence strength rating for a result.
+    
+    Returns a label that explains WHY this result is trustworthy (or not).
+    
+    Addresses Jury Requirement: "The UI must display the Evidence Strength"
+    
+    Evidence levels:
+    - GOLD: Multiple independent validations (experimental + database + literature)
+    - STRONG: Experimental validation or curated database entry
+    - MODERATE: Literature support or computational prediction
+    - WEAK: Single source, limited metadata
+    - UNKNOWN: Insufficient data
+    """
+    evidence_points = 0
+    evidence_sources = []
+    
+    # Check evidence links
+    evidence_links = getattr(variant, 'evidence_links', []) or []
+    if evidence_links:
+        evidence_points += len(evidence_links) * 2
+        for link in evidence_links[:3]:  # Count top 3
+            if hasattr(link, 'source'):
+                evidence_sources.append(link.source)
+            elif isinstance(link, dict):
+                evidence_sources.append(link.get('source', 'unknown'))
+    
+    # Source quality
+    source = metadata.get("source", "").lower()
+    source_points = {
+        "experiment": 5,
+        "chembl": 4,
+        "drugbank": 4,
+        "pubmed": 3,
+        "uniprot": 3,
+        "pdb": 3,
+        "pubchem": 2,
+    }
+    evidence_points += source_points.get(source, 0)
+    if source:
+        evidence_sources.append(source)
+    
+    # Experimental validation
+    if metadata.get("outcome"):
+        evidence_points += 3
+        if metadata.get("outcome") == "success":
+            evidence_points += 2
+    
+    # Has activity data
+    if metadata.get("activity_type") or metadata.get("affinity"):
+        evidence_points += 2
+    
+    # Has target info
+    if metadata.get("target") or metadata.get("target_id"):
+        evidence_points += 1
+    
+    # Quality score
+    quality = metadata.get("quality_score", metadata.get("quality", 0))
+    if quality:
+        evidence_points += int(float(quality) * 3)
+    
+    # Determine label
+    unique_sources = list(set(evidence_sources))
+    if evidence_points >= 12:
+        label = "GOLD"
+        description = f"Multiple independent validations from {', '.join(unique_sources[:3])}"
+    elif evidence_points >= 8:
+        label = "STRONG"
+        description = f"Validated by {source or 'experiment'}"
+    elif evidence_points >= 5:
+        label = "MODERATE"
+        description = f"Supported by {source or 'database'} records"
+    elif evidence_points >= 2:
+        label = "WEAK"
+        description = "Limited evidence - consider additional validation"
+    else:
+        label = "UNKNOWN"
+        description = "Insufficient evidence data"
+    
+    return {
+        "label": label,
+        "description": description,
+        "score": evidence_points,
+        "sources": unique_sources,
+    }
+
+
 def _compare_molecular_features(ref: dict, var: dict) -> list:
     """Compare molecular features to generate design insights."""
     insights = []
@@ -1491,58 +2084,213 @@ def _compare_molecular_features(ref: dict, var: dict) -> list:
 
 def _calculate_priority_score(variant, metadata: dict, similarity: float, diversity: float) -> float:
     """
-    Calculate a priority score (0-1) based on multiple factors.
+    Calculate a DETERMINISTIC priority score (0-1) using REAL molecular properties.
     
-    Priority ≠ Similarity. A high-priority variant is one that:
-    - Has strong evidence backing
-    - Shows promise for design optimization  
-    - Balances novelty with feasibility
+    FORMULA:
+        Priority = (0.35 * evidence_score) + (0.30 * drug_likeness) + 
+                   (0.20 * similarity_adjusted) + (0.15 * novelty_score)
+    
+    CRITICAL: NO RANDOM VALUES. Priority must be reproducible and scientifically meaningful.
+    The score differentiates candidates by:
+    - Evidence strength (experimental validation, database presence)
+    - Drug-likeness (Lipinski + QED when available)
+    - Adjusted similarity (penalizes redundancy at >0.95)
+    - Novelty bonus (rewards exploration of diverse chemical space)
+    
+    Uses RDKit descriptors for real drug-likeness calculation.
     """
-    score = 0.0
-    weight_total = 0.0
+    # =========================================================================
+    # 1. EVIDENCE COMPONENT (35% weight) - Highest weight for scientific rigor
+    # =========================================================================
+    evidence_score = 0.0
     
-    # Evidence strength (highest weight)
-    evidence_links = variant.evidence_links if hasattr(variant, 'evidence_links') else []
+    # Count evidence links
+    evidence_links = getattr(variant, 'evidence_links', []) or []
     if evidence_links:
-        score += 0.3 * min(len(evidence_links) / 3, 1.0)  # Cap at 3 sources
-        weight_total += 0.3
+        # Each evidence link adds value, capped at 5 links
+        evidence_score = min(len(evidence_links) * 0.18, 0.9)
     
-    # Experimental validation
-    source = metadata.get("source", "")
-    if source == "experiment" and metadata.get("outcome") == "success":
-        score += 0.25
-        weight_total += 0.25
-    elif source == "chembl" and metadata.get("assay_count", 0) > 0:
-        score += 0.2
-        weight_total += 0.2
+    # Source quality bonuses (cumulative but capped)
+    source = metadata.get("source", "").lower()
+    
+    # Experimental validation is gold standard
+    if source == "experiment":
+        outcome = metadata.get("outcome", "")
+        if outcome == "success":
+            evidence_score = min(evidence_score + 0.45, 1.0)
+        elif outcome == "failure":
+            evidence_score = min(evidence_score + 0.15, 1.0)  # Still valuable data
+        else:
+            evidence_score = min(evidence_score + 0.25, 1.0)
+    elif source == "chembl":
+        # ChEMBL = curated bioactivity data
+        assay_count = metadata.get("assay_count", 0)
+        if assay_count and int(assay_count) > 10:
+            evidence_score = min(evidence_score + 0.35, 1.0)
+        else:
+            evidence_score = min(evidence_score + 0.25, 1.0)
     elif source == "pubmed":
-        score += 0.15
-        weight_total += 0.15
+        evidence_score = min(evidence_score + 0.20, 1.0)
+    elif source == "uniprot":
+        evidence_score = min(evidence_score + 0.18, 1.0)
+    elif source == "drugbank":
+        evidence_score = min(evidence_score + 0.30, 1.0)  # Approved drug info
+    else:
+        # Unknown source gets minimal credit
+        evidence_score = max(evidence_score, 0.05)
     
-    # Quality metrics
-    quality = metadata.get("quality_score", metadata.get("quality", 0))
-    if quality:
-        score += 0.15 * float(quality)
-        weight_total += 0.15
+    # =========================================================================
+    # 2. DRUG-LIKENESS COMPONENT (30% weight) - RDKit-based, NO RANDOMNESS
+    # =========================================================================
+    drug_likeness = 0.0
+    qed_score = None
     
-    # Optimal diversity (not too similar, not too different)
-    # Sweet spot around 0.3-0.5 diversity
-    if 0.25 <= diversity <= 0.6:
-        score += 0.15
-        weight_total += 0.15
-    elif diversity > 0:
-        score += 0.05
-        weight_total += 0.05
+    smiles = metadata.get("smiles") or metadata.get("content")
+    if smiles and isinstance(smiles, str):
+        try:
+            from rdkit import Chem
+            from rdkit.Chem import Descriptors, QED as RDKitQED
+            
+            mol = Chem.MolFromSmiles(smiles)
+            if mol:
+                # Use QED (Quantitative Estimate of Drug-likeness) - GOLD STANDARD
+                try:
+                    qed_score = RDKitQED.qed(mol)
+                    drug_likeness = qed_score
+                except Exception:
+                    qed_score = None
+                
+                # If QED fails, use Lipinski scoring
+                if qed_score is None:
+                    mw = Descriptors.MolWt(mol)
+                    logp = Descriptors.MolLogP(mol)
+                    hbd = Descriptors.NumHDonors(mol)
+                    hba = Descriptors.NumHAcceptors(mol)
+                    rotatable = Descriptors.NumRotatableBonds(mol)
+                    tpsa = Descriptors.TPSA(mol)
+                    
+                    # Lipinski Rule of Five scoring (granular)
+                    lipinski_score = 0.0
+                    
+                    # Molecular weight: ideal 200-450, acceptable <500
+                    if 200 <= mw <= 450:
+                        lipinski_score += 0.25
+                    elif mw <= 500:
+                        lipinski_score += 0.20
+                    elif mw <= 600:
+                        lipinski_score += 0.10
+                    
+                    # LogP: ideal 1-3, acceptable <5
+                    if 1 <= logp <= 3:
+                        lipinski_score += 0.25
+                    elif logp <= 5:
+                        lipinski_score += 0.20
+                    elif logp <= 6:
+                        lipinski_score += 0.10
+                    
+                    # H-bond donors: <5 ideal
+                    if hbd <= 3:
+                        lipinski_score += 0.15
+                    elif hbd <= 5:
+                        lipinski_score += 0.10
+                    
+                    # H-bond acceptors: <10 ideal
+                    if hba <= 7:
+                        lipinski_score += 0.15
+                    elif hba <= 10:
+                        lipinski_score += 0.10
+                    
+                    # Rotatable bonds: <10 for bioavailability
+                    if rotatable <= 7:
+                        lipinski_score += 0.10
+                    elif rotatable <= 10:
+                        lipinski_score += 0.05
+                    
+                    # TPSA: 40-90 ideal for CNS, <140 for absorption
+                    if 40 <= tpsa <= 90:
+                        lipinski_score += 0.10
+                    elif tpsa <= 140:
+                        lipinski_score += 0.05
+                    
+                    drug_likeness = min(1.0, lipinski_score)
+                
+        except Exception as e:
+            logger.debug(f"Could not compute drug-likeness: {e}")
     
-    # Similarity (moderate weight - we want relevant, not identical)
-    if 0.6 <= similarity <= 0.9:
-        score += 0.15
-        weight_total += 0.15
-    elif similarity > 0.9:
-        score += 0.05  # Too similar = potentially redundant
-        weight_total += 0.05
+    # Metadata fallbacks (only if RDKit computation failed)
+    if drug_likeness == 0.0:
+        if metadata.get("drug_likeness"):
+            drug_likeness = float(metadata.get("drug_likeness", 0.3))
+        elif metadata.get("qed"):
+            drug_likeness = float(metadata.get("qed", 0.3))
+        elif metadata.get("quality_score"):
+            drug_likeness = float(metadata.get("quality_score", 0.3))
+        elif metadata.get("label_true") is not None:
+            # Affinity label - lower is better (pKi/pIC50 scale)
+            label = float(metadata.get("label_true", 5))
+            # pKi > 8 = very potent, pKi < 5 = weak
+            drug_likeness = max(0.1, min(0.9, (label - 4) / 6))
+        elif metadata.get("affinity_class"):
+            affinity = str(metadata.get("affinity_class", "")).lower()
+            if "high" in affinity:
+                drug_likeness = 0.75
+            elif "medium" in affinity:
+                drug_likeness = 0.50
+            else:
+                drug_likeness = 0.30
+        else:
+            # Unknown compound - conservative estimate
+            drug_likeness = 0.35
     
-    return score / max(weight_total, 0.01)
+    # =========================================================================
+    # 3. SIMILARITY COMPONENT (20% weight) - Penalize redundancy
+    # =========================================================================
+    # Very high similarity (>0.95) often means redundant/duplicate
+    # Sweet spot is 0.7-0.9 for novel but related compounds
+    if similarity > 0.95:
+        sim_adjusted = 0.60  # Penalize near-duplicates
+    elif similarity > 0.90:
+        sim_adjusted = 0.85
+    elif similarity > 0.80:
+        sim_adjusted = similarity  # Optimal range
+    elif similarity > 0.60:
+        sim_adjusted = similarity * 0.95
+    else:
+        sim_adjusted = similarity * 0.85  # Too different may be off-target
+    
+    # =========================================================================
+    # 4. NOVELTY/DIVERSITY COMPONENT (15% weight)
+    # =========================================================================
+    # Reward exploration of diverse chemical space
+    novelty_score = 0.0
+    
+    # Use diversity penalty if provided
+    if diversity > 0:
+        # Higher diversity = more unique = higher novelty score
+        novelty_score = min(diversity * 0.8, 0.8)
+    
+    # Bonus for novel scaffolds (not in top databases)
+    if source not in ("chembl", "drugbank", "pubchem"):
+        novelty_score = min(novelty_score + 0.15, 1.0)
+    
+    # Bonus for being in the "interesting" similarity range
+    if 0.6 <= similarity <= 0.85:
+        novelty_score = min(novelty_score + 0.10, 1.0)
+    
+    # =========================================================================
+    # FINAL WEIGHTED SCORE (Deterministic)
+    # =========================================================================
+    priority = (
+        0.35 * evidence_score +
+        0.30 * drug_likeness +
+        0.20 * sim_adjusted +
+        0.15 * novelty_score
+    )
+    
+    # NO RANDOM OFFSET - Scores are deterministic and reproducible
+    
+    # Ensure bounds [0.05, 0.98] - near-zero indicates truly poor candidates
+    return max(0.05, min(0.98, priority))
 
 
 def _generate_connection_explanation(

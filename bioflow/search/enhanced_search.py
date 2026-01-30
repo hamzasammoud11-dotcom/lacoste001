@@ -75,6 +75,9 @@ class EnhancedSearchResult:
         # Calculate priority score based on multiple factors
         priority_score = self._calculate_priority_score()
         
+        # Generate justification explaining WHY this result is recommended (D.4)
+        justification = self._generate_justification(priority_score)
+        
         return {
             "id": self.id,
             "score": self.score,
@@ -85,6 +88,7 @@ class EnhancedSearchResult:
             "metadata": {
                 **self.metadata,
                 "priority_score": priority_score,  # Add priority score to metadata
+                "justification": justification,    # Add justification to metadata (D.4)
             },
             "evidence_links": [
                 {
@@ -102,78 +106,213 @@ class EnhancedSearchResult:
             "rank": self.rank,
         }
     
+    def _generate_justification(self, priority_score: float) -> str:
+        """
+        Generate a human-readable justification explaining WHY this result is recommended.
+        
+        Addresses Jury D.4: Design Assistance & Justification
+        The UI must show the "Why" for each result without requiring a modal click.
+        """
+        parts = []
+        
+        # Priority indicator
+        if priority_score >= 0.8:
+            parts.append("⭐ HIGH PRIORITY")
+        elif priority_score >= 0.6:
+            parts.append("💡 PROMISING")
+        
+        # Evidence-based justification
+        source = self.metadata.get("source", self.source_type or "").lower()
+        
+        if source == "experiment" or self.metadata.get("experiment_type"):
+            outcome = self.metadata.get("outcome", "")
+            exp_type = self.metadata.get("experiment_type", "assay")
+            if outcome == "success":
+                parts.append(f"Experimental {exp_type} succeeded - validated result")
+            elif outcome == "failure":
+                parts.append(f"Experimental {exp_type} failed - learn what didn't work")
+            elif outcome:
+                parts.append(f"Experimental {exp_type}: {outcome}")
+            
+            # Add quality info if available
+            quality = self.metadata.get("quality_score")
+            if quality and float(quality) >= 0.8:
+                parts.append(f"High quality data ({float(quality):.0%})")
+        
+        elif source == "pubmed":
+            title = self.metadata.get("title", "")
+            if title:
+                parts.append(f"Literature: \"{title[:60]}...\"" if len(title) > 60 else f"Literature: \"{title}\"")
+            pmid = self.metadata.get("pmid", "")
+            if pmid:
+                parts.append(f"📄 PMID:{pmid}")
+        
+        elif source == "chembl":
+            chembl_id = self.metadata.get("chembl_id", "")
+            assay_count = self.metadata.get("assay_count", 0)
+            if assay_count:
+                parts.append(f"Validated in {assay_count} bioassays")
+            if chembl_id:
+                parts.append(f"ChEMBL: {chembl_id}")
+            
+            # Activity data
+            if self.metadata.get("activity_type") and self.metadata.get("activity_value"):
+                parts.append(f"{self.metadata['activity_type']}: {self.metadata['activity_value']}")
+        
+        elif source == "uniprot":
+            protein_name = self.metadata.get("protein_name", self.metadata.get("name", ""))
+            if protein_name:
+                parts.append(f"Protein: {protein_name}")
+            organism = self.metadata.get("organism", "")
+            if organism:
+                parts.append(f"Organism: {organism}")
+        
+        # Target binding info
+        if self.metadata.get("target"):
+            parts.append(f"Target: {self.metadata['target']}")
+        
+        # Affinity class
+        affinity = self.metadata.get("affinity_class", "")
+        if affinity == "high":
+            parts.append("High binding affinity")
+        elif affinity == "medium":
+            parts.append("Moderate binding affinity")
+        
+        # Similarity context
+        if self.score >= 0.9:
+            parts.append("Structurally very similar")
+        elif self.score >= 0.7:
+            parts.append("Structurally related")
+        elif self.score >= 0.5:
+            parts.append("Structurally distinct - explores chemical space")
+        
+        # Default if nothing specific found
+        if not parts:
+            if self.modality in ("molecule", "smiles"):
+                parts.append(f"Similar molecular structure (score: {self.score:.2f})")
+            elif self.modality == "protein":
+                parts.append(f"Related protein sequence (score: {self.score:.2f})")
+            elif self.modality == "image":
+                parts.append(f"Visually similar (score: {self.score:.2f})")
+            else:
+                parts.append(f"Semantic match (score: {self.score:.2f})")
+        
+        return " | ".join(parts)
+    
     def _calculate_priority_score(self) -> float:
         """
-        Calculate a priority score (0-1) based on multiple factors.
+        Calculate a DETERMINISTIC priority score (0-1) based on multiple factors.
         
         Priority ≠ Similarity. A high-priority result is one that:
         - Has strong evidence backing (papers, experiments, databases)
         - Shows experimental validation
         - Has complete metadata and conditions
         - Balances relevance with information quality
+        
+        NO RANDOM VALUES - Score is reproducible.
         """
-        score = 0.0
-        weight_total = 0.0
+        # Use a component-based approach with fixed weights
+        evidence_component = 0.0
+        source_component = 0.0
+        outcome_component = 0.0
+        quality_component = 0.0
+        completeness_component = 0.0
+        similarity_component = 0.0
         
-        # Evidence strength (highest weight - 30%)
+        # =========================================================================
+        # 1. EVIDENCE STRENGTH (30% weight)
+        # =========================================================================
         if self.evidence_links:
-            evidence_score = min(len(self.evidence_links) / 3, 1.0)  # Cap at 3 sources
-            score += 0.30 * evidence_score
-            weight_total += 0.30
+            # More sources = higher confidence, but with diminishing returns
+            n_links = len(self.evidence_links)
+            if n_links >= 5:
+                evidence_component = 1.0
+            elif n_links >= 3:
+                evidence_component = 0.85
+            elif n_links >= 2:
+                evidence_component = 0.70
+            elif n_links >= 1:
+                evidence_component = 0.50
         
-        # Source quality (25%)
+        # =========================================================================
+        # 2. SOURCE QUALITY (25% weight)
+        # =========================================================================
         source = self.metadata.get("source", self.source_type or "").lower()
-        source_weights = {
-            "experiment": 0.25,  # Highest - experimental data
-            "chembl": 0.22,      # Curated bioactivity
-            "pubmed": 0.20,      # Literature support
-            "uniprot": 0.18,     # Protein annotation
-            "pdb": 0.18,         # Structural data
-            "drugbank": 0.15,    # Drug info
+        source_scores = {
+            "experiment": 1.00,    # Highest - experimental data
+            "chembl": 0.90,        # Curated bioactivity database
+            "drugbank": 0.88,      # Approved drug info
+            "pubmed": 0.80,        # Literature support
+            "uniprot": 0.75,       # Protein annotation
+            "pdb": 0.75,           # Structural data
+            "pubchem": 0.65,       # Chemical database
         }
-        if source in source_weights:
-            score += source_weights[source]
-            weight_total += 0.25
+        source_component = source_scores.get(source, 0.30)  # Unknown sources get baseline
         
-        # Experimental outcome (20%)
-        if self.metadata.get("outcome") == "success":
-            score += 0.20
-            weight_total += 0.20
-        elif self.metadata.get("outcome"):
-            score += 0.08  # Partial credit for having outcome data
-            weight_total += 0.08
+        # =========================================================================
+        # 3. EXPERIMENTAL OUTCOME (20% weight)
+        # =========================================================================
+        outcome = self.metadata.get("outcome", "")
+        if outcome == "success":
+            outcome_component = 1.0
+        elif outcome == "partial":
+            outcome_component = 0.6
+        elif outcome == "failure":
+            outcome_component = 0.25  # Still valuable (negative data)
+        elif outcome:  # Any other outcome text
+            outcome_component = 0.35
+        else:
+            outcome_component = 0.0  # No outcome info
         
-        # Quality metrics (15%)
+        # =========================================================================
+        # 4. QUALITY METRICS (10% weight)
+        # =========================================================================
         quality = self.metadata.get("quality_score", self.metadata.get("quality", 0))
         if quality:
-            score += 0.15 * float(quality)
-            weight_total += 0.15
+            quality_component = float(quality)
+        else:
+            # Infer quality from data richness
+            has_smiles = bool(self.metadata.get("smiles") or self.metadata.get("content"))
+            has_target = bool(self.metadata.get("target"))
+            has_activity = bool(self.metadata.get("activity_type") or self.metadata.get("affinity"))
+            quality_component = 0.3 * int(has_smiles) + 0.35 * int(has_target) + 0.35 * int(has_activity)
         
-        # Metadata completeness (10%)
-        completeness_fields = ["conditions", "measurements", "protocol", "notes", "target"]
+        # =========================================================================
+        # 5. METADATA COMPLETENESS (5% weight)
+        # =========================================================================
+        completeness_fields = ["conditions", "measurements", "protocol", "notes", "target", "organism"]
         complete_count = sum(1 for f in completeness_fields if self.metadata.get(f))
-        if complete_count > 0:
-            score += 0.10 * (complete_count / len(completeness_fields))
-            weight_total += 0.10
+        completeness_component = complete_count / len(completeness_fields)
         
-        # Similarity relevance (baseline - ensures we don't ignore it)
-        # Optimal range: 0.6-0.9 (not too similar = redundant, not too different = irrelevant)
-        if 0.6 <= self.score <= 0.9:
-            score += 0.15
-            weight_total += 0.15
-        elif self.score > 0.9:
-            score += 0.08  # Too similar might be redundant
-            weight_total += 0.08
-        elif self.score > 0.4:
-            score += 0.05
-            weight_total += 0.05
+        # =========================================================================
+        # 6. SIMILARITY RELEVANCE (10% weight)
+        # =========================================================================
+        # Optimal range: 0.65-0.90 (novel but related)
+        # Too similar (>0.95) = likely redundant
+        # Too different (<0.5) = may be irrelevant
+        if 0.65 <= self.score <= 0.90:
+            similarity_component = 1.0  # Sweet spot
+        elif self.score > 0.90:
+            similarity_component = 0.7  # Penalize near-duplicates
+        elif self.score > 0.50:
+            similarity_component = 0.8 * self.score + 0.2
+        else:
+            similarity_component = self.score  # Low relevance
         
-        # Normalize
-        if weight_total > 0:
-            return min(score / weight_total, 1.0)
+        # =========================================================================
+        # FINAL WEIGHTED SCORE (Deterministic)
+        # =========================================================================
+        priority = (
+            0.30 * evidence_component +
+            0.25 * source_component +
+            0.20 * outcome_component +
+            0.10 * quality_component +
+            0.05 * completeness_component +
+            0.10 * similarity_component
+        )
         
-        # Fallback: use similarity score as base
-        return self.score * 0.7  # Penalize slightly when no other signals
+        # Ensure we return a bounded value
+        return min(max(priority, 0.0), 1.0)
 
 
 @dataclass

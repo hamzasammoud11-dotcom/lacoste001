@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getDesignVariants } from '@/lib/api';
+import { Smiles2DViewer } from '@/components/visualization/smiles-2d-viewer';
 
 interface EvidenceLink {
   source: string;
@@ -45,6 +46,53 @@ interface JustificationPart {
   icon?: string;
 }
 
+// Evidence strength levels (matching backend EvidenceStrength enum)
+type EvidenceStrengthLevel = 'GOLD' | 'STRONG' | 'MODERATE' | 'WEAK' | 'UNKNOWN';
+
+const EVIDENCE_STRENGTH_CONFIG: Record<EvidenceStrengthLevel, { 
+  emoji: string; 
+  color: string; 
+  bgColor: string;
+  borderColor: string;
+  description: string;
+}> = {
+  GOLD: {
+    emoji: '🥇',
+    color: 'text-yellow-600 dark:text-yellow-400',
+    bgColor: 'bg-yellow-500/10',
+    borderColor: 'border-yellow-500/30',
+    description: '15+ supporting data points'
+  },
+  STRONG: {
+    emoji: '💪',
+    color: 'text-green-600 dark:text-green-400',
+    bgColor: 'bg-green-500/10',
+    borderColor: 'border-green-500/30',
+    description: '10-14 supporting data points'
+  },
+  MODERATE: {
+    emoji: '✅',
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500/30',
+    description: '5-9 supporting data points'
+  },
+  WEAK: {
+    emoji: '⚠️',
+    color: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'bg-amber-500/10',
+    borderColor: 'border-amber-500/30',
+    description: '2-4 supporting data points'
+  },
+  UNKNOWN: {
+    emoji: '❓',
+    color: 'text-gray-500 dark:text-gray-400',
+    bgColor: 'bg-gray-500/10',
+    borderColor: 'border-gray-500/30',
+    description: '0-1 supporting data points'
+  }
+};
+
 interface Variant {
   rank: number;
   id: string;
@@ -56,6 +104,10 @@ interface Variant {
   justification: string;
   evidence_links: EvidenceLink[];
   metadata: Record<string, unknown>;
+  // NEW: Enhanced fields for scientific traceability
+  tanimoto_score?: number;        // Tanimoto fingerprint similarity (structural)
+  evidence_strength?: EvidenceStrengthLevel;
+  evidence_summary?: string;
 }
 
 interface DesignAssistantModalProps {
@@ -136,7 +188,14 @@ export function DesignAssistantModal({
         diversity: 0.5,
       });
 
-      setVariants(response.variants || []);
+      // CRITICAL FIX: Filter out identical/near-identical matches
+      // A variant must be DIFFERENT from the source - identical results are not useful
+      // Also filter out very low similarity (< 0.5) as they're too different
+      const filteredVariants = (response.variants || []).filter(
+        (v) => v.similarity_score < 0.98 && v.similarity_score >= 0.5
+      );
+
+      setVariants(filteredVariants);
       setReferenceModality(response.reference_modality || sourceModality);
     } catch (err) {
       setError(
@@ -308,22 +367,38 @@ export function DesignAssistantModal({
                               )}
                             </div>
 
-                            {/* Variant content */}
+                            {/* Variant content with 2D Structure Visualization */}
                             <div className="bg-muted/30 rounded p-2 mb-2">
-                              <code className="text-xs font-mono break-all text-foreground">
-                                {highlightDifferences(
-                                  sourceItem,
-                                  variant.content
+                              <div className="flex items-start gap-3">
+                                {/* 2D Molecule Structure - Only for molecule modality */}
+                                {(variant.modality === 'molecule' || variant.modality === 'drug') && variant.content && (
+                                  <div className="shrink-0 rounded border bg-white dark:bg-slate-900 overflow-hidden">
+                                    <Smiles2DViewer 
+                                      smiles={variant.content} 
+                                      width={100} 
+                                      height={75}
+                                      className="p-0.5"
+                                    />
+                                  </div>
                                 )}
-                              </code>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 ml-2"
-                                onClick={() => copyToClipboard(variant.content)}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
+                                <div className="flex-1 min-w-0">
+                                  <code className="text-xs font-mono break-all text-foreground block">
+                                    {highlightDifferences(
+                                      sourceItem,
+                                      variant.content
+                                    )}
+                                  </code>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 mt-1"
+                                    onClick={() => copyToClipboard(variant.content)}
+                                  >
+                                    <Copy className="h-3 w-3 mr-1" />
+                                    <span className="text-xs">Copy</span>
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
 
                             {/* Justification - Now with rich formatting */}
@@ -386,7 +461,19 @@ export function DesignAssistantModal({
                           </div>
 
                           {/* Scores column - PRIORITY vs SIMILARITY distinction */}
-                          <div className="flex flex-col items-end gap-2 shrink-0 min-w-[100px]">
+                          <div className="flex flex-col items-end gap-2 shrink-0 min-w-[120px]">
+                            {/* Evidence Strength Badge - NEW */}
+                            {(() => {
+                              const strength = (variant.evidence_strength || variant.metadata?.evidence_strength || 'UNKNOWN') as EvidenceStrengthLevel;
+                              const config = EVIDENCE_STRENGTH_CONFIG[strength] || EVIDENCE_STRENGTH_CONFIG.UNKNOWN;
+                              return (
+                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bgColor} ${config.borderColor} border`}>
+                                  <span>{config.emoji}</span>
+                                  <span className={config.color}>{strength}</span>
+                                </div>
+                              );
+                            })()}
+                            
                             {/* Priority Score - This is the RANKING signal */}
                             <div className="text-right">
                               <div className="text-xs font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1 justify-end">
@@ -406,10 +493,32 @@ export function DesignAssistantModal({
                               </div>
                             </div>
                             
-                            {/* Similarity Score - The RAW vector distance */}
+                            {/* Tanimoto Score (Structural Similarity) - NEW */}
+                            {(() => {
+                              const tanimoto = variant.tanimoto_score || variant.metadata?.tanimoto_score;
+                              if (typeof tanimoto === 'number' && tanimoto > 0) {
+                                return (
+                                  <div className="text-right border-t pt-1">
+                                    <div className="text-[10px] text-muted-foreground flex items-center gap-0.5 justify-end">
+                                      <span title="Tanimoto coefficient using Morgan fingerprints (ECFP4)">🧬 Tanimoto</span>
+                                    </div>
+                                    <div className={`text-xs font-medium ${
+                                      tanimoto >= 0.7 ? 'text-green-600' : 
+                                      tanimoto >= 0.5 ? 'text-amber-600' : 
+                                      'text-gray-500'
+                                    }`}>
+                                      {formatScore(tanimoto)}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            
+                            {/* Cosine Similarity Score - The vector embedding distance */}
                             <div className="text-right border-t pt-1">
-                              <div className="text-[10px] text-muted-foreground">
-                                Similarity
+                              <div className="text-[10px] text-muted-foreground flex items-center gap-0.5 justify-end">
+                                <span title="Cosine similarity in embedding space">📐 Cosine</span>
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {formatScore(variant.similarity_score)}
@@ -442,10 +551,25 @@ export function DesignAssistantModal({
           </div>
 
           <div className="flex justify-between items-center pt-4 border-t mt-4">
-            <p className="text-xs text-muted-foreground">
-              {variants.length} variant{variants.length !== 1 ? 's' : ''}{' '}
-              generated • Sorted by <span className="font-medium text-purple-600">Priority</span> (not just similarity)
-            </p>
+            <div className="text-xs text-muted-foreground max-w-md">
+              <div className="font-medium text-foreground mb-1">
+                {variants.length} variant{variants.length !== 1 ? 's' : ''} generated
+              </div>
+              <p>
+                Sorted by <span className="font-semibold text-purple-600">Priority</span> (not just similarity).
+              </p>
+              <div className="mt-1 space-y-0.5">
+                <div className="text-[10px] text-muted-foreground">
+                  <span className="font-medium">Priority</span> = Evidence(35%) + Drug-likeness(30%) + Similarity(20%) + Novelty(15%)
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  <span className="font-medium">Evidence Strength:</span> 🥇 GOLD (15+) • 💪 STRONG (10-14) • ✅ MODERATE (5-9) • ⚠️ WEAK (2-4) • ❓ UNKNOWN (0-1)
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  <span className="font-medium">🧬 Tanimoto</span> = Structural (fingerprint), <span className="font-medium">📐 Cosine</span> = Embedding (semantic)
+                </div>
+              </div>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={fetchVariants} disabled={isLoading}>
                 {isLoading ? (
