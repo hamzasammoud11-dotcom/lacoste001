@@ -97,11 +97,29 @@ def main():
     failed = 0
     
     for i, img in enumerate(images, 1):
-        filepath = img.get("image", "")
-        if not os.path.exists(filepath):
-            print(f"[{i}/{len(images)}] Skipping (file not found): {filepath}")
+        # Get the image filename and resolve full path
+        image_filename = img.get("image", "")
+        
+        # Try multiple paths to find the image
+        possible_paths = [
+            IMAGES_DIR / image_filename,  # data/images/filename.png
+            Path(image_filename),  # As-is (might be absolute)
+            IMAGES_DIR.parent / image_filename,  # data/filename.png
+        ]
+        
+        filepath = None
+        for p in possible_paths:
+            if p.exists():
+                filepath = str(p)
+                break
+        
+        if not filepath:
+            print(f"[{i}/{len(images)}] Skipping (file not found): {image_filename}")
             failed += 1
             continue
+        
+        # Update img dict with resolved path
+        img["image"] = filepath
             
         print(f"[{i}/{len(images)}] Ingesting: {os.path.basename(filepath)}")
         if ingest_single_image(img):

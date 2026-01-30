@@ -1,5 +1,70 @@
 [
   {
+    "image": "gel_western_egfr.png",
+    "image_type": "gel",
+    "description": "Western blot showing EGFR phosphorylation inhibition by gefitinib",
+    "modality": "image",
+    "source": "lab_experiment",
+    "metadata": {
+      "experiment_type": "Western blot",
+      "target_protein": "pEGFR (Y1068)",
+      "treatment": "Gefitinib 0-1000nM",
+      "cell_line": "A431",
+      "protocol": "Standard Western protocol with 10% SDS-PAGE, transfer to PVDF, anti-pEGFR Y1068 (CST #3777) 1:1000, HRP-secondary 1:5000",
+      "notes": "Dose-dependent inhibition of EGFR phosphorylation. Complete inhibition at 100nM. Loading control: total EGFR unchanged.",
+      "quality_score": 0.95
+    }
+  },
+  {
+    "image": "microscopy_cell_apoptosis.png",
+    "image_type": "microscopy",
+    "description": "Fluorescence microscopy of cancer cells undergoing apoptosis after kinase inhibitor treatment",
+    "modality": "image",
+    "source": "lab_experiment",
+    "metadata": {
+      "experiment_type": "Fluorescence microscopy",
+      "staining": "Annexin V-FITC / PI",
+      "cell_line": "H1975 (EGFR L858R/T790M)",
+      "treatment": "Osimertinib 100nM, 48h",
+      "magnification": "40x",
+      "protocol": "Cells fixed with 4% PFA, permeabilized with 0.1% Triton X-100, stained with Annexin V-FITC kit (BD #556547). DAPI counterstain for nuclei.",
+      "notes": "Green = early apoptosis (Annexin V+/PI-), Red = late apoptosis (Annexin V+/PI+). ~65% apoptotic cells at 48h.",
+      "quality_score": 0.92
+    }
+  },
+  {
+    "image": "gel_protein_expression.png",
+    "image_type": "gel",
+    "description": "SDS-PAGE gel showing recombinant kinase domain expression and purification",
+    "modality": "image",
+    "source": "lab_experiment",
+    "metadata": {
+      "experiment_type": "SDS-PAGE",
+      "protein": "EGFR kinase domain (aa 696-1022)",
+      "expression_system": "Sf9 insect cells",
+      "purification": "Ni-NTA affinity followed by SEC",
+      "protocol": "12% SDS-PAGE, Coomassie R-250 staining. Lanes: M=marker, 1=lysate, 2=flow-through, 3=wash, 4-6=elution fractions",
+      "notes": "Expected MW ~37 kDa. High purity in elution fractions 4-5. Yield: 2mg/L culture.",
+      "quality_score": 0.88
+    }
+  },
+  {
+    "image": "microscopy_drug_uptake.png",
+    "image_type": "microscopy",
+    "description": "Confocal microscopy showing intracellular drug distribution of fluorescently-labeled inhibitor",
+    "modality": "image",
+    "source": "lab_experiment",
+    "metadata": {
+      "experiment_type": "Confocal microscopy",
+      "probe": "BODIPY-labeled erlotinib analog",
+      "cell_line": "HCC827",
+      "magnification": "63x oil immersion",
+      "protocol": "Live cell imaging with 488nm excitation, emission 500-550nm. Cells incubated with 1μM probe for 2h at 37°C.",
+      "notes": "Drug accumulates in cytoplasm with partial nuclear exclusion. Membrane binding visible. Efflux observed after washout - check for MDR1 expression.",
+      "quality_score": 0.90
+    }
+  },
+  {
     "image": "aspirin_structure.png",
     "image_type": "spectra",
     "description": "Aspirin (acetylsalicylic acid) 2D chemical structure",

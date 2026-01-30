@@ -31,6 +31,10 @@ from bioflow.core.base import Modality
 
 logger = logging.getLogger(__name__)
 
+# Standard data directory for resolving relative image paths
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_DATA_DIR = os.path.join(_ROOT_DIR, "data")
+
 
 class ImageIngestor(BaseIngestor):
     """
@@ -47,6 +51,80 @@ class ImageIngestor(BaseIngestor):
     @property
     def source_name(self) -> str:
         return "image"
+    
+    def _convert_file_to_base64(self, image_path: str) -> Optional[str]:
+        """
+        Convert a local file path to a base64 data URL.
+        
+        CRITICAL: Browsers cannot display local file paths like C:\\Users\\...
+        This MUST convert all local images to base64 during ingestion.
+        
+        Tries multiple paths:
+        1. Absolute path as-is
+        2. Relative to data/images/
+        3. Relative to data/
+        4. Just the filename in data/images/
+        """
+        if not image_path:
+            return None
+        
+        # Normalize path separators
+        normalized_path = image_path.replace('\\', '/')
+        filename = os.path.basename(normalized_path)
+        
+        # List of paths to try, in order of priority
+        paths_to_try = [
+            image_path,  # As-is (might be absolute)
+            normalized_path,
+            os.path.join(_DATA_DIR, "images", filename),  # data/images/filename.png
+            os.path.join(_DATA_DIR, "images", normalized_path),  # data/images/path
+            os.path.join(_DATA_DIR, filename),  # data/filename.png
+            os.path.join(_DATA_DIR, normalized_path),  # data/path
+            os.path.join(_ROOT_DIR, normalized_path),  # project_root/path
+        ]
+        
+        # Also try if the path starts with data/ or images/
+        if normalized_path.startswith('data/'):
+            clean_path = normalized_path[5:]  # Remove 'data/'
+            paths_to_try.append(os.path.join(_DATA_DIR, clean_path))
+            paths_to_try.append(os.path.join(_DATA_DIR, "images", clean_path))
+        
+        if normalized_path.startswith('images/'):
+            clean_path = normalized_path[7:]  # Remove 'images/'
+            paths_to_try.append(os.path.join(_DATA_DIR, "images", clean_path))
+        
+        for path in paths_to_try:
+            if not path:
+                continue
+            try:
+                if os.path.isfile(path):
+                    with open(path, 'rb') as f:
+                        image_bytes = f.read()
+                    
+                    # Detect MIME type from extension
+                    ext = os.path.splitext(path)[1].lower()
+                    mime_types = {
+                        '.jpg': 'image/jpeg',
+                        '.jpeg': 'image/jpeg',
+                        '.png': 'image/png',
+                        '.gif': 'image/gif',
+                        '.bmp': 'image/bmp',
+                        '.tiff': 'image/tiff',
+                        '.tif': 'image/tiff',
+                        '.webp': 'image/webp',
+                        '.svg': 'image/svg+xml',
+                    }
+                    mime_type = mime_types.get(ext, 'image/png')
+                    
+                    base64_str = base64.b64encode(image_bytes).decode('utf-8')
+                    logger.debug(f"Successfully converted image to base64: {path}")
+                    return f"data:{mime_type};base64,{base64_str}"
+            except Exception as e:
+                logger.debug(f"Could not read image from {path}: {e}")
+                continue
+        
+        logger.warning(f"Image file not found, tried multiple paths for: {image_path}")
+        return None
     
     def fetch_data(
         self,
@@ -158,8 +236,11 @@ class ImageIngestor(BaseIngestor):
                 # Check if string is already a base64 data URL
                 if isinstance(image_data, str) and image_data.startswith("data:image"):
                     image_b64 = image_data  # Already a data URL, use as-is
+                elif isinstance(image_data, str) and (image_data.startswith("http://") or image_data.startswith("https://")):
+                    image_b64 = image_data  # HTTP URL - browser can load directly
                 else:
-                    image_b64 = None # File path or URL, handled elsewhere
+                    # File path - MUST convert to base64 NOW (browsers can't load local paths)
+                    image_b64 = self._convert_file_to_base64(image_data)
             
             # Build metadata
             metadata = {

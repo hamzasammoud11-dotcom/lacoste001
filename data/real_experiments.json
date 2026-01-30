@@ -26,7 +26,10 @@
     "quality_score": 0.98,
     "description": "Potent EGFR inhibitor (IC50 = 0.17 nM). First-generation TKI approved for NSCLC. ChEMBL26879.",
     "source": "ChEMBL/PubChem",
-    "date": "2026-01-30"
+    "date": "2026-01-30",
+    "abstract": "Gefitinib (ZD1839, Iressa) is a selective inhibitor of the epidermal growth factor receptor (EGFR) tyrosine kinase. This study demonstrates sub-nanomolar inhibition of EGFR autophosphorylation in A431 human tumor cells. The quinazoline scaffold binds to the ATP-binding pocket of EGFR, preventing downstream signaling cascades including Ras-MAPK and PI3K-Akt pathways critical for cell proliferation.",
+    "notes": "Batch #GEF-2026-001. Compound purity >99% by HPLC. Stock solution prepared in DMSO at 10mM. Cell viability confirmed at 48h. Western blot showed complete pY1068 inhibition at 100nM. Consider testing against T790M resistance mutant in follow-up.",
+    "protocol": "EGFR kinase assay: A431 cells (5x10^4/well) in 96-well plates. 24h serum starvation, 2h compound incubation, 15min EGF stimulation (100ng/mL). Phospho-EGFR detection by ELISA (Cell Signaling #7240). IC50 calculated by 4-parameter logistic regression."
   },
   {
     "experiment_id": "2eb40e40-c334-4b99-8b1c-b77e9f08f566",
@@ -55,7 +58,10 @@
     "quality_score": 0.97,
     "description": "Highly potent against EGFR L858R mutant (IC50 < 20 nM). Tarceva. ChEMBL553.",
     "source": "ChEMBL/PubChem",
-    "date": "2026-01-30"
+    "date": "2026-01-30",
+    "abstract": "Erlotinib (Tarceva) demonstrates enhanced potency against the oncogenic EGFR L858R mutation commonly found in non-small cell lung cancer patients. The L858R mutation in exon 21 increases EGFR activation and creates a favorable binding pocket for erlotinib's quinazoline scaffold. This mutation correlates with dramatic clinical responses to EGFR-TKIs and improved progression-free survival.",
+    "notes": "Mutant EGFR (L858R) expressed in HEK293 cells. Compare with wild-type EGFR IC50 = 79nM - 4-fold selectivity for mutant. Resistance monitoring: check for T790M emergence after 3 months. Plasma protein binding = 93%.",
+    "protocol": "Ba/F3-EGFR-L858R cell proliferation assay. Cells seeded at 2x10^4/well, treated with serial dilutions (0.1-10000nM) for 72h. Viability by CellTiter-Glo. Western blot confirmation of pEGFR inhibition at IC50 concentration."
   },
   {
     "experiment_id": "a0f3c277-d5ed-4dc1-87be-db2d926b62ba",
@@ -84,7 +90,10 @@
     "quality_score": 0.95,
     "description": "Irreversible EGFR/HER2 inhibitor. IC50 = 0.5 nM. Gilotrif for NSCLC with EGFR mutations.",
     "source": "ChEMBL/PubChem",
-    "date": "2026-01-30"
+    "date": "2026-01-30",
+    "abstract": "Afatinib (BIBW2992, Gilotrif) is a second-generation, irreversible ErbB family blocker that covalently binds to Cys797 in the ATP-binding cleft of EGFR. Unlike reversible inhibitors, afatinib maintains target engagement even after drug washout, providing sustained inhibition. This study demonstrates potent activity against the T790M gatekeeper mutation that confers resistance to first-generation TKIs.",
+    "notes": "Irreversible binding confirmed by mass spectrometry - covalent adduct at Cys797. Pan-HER activity: HER2 IC50 = 14nM, HER4 IC50 = 1nM. Monitor for diarrhea and rash as dose-limiting toxicities. Recommend starting dose 40mg QD.",
+    "protocol": "Covalent inhibitor characterization: H1975 cells (EGFR L858R/T790M) treated for 4h, washed 3x with PBS, then monitored for 24h. Target engagement confirmed by activity-based protein profiling. Cell viability by MTT at 72h."
   },
   {
     "experiment_id": "85c6df3f-98a5-49b9-b82d-e68b1955a485",
@@ -113,7 +122,10 @@
     "quality_score": 0.99,
     "description": "Third-generation EGFR-TKI targeting T790M resistance mutation. IC50 = 1 nM. Tagrisso.",
     "source": "ChEMBL/PubChem",
-    "date": "2026-01-30"
+    "date": "2026-01-30",
+    "abstract": "Osimertinib (AZD9291, Tagrisso) represents a breakthrough in treating EGFR T790M-positive NSCLC that has progressed on prior EGFR-TKI therapy. This third-generation compound was rationally designed to spare wild-type EGFR (IC50 ~500nM) while maintaining picomolar potency against the T790M gatekeeper mutation. The pyrimidine-based scaffold with Michael acceptor acrylamide warhead provides irreversible inhibition through covalent binding to Cys797.",
+    "notes": "CNS penetration superior to earlier TKIs - brain metastasis efficacy observed. Monitor for interstitial lung disease (ILD). Resistance mechanisms: C797S mutation in cis or trans with T790M. Consider combination with MET inhibitors for MET amplification.",
+    "protocol": "H1975 (L858R/T790M) and PC9 (exon 19 del) cellular IC50 assays. 72h treatment, CellTiter-Glo readout. Selectivity: WT EGFR (A431) vs mutant EGFR ratio >200-fold. In vivo: H1975 xenograft, 5mg/kg QD oral dosing, tumor volume measurements at Day 21."
   },
   {
     "experiment_id": "c8c92deb-e3f9-4885-9e8b-9dedf988c3d8",
@@ -142,7 +154,10 @@
     "quality_score": 0.95,
     "description": "First-line CML treatment. IC50 ~ 250 nM against Abl. Gleevec revolutionized CML therapy.",
     "source": "ChEMBL/PubChem",
-    "date": "2026-01-30"
+    "date": "2026-01-30",
+    "abstract": "Imatinib mesylate (STI571, Gleevec) represents the paradigm of targeted cancer therapy. This 2-phenylaminopyrimidine derivative selectively inhibits the BCR-ABL fusion protein characteristic of chronic myeloid leukemia. Crystal structures reveal imatinib binds to the inactive DFG-out conformation of ABL kinase, preventing the conformational switch required for catalytic activity.",
+    "notes": "Batch verified against reference standard. Resistance monitoring: sequence ABL kinase domain for T315I, E255K, M351T mutations. Cross-reactivity: c-Kit (IC50 ~100nM), PDGFR (IC50 ~100nM) - implications for GIST therapy. Plasma trough levels target: >1000 ng/mL.",
+    "protocol": "K562 cell proliferation assay (BCR-ABL+). Cells seeded 5000/well, 72h incubation with compound. IC50 by nonlinear regression. Confirm target engagement by pCrkL Western blot (downstream BCR-ABL substrate)."
   },
   {
     "experiment_id": "49829106-f799-4328-a68f-ac7d0df0a139",

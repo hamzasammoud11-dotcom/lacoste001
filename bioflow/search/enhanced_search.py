@@ -72,6 +72,9 @@ class EnhancedSearchResult:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
+        # Calculate priority score based on multiple factors
+        priority_score = self._calculate_priority_score()
+        
         return {
             "id": self.id,
             "score": self.score,
@@ -79,7 +82,10 @@ class EnhancedSearchResult:
             "diversity_penalty": self.diversity_penalty,
             "content": self.content,
             "modality": self.modality,
-            "metadata": self.metadata,
+            "metadata": {
+                **self.metadata,
+                "priority_score": priority_score,  # Add priority score to metadata
+            },
             "evidence_links": [
                 {
                     "source": l.source,
@@ -95,6 +101,79 @@ class EnhancedSearchResult:
             "citation": self.citation,
             "rank": self.rank,
         }
+    
+    def _calculate_priority_score(self) -> float:
+        """
+        Calculate a priority score (0-1) based on multiple factors.
+        
+        Priority ≠ Similarity. A high-priority result is one that:
+        - Has strong evidence backing (papers, experiments, databases)
+        - Shows experimental validation
+        - Has complete metadata and conditions
+        - Balances relevance with information quality
+        """
+        score = 0.0
+        weight_total = 0.0
+        
+        # Evidence strength (highest weight - 30%)
+        if self.evidence_links:
+            evidence_score = min(len(self.evidence_links) / 3, 1.0)  # Cap at 3 sources
+            score += 0.30 * evidence_score
+            weight_total += 0.30
+        
+        # Source quality (25%)
+        source = self.metadata.get("source", self.source_type or "").lower()
+        source_weights = {
+            "experiment": 0.25,  # Highest - experimental data
+            "chembl": 0.22,      # Curated bioactivity
+            "pubmed": 0.20,      # Literature support
+            "uniprot": 0.18,     # Protein annotation
+            "pdb": 0.18,         # Structural data
+            "drugbank": 0.15,    # Drug info
+        }
+        if source in source_weights:
+            score += source_weights[source]
+            weight_total += 0.25
+        
+        # Experimental outcome (20%)
+        if self.metadata.get("outcome") == "success":
+            score += 0.20
+            weight_total += 0.20
+        elif self.metadata.get("outcome"):
+            score += 0.08  # Partial credit for having outcome data
+            weight_total += 0.08
+        
+        # Quality metrics (15%)
+        quality = self.metadata.get("quality_score", self.metadata.get("quality", 0))
+        if quality:
+            score += 0.15 * float(quality)
+            weight_total += 0.15
+        
+        # Metadata completeness (10%)
+        completeness_fields = ["conditions", "measurements", "protocol", "notes", "target"]
+        complete_count = sum(1 for f in completeness_fields if self.metadata.get(f))
+        if complete_count > 0:
+            score += 0.10 * (complete_count / len(completeness_fields))
+            weight_total += 0.10
+        
+        # Similarity relevance (baseline - ensures we don't ignore it)
+        # Optimal range: 0.6-0.9 (not too similar = redundant, not too different = irrelevant)
+        if 0.6 <= self.score <= 0.9:
+            score += 0.15
+            weight_total += 0.15
+        elif self.score > 0.9:
+            score += 0.08  # Too similar might be redundant
+            weight_total += 0.08
+        elif self.score > 0.4:
+            score += 0.05
+            weight_total += 0.05
+        
+        # Normalize
+        if weight_total > 0:
+            return min(score / weight_total, 1.0)
+        
+        # Fallback: use similarity score as base
+        return self.score * 0.7  # Penalize slightly when no other signals
 
 
 @dataclass

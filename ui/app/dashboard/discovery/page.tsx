@@ -665,6 +665,62 @@ export default function DiscoveryPage() {
                               </div>
                             </div>
                           )}
+                          
+                          {/* Experimental Conditions - NEW */}
+                          {result.metadata?.conditions && typeof result.metadata.conditions === 'object' && Object.keys(result.metadata.conditions as object).length > 0 && (
+                            <div className="bg-blue-50 dark:bg-blue-950/30 mt-2 rounded p-2">
+                              <div className="text-xs font-medium mb-1 text-blue-700 dark:text-blue-300">Experimental Conditions:</div>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(result.metadata.conditions as Record<string, unknown>).map(([key, value], idx) => (
+                                  <span key={idx} className="bg-blue-100 dark:bg-blue-900/50 rounded px-2 py-0.5 text-xs text-blue-800 dark:text-blue-200">
+                                    {key}: {String(value)}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Lab Notes Excerpt - NEW */}
+                          {result.metadata?.notes && (
+                            <div className="bg-amber-50 dark:bg-amber-950/30 mt-2 rounded p-2">
+                              <div className="text-xs font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1 mb-1">
+                                📝 Lab Notes
+                              </div>
+                              <p className="text-xs text-amber-600 dark:text-amber-400 italic">
+                                "{String(result.metadata.notes).slice(0, 200)}
+                                {String(result.metadata.notes).length > 200 ? '...' : ''}"
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Protocol Reference - NEW */}
+                          {result.metadata?.protocol && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <span className="font-medium">Protocol:</span> {String(result.metadata.protocol)}
+                            </div>
+                          )}
+                          
+                          {/* Evidence Links for Experiments - NEW */}
+                          {Array.isArray(result.metadata?.evidence_links) && result.metadata.evidence_links.length > 0 && (
+                            <div className="border-t pt-2 mt-2">
+                              <div className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                                📄 Source References
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {(result.metadata.evidence_links as Array<{source: string; identifier: string; url: string}>).map((link, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs bg-muted hover:bg-muted/80 px-2 py-0.5 rounded text-blue-600 dark:text-blue-400"
+                                  >
+                                    {link.source}: {link.identifier}
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ) : result.modality === 'image' ? (
                         <div className="flex items-start gap-4 py-2">
@@ -751,20 +807,26 @@ export default function DiscoveryPage() {
                     <div className="flex flex-col items-end gap-2">
                       <div className="text-right">
                         <div className="text-muted-foreground text-sm">
-                          Similarity
+                          {result.metadata?.priority_score ? 'Priority' : 'Similarity'}
                         </div>
                         <div
-                          className={`text-xl font-bold ${result.score >= 0.9
-                            ? 'text-green-600'
-                            : result.score >= 0.7
-                              ? 'text-green-500'
-                              : result.score >= 0.5
-                                ? 'text-amber-500'
-                                : 'text-muted-foreground'
+                          className={`text-xl font-bold ${
+                            (result.metadata?.priority_score as number || result.score) >= 0.9
+                              ? 'text-green-600'
+                              : (result.metadata?.priority_score as number || result.score) >= 0.7
+                                ? 'text-green-500'
+                                : (result.metadata?.priority_score as number || result.score) >= 0.5
+                                  ? 'text-amber-500'
+                                  : 'text-muted-foreground'
                             }`}
                         >
-                          {result.score.toFixed(3)}
+                          {(result.metadata?.priority_score as number || result.score).toFixed(3)}
                         </div>
+                        {result.metadata?.priority_score && result.score !== result.metadata?.priority_score && (
+                          <div className="text-xs text-muted-foreground">
+                            Similarity: {result.score.toFixed(3)}
+                          </div>
+                        )}
                       </div>
                       {/* Action Buttons */}
                       <div className="flex gap-2">
@@ -960,6 +1022,20 @@ export default function DiscoveryPage() {
                   <div className="text-sm font-medium truncate">
                     {neighbor.metadata?.name || neighbor.metadata?.title || neighbor.metadata?.description || `Neighbor ${i + 1}`}
                   </div>
+                  
+                  {/* Connection Explanation - NEW: Addresses "Black Box" critique */}
+                  {neighbor.connection_explanation && (
+                    <div className="bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 mt-2 mb-2">
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        {neighbor.connection_explanation.split(' | ').map((part: string, idx: number) => (
+                          <span key={idx} className={idx > 0 ? 'block mt-1' : ''}>
+                            {part.replace(/\*\*/g, '')}
+                          </span>
+                        ))}
+                      </p>
+                    </div>
+                  )}
+                  
                   {/* Render image if modality is image */}
                   {neighbor.modality === 'image' ? (
                     <div className="mt-2">
@@ -972,6 +1048,7 @@ export default function DiscoveryPage() {
                               src={base64Img} 
                               alt={neighbor.metadata?.description || 'Neighbor image'}
                               className="w-full h-24 object-cover rounded"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
                           );
                         }
@@ -981,6 +1058,7 @@ export default function DiscoveryPage() {
                               src={directUrl} 
                               alt={neighbor.metadata?.description || 'Neighbor image'}
                               className="w-full h-24 object-cover rounded"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
                           );
                         }
@@ -1040,6 +1118,17 @@ export default function DiscoveryPage() {
 
 function ExpandableImage({ src, alt, caption }: { src: string, alt: string, caption?: string }) {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [hasError, setHasError] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  if (hasError) {
+    return (
+      <div className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-md border border-dashed border-gray-300 bg-muted flex flex-col items-center justify-center">
+        <ImageIcon className="h-6 w-6 text-muted-foreground" />
+        <span className="text-[9px] text-muted-foreground mt-1">Load failed</span>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1047,11 +1136,17 @@ function ExpandableImage({ src, alt, caption }: { src: string, alt: string, capt
         className="group relative h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-md border border-gray-200"
         onClick={() => setIsOpen(true)}
       >
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
         <img 
           src={src} 
           alt={alt} 
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-110 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          onLoad={() => setIsLoading(false)}
+          onError={() => { setHasError(true); setIsLoading(false); }}
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/20">
             <Maximize2 className="text-white opacity-0 transition-opacity group-hover:opacity-100 h-6 w-6" />
@@ -1064,7 +1159,7 @@ function ExpandableImage({ src, alt, caption }: { src: string, alt: string, capt
              <button onClick={() => setIsOpen(false)} className="absolute right-2 top-2 z-10 rounded-full bg-white/80 p-1 hover:bg-white text-black transition-colors shadow-sm">
                 <X className="h-5 w-5" />
              </button>
-             <img src={src} alt={alt} className="max-h-[85vh] w-auto rounded" />
+             <img src={src} alt={alt} className="max-h-[85vh] w-auto rounded" onError={(e) => e.currentTarget.style.display = 'none'} />
              {caption && <p className="mt-2 text-center text-sm text-gray-700 font-medium px-4 pb-2">{caption}</p>}
           </div>
         </div>

@@ -10,6 +10,11 @@ import {
   TrendingUp,
   Beaker,
   Dna,
+  FileText,
+  FlaskConical,
+  BookOpen,
+  Star,
+  Lightbulb,
 } from 'lucide-react';
 
 import {
@@ -27,15 +32,29 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getDesignVariants } from '@/lib/api';
 
+interface EvidenceLink {
+  source: string;
+  identifier: string;
+  url: string;
+  label?: string;
+}
+
+interface JustificationPart {
+  type: 'priority' | 'rationale' | 'evidence';
+  text: string;
+  icon?: string;
+}
+
 interface Variant {
   rank: number;
   id: string;
   content: string;
   modality: string;
   similarity_score: number;
+  priority_score?: number;  // Priority ≠ Similarity - based on evidence strength
   diversity_score: number;
   justification: string;
-  evidence_links: Array<{ source: string; identifier: string; url: string }>;
+  evidence_links: EvidenceLink[];
   metadata: Record<string, unknown>;
 }
 
@@ -45,6 +64,44 @@ interface DesignAssistantModalProps {
   sourceItem: string; // SMILES string or protein sequence
   sourceModality?: 'molecule' | 'protein' | 'auto';
   sourceName?: string;
+}
+
+// Parse justification to extract structured parts (top-level helper)
+function parseJustificationText(justification: string): JustificationPart[] {
+  const parts: JustificationPart[] = [];
+  let text = justification;
+  
+  // Check for priority indicator
+  if (text.startsWith('⭐ HIGH PRIORITY:')) {
+    parts.push({ type: 'priority', text: 'HIGH PRIORITY', icon: '⭐' });
+    text = text.replace('⭐ HIGH PRIORITY: ', '');
+  } else if (text.startsWith('PROMISING:')) {
+    parts.push({ type: 'priority', text: 'PROMISING', icon: '💡' });
+    text = text.replace('PROMISING: ', '');
+  }
+  
+  // Split by separators
+  const segments = text.split(' | ');
+  segments.forEach(segment => {
+    if (segment.includes('📄') || segment.includes('PMID')) {
+      parts.push({ type: 'evidence', text: segment.replace('📄 ', ''), icon: '📄' });
+    } else if (segment.includes('📊') || segment.includes('📝') || segment.includes('🧪')) {
+      const icon = segment.match(/^[📊📝🧪]/)?.[0] || '📊';
+      parts.push({ type: 'evidence', text: segment.replace(/^[📊📝🧪] /, ''), icon });
+    } else if (segment.startsWith('**')) {
+      // Extract bolded hypothesis
+      const match = segment.match(/\*\*([^*]+)\*\*:?\s*(.*)/);
+      if (match) {
+        parts.push({ type: 'rationale', text: `${match[1]}: ${match[2]}` });
+      } else {
+        parts.push({ type: 'rationale', text: segment.replace(/\*\*/g, '') });
+      }
+    } else if (segment.trim()) {
+      parts.push({ type: 'rationale', text: segment });
+    }
+  });
+  
+  return parts;
 }
 
 export function DesignAssistantModal({
@@ -116,6 +173,33 @@ export function DesignAssistantModal({
     }
     // For longer sequences, show truncated with note
     return variant.length > 60 ? variant.slice(0, 60) + '...' : variant;
+  };
+
+  // Get source icon based on evidence source type
+  const getSourceIcon = (source: string): React.ReactNode => {
+    const sourceIcons: Record<string, React.ReactNode> = {
+      pubmed: <BookOpen className="h-3 w-3" />,
+      chembl: <FlaskConical className="h-3 w-3" />,
+      uniprot: <Dna className="h-3 w-3" />,
+      pdb: <Dna className="h-3 w-3" />,
+      experiment: <Beaker className="h-3 w-3" />,
+      doi: <FileText className="h-3 w-3" />,
+    };
+    return sourceIcons[source.toLowerCase()] || <ExternalLink className="h-3 w-3" />;
+  };
+
+  // Get human-readable source label
+  const getSourceLabel = (source: string, identifier: string) => {
+    const labels: Record<string, string> = {
+      pubmed: `PubMed: ${identifier}`,
+      chembl_compound: `ChEMBL: ${identifier}`,
+      chembl_target: `Target: ${identifier}`,
+      uniprot: `UniProt: ${identifier}`,
+      pdb: `PDB: ${identifier}`,
+      doi: `DOI: ${identifier}`,
+      experiment: `Experiment: ${identifier}`,
+    };
+    return labels[source.toLowerCase()] || `${source}: ${identifier}`;
   };
 
   return (
@@ -242,29 +326,47 @@ export function DesignAssistantModal({
                               </Button>
                             </div>
 
-                            {/* Justification */}
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {variant.justification}
-                            </p>
+                            {/* Justification - Now with rich formatting */}
+                            <VariantJustification parts={parseJustificationText(variant.justification)} />
 
-                            {/* Evidence links */}
-                            {variant.evidence_links &&
-                              variant.evidence_links.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                  {variant.evidence_links.map((link, linkIdx) => (
-                                    <a
-                                      key={linkIdx}
-                                      href={link.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 hover:underline"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                      {link.source}: {link.identifier}
-                                    </a>
-                                  ))}
+                            {/* Evidence links - Enhanced display */}
+                            <VariantEvidenceLinks links={variant.evidence_links} getSourceIcon={getSourceIcon} getSourceLabel={getSourceLabel} />
+
+                            {/* Lab notes / Abstract snippet if available */}
+                            {Boolean(variant.metadata?.notes) && (
+                              <div className="bg-amber-50 dark:bg-amber-950/30 rounded-md p-2 mt-2">
+                                <div className="text-xs font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1 mb-1">
+                                  📝 Lab Notes
                                 </div>
-                              )}
+                                <p className="text-xs text-amber-600 dark:text-amber-400 italic">
+                                  "{String(variant.metadata.notes).slice(0, 200)}
+                                  {String(variant.metadata.notes).length > 200 ? '...' : ''}"
+                                </p>
+                              </div>
+                            )}
+
+                            {Boolean(variant.metadata?.abstract) && (
+                              <div className="bg-green-50 dark:bg-green-950/30 rounded-md p-2 mt-2">
+                                <div className="text-xs font-medium text-green-700 dark:text-green-300 flex items-center gap-1 mb-1">
+                                  📄 Abstract Excerpt
+                                </div>
+                                <p className="text-xs text-green-600 dark:text-green-400 italic">
+                                  "{String(variant.metadata.abstract).slice(0, 200)}
+                                  {String(variant.metadata.abstract).length > 200 ? '...' : ''}"
+                                </p>
+                              </div>
+                            )}
+
+                            {Boolean(variant.metadata?.protocol) && (
+                              <div className="bg-purple-50 dark:bg-purple-950/30 rounded-md p-2 mt-2">
+                                <div className="text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-1 mb-1">
+                                  🧪 Protocol
+                                </div>
+                                <p className="text-xs text-purple-600 dark:text-purple-400">
+                                  {String(variant.metadata.protocol)}
+                                </p>
+                              </div>
+                            )}
 
                             {/* Metadata badges */}
                             {variant.metadata && Object.keys(variant.metadata).length > 0 && (
@@ -283,17 +385,47 @@ export function DesignAssistantModal({
                             )}
                           </div>
 
-                          {/* Scores column */}
-                          <div className="flex flex-col items-end gap-1 shrink-0">
+                          {/* Scores column - PRIORITY vs SIMILARITY distinction */}
+                          <div className="flex flex-col items-end gap-2 shrink-0 min-w-[100px]">
+                            {/* Priority Score - This is the RANKING signal */}
                             <div className="text-right">
+                              <div className="text-xs font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1 justify-end">
+                                <Star className="h-3 w-3" />
+                                Priority
+                              </div>
+                              <div
+                                className={`text-lg font-bold ${
+                                  (variant.priority_score || variant.metadata?.priority_score as number || variant.similarity_score * 0.8) >= 0.7
+                                    ? 'text-purple-600'
+                                    : (variant.priority_score || variant.metadata?.priority_score as number || variant.similarity_score * 0.8) >= 0.5
+                                      ? 'text-amber-600'
+                                      : 'text-gray-500'
+                                }`}
+                              >
+                                {formatScore(variant.priority_score || variant.metadata?.priority_score as number || variant.similarity_score * 0.8)}
+                              </div>
+                            </div>
+                            
+                            {/* Similarity Score - The RAW vector distance */}
+                            <div className="text-right border-t pt-1">
+                              <div className="text-[10px] text-muted-foreground">
+                                Similarity
+                              </div>
                               <div className="text-xs text-muted-foreground">
+                                {formatScore(variant.similarity_score)}
+                              </div>
+                            </div>
+                            
+                            {/* Diversity Score */}
+                            <div className="text-right">
+                              <div className="text-[10px] text-muted-foreground">
                                 Diversity
                               </div>
                               <div
-                                className={`text-sm font-semibold ${
-                                  variant.diversity_score >= 0.5
+                                className={`text-xs ${
+                                  variant.diversity_score >= 0.4
                                     ? 'text-green-600'
-                                    : 'text-amber-600'
+                                    : 'text-muted-foreground'
                                 }`}
                               >
                                 {formatScore(variant.diversity_score)}
@@ -312,7 +444,7 @@ export function DesignAssistantModal({
           <div className="flex justify-between items-center pt-4 border-t mt-4">
             <p className="text-xs text-muted-foreground">
               {variants.length} variant{variants.length !== 1 ? 's' : ''}{' '}
-              generated
+              generated • Sorted by <span className="font-medium text-purple-600">Priority</span> (not just similarity)
             </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={fetchVariants} disabled={isLoading}>
@@ -329,5 +461,97 @@ export function DesignAssistantModal({
         </DialogContent>
       </DialogPortal>
     </Dialog>
+  );
+}
+
+// Helper component for rendering variant justification
+function VariantJustification({ parts }: { parts: JustificationPart[] }) {
+  return (
+    <div className="space-y-2">
+      {/* Priority badge */}
+      {parts.some(p => p.type === 'priority') && (
+        <div className="flex items-center gap-1">
+          {parts.filter(p => p.type === 'priority').map((p, pidx) => (
+            <Badge 
+              key={pidx}
+              variant="default" 
+              className={`text-xs ${
+                p.text === 'HIGH PRIORITY' 
+                  ? 'bg-amber-500 hover:bg-amber-600' 
+                  : 'bg-blue-500 hover:bg-blue-600'
+              }`}
+            >
+              <Star className="h-3 w-3 mr-1" />
+              {p.text}
+            </Badge>
+          ))}
+        </div>
+      )}
+      
+      {/* Design rationale */}
+      {parts.filter(p => p.type === 'rationale').map((p, pidx) => (
+        <div key={pidx} className="flex items-start gap-2 text-sm">
+          <Lightbulb className="h-4 w-4 mt-0.5 text-amber-500 shrink-0" />
+          <span className="text-muted-foreground leading-relaxed">
+            {p.text}
+          </span>
+        </div>
+      ))}
+      
+      {/* Evidence snippets */}
+      {parts.filter(p => p.type === 'evidence').length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 space-y-1">
+          <div className="text-xs font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1">
+            <FileText className="h-3 w-3" />
+            Evidence
+          </div>
+          {parts.filter(p => p.type === 'evidence').map((p, pidx) => (
+            <div key={pidx} className="text-xs text-blue-600 dark:text-blue-400 pl-4">
+              {p.icon && <span className="mr-1">{p.icon}</span>}
+              {p.text}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Helper component for rendering evidence links
+function VariantEvidenceLinks({ 
+  links, 
+  getSourceIcon, 
+  getSourceLabel 
+}: { 
+  links: EvidenceLink[]; 
+  getSourceIcon: (source: string) => React.ReactNode;
+  getSourceLabel: (source: string, identifier: string) => string;
+}) {
+  if (!links || links.length === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="border-t pt-2 mt-2">
+      <div className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+        <BookOpen className="h-3 w-3" />
+        Source References ({links.length})
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {links.map((link, linkIdx) => (
+          <a
+            key={linkIdx}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs bg-muted hover:bg-muted/80 px-2 py-1 rounded-md text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
+          >
+            {getSourceIcon(link.source)}
+            <span>{getSourceLabel(link.source, link.identifier)}</span>
+            <ExternalLink className="h-2.5 w-2.5 opacity-50" />
+          </a>
+        ))}
+      </div>
+    </div>
   );
 }
