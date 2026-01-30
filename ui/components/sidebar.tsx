@@ -2,16 +2,17 @@
 
 import {
   BadgeCheck,
-  BarChart2,
   Bell,
   ChevronRight,
   ChevronsUpDown,
+  Compass,
   CreditCard,
+  Database,
   Dna,
   FlaskConical,
   Home,
   LogOut,
-  Microscope,
+  Search,
   Settings,
   Sparkles,
   User,
@@ -41,7 +42,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarRail,
 } from '@/components/animate-ui/components/radix/sidebar';
 import {
   Collapsible,
@@ -54,13 +54,13 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 const navMain = [
   {
-    title: 'Home',
+    title: 'Dashboard',
     url: '/dashboard',
     icon: Home,
     isActive: true,
   },
   {
-    title: 'Visualization',
+    title: 'Structure Viewer',
     url: '/dashboard/molecules-2d',
     icon: FlaskConical,
     items: [
@@ -79,17 +79,17 @@ const navMain = [
     ],
   },
   {
-    title: 'Discovery',
+    title: 'Multimodal Discovery',
     url: '/dashboard/discovery',
-    icon: Microscope,
+    icon: Compass,
   },
   {
-    title: 'Explorer',
+    title: 'Embeddings Explorer',
     url: '/dashboard/explorer',
-    icon: Dna,
+    icon: Search,
     items: [
       {
-        title: 'Embeddings',
+        title: 'Vector Space',
         url: '/dashboard/explorer',
       },
       {
@@ -99,7 +99,7 @@ const navMain = [
     ],
   },
   {
-    title: 'Workflows',
+    title: 'Design Workflows',
     url: '/dashboard/workflow',
     icon: Sparkles,
     items: [
@@ -114,9 +114,9 @@ const navMain = [
     ],
   },
   {
-    title: 'Data',
+    title: 'Data Corpus',
     url: '/dashboard/data',
-    icon: BarChart2,
+    icon: Database,
   },
   {
     title: 'Settings',
@@ -136,7 +136,7 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="none">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -147,7 +147,7 @@ export function AppSidebar() {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">BioFlow</span>
-                  <span className="truncate text-xs">AI Drug Discovery</span>
+                  <span className="truncate text-xs">Multimodal Discovery</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -160,8 +160,13 @@ export function AppSidebar() {
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarMenu>
             {navMain.map((item) => {
-              const isActive =
-                pathname === item.url || pathname?.startsWith(item.url + '/');
+              // For items without children, match exact URL or prefix
+              // For items with children, only expand but don't highlight parent
+              const hasChildren = item.items && item.items.length > 0;
+              const isExactMatch = pathname === item.url;
+              const isPrefixMatch = pathname?.startsWith(item.url + '/');
+              const isActive = hasChildren ? false : (isExactMatch || isPrefixMatch);
+              const shouldExpand = isExactMatch || isPrefixMatch;
 
               if (!item.items || item.items.length === 0) {
                 return (
@@ -184,14 +189,13 @@ export function AppSidebar() {
                 <Collapsible
                   key={item.title}
                   asChild
-                  defaultOpen={isActive}
+                  defaultOpen={shouldExpand}
                   className="group/collapsible"
                 >
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
                         tooltip={item.title}
-                        isActive={isActive}
                       >
                         {item.icon && <item.icon />}
                         <span>{item.title}</span>
@@ -306,7 +310,6 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   );
 }

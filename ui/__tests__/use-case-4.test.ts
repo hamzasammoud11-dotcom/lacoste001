@@ -8,7 +8,7 @@
  * D.1 - Data Ingestion: Ingest & normalize multimodal items with meaningful metadata
  */
 
-import { describe, expect, it, beforeAll } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 const API_BASE = process.env.TEST_API_BASE || 'http://localhost:8000';
 

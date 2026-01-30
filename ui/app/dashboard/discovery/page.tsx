@@ -40,11 +40,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { search, searchByImage, searchNeighbors, searchExperiments, QueryValidation } from '@/lib/api';
+import { search, searchByImage, searchNeighbors, searchExperiments, getExperimentalImages, QueryValidation, ExperimentalImage } from '@/lib/api';
 import { SearchResult } from '@/schemas/search';
 import { Smiles2DViewer } from '@/components/visualization/smiles-2d-viewer';
 
-type SearchMode = 'text' | 'image' | 'experiment';
+type SearchMode = 'text' | 'image' | 'experiment' | 'gallery';
 
 // Error state for invalid queries (HTTP 400)
 interface InvalidQueryError {
@@ -86,6 +86,12 @@ export default function DiscoveryPage() {
   const [isLoadingNeighbors, setIsLoadingNeighbors] = React.useState(false);
   const [selectedItemId, setSelectedItemId] = React.useState<string | null>(null);
   const [selectedItemName, setSelectedItemName] = React.useState<string | null>(null);
+  const [neighborsDisplayCount, setNeighborsDisplayCount] = React.useState(6); // Pagination for performance
+
+  // Gallery state for experimental images (gels, microscopy)
+  const [galleryImages, setGalleryImages] = React.useState<ExperimentalImage[]>([]);
+  const [galleryFilter, setGalleryFilter] = React.useState<'all' | 'gel' | 'microscopy'>('all');
+  const [isLoadingGallery, setIsLoadingGallery] = React.useState(false);
 
   // Design assistant state
   const [designModalOpen, setDesignModalOpen] = React.useState(false);
@@ -164,6 +170,26 @@ export default function DiscoveryPage() {
     setUploadedImage(null);
     setImageFileName('');
   };
+
+  // Load gallery images when gallery mode is selected or filter changes
+  const loadGalleryImages = React.useCallback(async () => {
+    setIsLoadingGallery(true);
+    try {
+      const response = await getExperimentalImages({ type: galleryFilter, limit: 30 });
+      setGalleryImages(response.images);
+    } catch (err) {
+      console.error('Failed to load gallery images:', err);
+      setGalleryImages([]);
+    } finally {
+      setIsLoadingGallery(false);
+    }
+  }, [galleryFilter]);
+
+  React.useEffect(() => {
+    if (searchMode === 'gallery') {
+      loadGalleryImages();
+    }
+  }, [searchMode, galleryFilter, loadGalleryImages]);
 
   // Explore neighbors handler
   const handleExploreNeighbors = async (itemId: string, itemName?: string) => {
@@ -286,16 +312,60 @@ export default function DiscoveryPage() {
       const ocsrData = data as any; // Type assertion for OCSR fields
       if (ocsrData.ocsr_attempted) {
         if (ocsrData.ocsr_success && ocsrData.extracted_smiles) {
-          // OCSR succeeded - show success message
-          setQueryWarning(`✓ Structure recognized! SMILES: ${ocsrData.extracted_smiles.slice(0, 30)}...`);
+          // OCSR succeeded - show detailed success message with format
+          const detectedFormat = (ocsrData.ocsr_details?.structure_type || 'skeletal') as string;
+          const formatLabels: Record<string, string> = {
+            'skeletal': 'Skeletal Formula',
+            'chemdraw': 'ChemDraw Structure', 
+            'lewis': 'Lewis Structure',
+            'condensed': 'Condensed Formula',
+            '2d_skeletal': '2D Skeletal',
+            'ball_and_stick_2d': '2D Ball-and-Stick'
+          };
+          const formatLabel = formatLabels[detectedFormat] || 'Chemical Structure';
+          setQueryWarning(`✓ Molecule detected (Format: ${formatLabel}). Extracted SMILES: ${ocsrData.extracted_smiles.slice(0, 40)}${ocsrData.extracted_smiles.length > 40 ? '...' : ''}`);
         } else if (ocsrData.ocsr_message) {
-          // OCSR failed with specific reason
+          // OCSR failed with specific reason - provide detailed feedback
           const imageType = ocsrData.ocsr_details?.image_type;
+          const detectedContent = ocsrData.ocsr_details?.detected_content;
+          
           if (imageType === '3d_ball_and_stick') {
             setInvalidQueryError({
               type: '3D_BALL_AND_STICK',
               message: 'This appears to be a 3D ball-and-stick model.',
               suggestion: 'OCSR requires 2D structures. Convert to 2D skeletal formula using ChemDraw, MarvinSketch, or similar tools. Or search by molecule name.'
+            });
+            setResults([]);
+            return;
+          } else if (imageType === 'photo' || detectedContent === 'photograph') {
+            setInvalidQueryError({
+              type: 'NO_STRUCTURE_DETECTED',
+              message: '⚠ This appears to be a photograph, not a molecular structure.',
+              suggestion: 'Please upload a 2D chemical structure diagram (skeletal formula, ChemDraw output, or Lewis structure).'
+            });
+            setResults([]);
+            return;
+          } else if (imageType === 'diagram' || imageType === 'chart' || detectedContent === 'graph') {
+            setInvalidQueryError({
+              type: 'NO_STRUCTURE_DETECTED',
+              message: '⚠ This appears to be a diagram or chart, not a molecular structure.',
+              suggestion: 'Please upload a 2D chemical structure. If you have a structure in a figure, crop it to show only the molecule.'
+            });
+            setResults([]);
+            return;
+          } else if (imageType === 'text' || detectedContent === 'text_document') {
+            setInvalidQueryError({
+              type: 'NO_STRUCTURE_DETECTED',
+              message: '⚠ This appears to be a text document or screenshot.',
+              suggestion: 'Please upload an image containing a molecular structure diagram, not text.'
+            });
+            setResults([]);
+            return;
+          } else if (ocsrData.ocsr_details?.quality === 'low' || ocsrData.ocsr_details?.is_noisy) {
+            setInvalidQueryError({
+              type: 'NO_STRUCTURE_DETECTED',
+              message: '⚠ Image contains noise or unrecognizable content.',
+              suggestion: 'Please upload a clear chemical structure with good contrast. Avoid blurry, low-resolution, or heavily compressed images.'
             });
             setResults([]);
             return;
@@ -351,9 +421,9 @@ export default function DiscoveryPage() {
   return (
     <div className="animate-in fade-in space-y-8 duration-500">
       <PageHeader
-        title="Drug Discovery"
-        subtitle="Search for drug candidates using DeepPurpose + Qdrant"
-        icon={<Microscope className="h-8 w-8" />}
+        title="Multimodal Discovery"
+        subtitle="Find similar compounds, proteins, experiments, gels, and microscopy images across your data corpus"
+        icon={<Compass className="h-8 w-8" />}
       />
 
       <Card id="search">
@@ -362,11 +432,11 @@ export default function DiscoveryPage() {
           {/* Search Mode Selector */}
           <div className="mb-6">
             <Label className="mb-2 block">Search Mode</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant={searchMode === 'text' ? 'default' : 'outline'}
                 onClick={() => setSearchMode('text')}
-                className="flex-1"
+                className="flex-1 min-w-[140px]"
               >
                 <Search className="mr-2 h-4 w-4" />
                 Text / SMILES
@@ -374,22 +444,137 @@ export default function DiscoveryPage() {
               <Button
                 variant={searchMode === 'image' ? 'default' : 'outline'}
                 onClick={() => setSearchMode('image')}
-                className="flex-1"
+                className="flex-1 min-w-[140px]"
               >
                 <ImageIcon className="mr-2 h-4 w-4" />
-                Image
+                Structure Image
               </Button>
               <Button
                 variant={searchMode === 'experiment' ? 'default' : 'outline'}
                 onClick={() => setSearchMode('experiment')}
-                className="flex-1"
+                className="flex-1 min-w-[140px]"
               >
                 <Beaker className="mr-2 h-4 w-4" />
                 Experiment
               </Button>
+              <Button
+                variant={searchMode === 'gallery' ? 'default' : 'outline'}
+                onClick={() => setSearchMode('gallery')}
+                className="flex-1 min-w-[140px]"
+              >
+                <Microscope className="mr-2 h-4 w-4" />
+                Gels & Microscopy
+              </Button>
             </div>
           </div>
 
+          {/* Gallery Mode Content */}
+          {searchMode === 'gallery' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Label>Filter by type:</Label>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={galleryFilter === 'all' ? 'default' : 'outline'}
+                    onClick={() => setGalleryFilter('all')}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={galleryFilter === 'gel' ? 'default' : 'outline'}
+                    onClick={() => setGalleryFilter('gel')}
+                  >
+                    Western Blots & Gels
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={galleryFilter === 'microscopy' ? 'default' : 'outline'}
+                    onClick={() => setGalleryFilter('microscopy')}
+                  >
+                    Microscopy
+                  </Button>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={loadGalleryImages}
+                  disabled={isLoadingGallery}
+                >
+                  {isLoadingGallery ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+                </Button>
+              </div>
+
+              {/* Gallery Grid */}
+              {isLoadingGallery ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : galleryImages.length === 0 ? (
+                <div className="bg-muted/50 rounded-lg p-8 text-center">
+                  <Microscope className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="font-semibold mb-2">No Experimental Images Found</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    No gel or microscopy images are currently in the data corpus.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Images can be ingested from IDR (microscopy), PMC Open Access (western blots), 
+                    or uploaded directly via the Image search mode.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {galleryImages.map((img, idx) => (
+                    <div key={img.id || idx} className="group relative rounded-lg border bg-card overflow-hidden">
+                      <div className="aspect-square">
+                        {img.metadata?.image?.startsWith('data:') ? (
+                          <ExpandableImage 
+                            src={img.metadata.image} 
+                            alt={img.metadata?.description || 'Experimental image'} 
+                            caption={img.metadata?.caption || img.metadata?.description}
+                          />
+                        ) : img.metadata?.thumbnail_url ? (
+                          <ExpandableImage 
+                            src={img.metadata.thumbnail_url} 
+                            alt={img.metadata?.description || 'Experimental image'} 
+                            caption={img.metadata?.caption || img.metadata?.description}
+                          />
+                        ) : (
+                          <div className="h-full flex items-center justify-center bg-muted">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <span className={`inline-block text-xs px-2 py-0.5 rounded mb-1 ${
+                          img.metadata?.image_type === 'gel' 
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' 
+                            : img.metadata?.image_type === 'microscopy' || img.metadata?.image_type === 'fluorescence'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                        }`}>
+                          {img.metadata?.image_type === 'gel' ? 'Western Blot/Gel' : 
+                           img.metadata?.image_type === 'fluorescence' ? 'Fluorescence' : 
+                           img.metadata?.image_type || 'Image'}
+                        </span>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {img.metadata?.description || img.content}
+                        </p>
+                        {img.metadata?.experiment_type && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {img.metadata.experiment_type}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {searchMode !== 'gallery' && (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
             <div className="md:col-span-3">
               {/* Text Search Input */}
@@ -610,6 +795,7 @@ export default function DiscoveryPage() {
               </Button>
             </div>
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -797,12 +983,6 @@ export default function DiscoveryPage() {
           <Tabs defaultValue="candidates">
             <TabsList>
               <TabsTrigger value="candidates">Top Candidates</TabsTrigger>
-              {/* Show Photos tab if include_images was checked and we have image results */}
-              {includeImages && results.some(r => r.modality === 'image') && (
-                <TabsTrigger value="photos">
-                  Photos ({results.filter(r => r.modality === 'image').length})
-                </TabsTrigger>
-              )}
               <TabsTrigger value="details">Raw Data</TabsTrigger>
             </TabsList>
             <TabsContent value="candidates" className="space-y-4">
@@ -1136,143 +1316,6 @@ export default function DiscoveryPage() {
               ))}
             </TabsContent>
             
-            {/* Photos Tab Content */}
-            {includeImages && (
-              <TabsContent value="photos" className="space-y-4">
-                {results.filter(r => r.modality === 'image').length === 0 ? (
-                  <Card>
-                    <CardContent className="p-8 text-center text-muted-foreground">
-                      <ImageIcon className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                      <p>No photo results found.</p>
-                      <p className="text-sm mt-2">Try a different search query or check if images have been ingested.</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {results.filter(r => r.modality === 'image').map((result, i) => (
-                      <Card key={result.id} className="overflow-hidden">
-                        <CardContent className="p-0">
-                          <div className="aspect-video w-full bg-muted relative">
-                            {(() => {
-                              const base64Img = result.metadata?.image;
-                              const directUrl = result.metadata?.thumbnail_url || result.metadata?.url;
-                              
-                              if (typeof base64Img === 'string' && base64Img.startsWith('data:')) {
-                                return (
-                                  <ExpandableImage 
-                                    src={base64Img} 
-                                    alt={`Image ${i + 1}`}
-                                    caption={typeof result.metadata?.caption === 'string' ? result.metadata.caption : undefined}
-                                  />
-                                );
-                              }
-                              
-                              if (typeof directUrl === 'string' && directUrl.startsWith('http')) {
-                                return (
-                                  <ExpandableImage 
-                                    src={directUrl} 
-                                    alt={`Image ${i + 1}`}
-                                    caption={typeof result.metadata?.caption === 'string' ? result.metadata.caption : undefined}
-                                  />
-                                );
-                              }
-                              
-                              return (
-                                <div className="flex h-full w-full items-center justify-center">
-                                  <ImageIcon className="h-12 w-12 text-muted-foreground/50" />
-                                </div>
-                              );
-                            })()}
-                          </div>
-                          <div className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <span className="text-sm font-medium truncate flex-1">
-                                {result.metadata?.description || result.metadata?.caption || `Image ${i + 1}`}
-                              </span>
-                              <span className={`ml-2 text-sm font-bold ${
-                                result.score >= 0.9 ? 'text-green-600' :
-                                result.score >= 0.7 ? 'text-green-500' :
-                                'text-amber-500'
-                              }`}>
-                                {result.score.toFixed(3)}
-                              </span>
-                            </div>
-                            <div className="text-xs text-muted-foreground space-y-1">
-                              {result.metadata?.source ? (
-                                <p>Source: {String(result.metadata.source)}</p>
-                              ) : null}
-                              {/* Biological Image Type - With Emoji */}
-                              {result.metadata?.image_type ? (() => {
-                                const imageType = String(result.metadata.image_type);
-                                const emojiMap: Record<string, string> = {
-                                  'western_blot': '🔬',
-                                  'gel': '🧬',
-                                  'microscopy': '🔭',
-                                  'fluorescence': '🟢',
-                                  'spectra': '📊',
-                                  'xray': '💎',
-                                  'pdb_structure': '🏗️',
-                                  'flow_cytometry': '📈',
-                                  'plate_assay': '🧫',
-                                };
-                                const emoji = emojiMap[imageType] || '🖼️';
-                                return (
-                                  <p className="flex items-center gap-1">
-                                    <span>{emoji}</span>
-                                    <span className="capitalize">{imageType.replace(/_/g, ' ')}</span>
-                                    {/* Classification confidence */}
-                                    {result.metadata?.classification_confidence ? (
-                                      <span className="text-muted-foreground">
-                                        ({(Number(result.metadata.classification_confidence) * 100).toFixed(0)}%)
-                                      </span>
-                                    ) : null}
-                                  </p>
-                                );
-                              })() : null}
-                              {/* OCSR extracted SMILES */}
-                              {result.metadata?.extracted_smiles ? (
-                                <p className="font-mono text-green-600 truncate" title={String(result.metadata.extracted_smiles)}>
-                                  ✓ SMILES: {String(result.metadata.extracted_smiles).slice(0, 20)}...
-                                </p>
-                              ) : null}
-                              {/* Quality metrics if available */}
-                              {result.metadata?.quality_metrics ? (() => {
-                                const qm = result.metadata.quality_metrics as Record<string, number>;
-                                return (
-                                  <div className="flex gap-2 text-[10px]">
-                                    {qm.snr_estimate ? (
-                                      <span>SNR: {qm.snr_estimate.toFixed(1)}</span>
-                                    ) : null}
-                                    {qm.contrast_score ? (
-                                      <span>Contrast: {qm.contrast_score.toFixed(2)}</span>
-                                    ) : null}
-                                  </div>
-                                );
-                              })() : null}
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleExploreNeighbors(result.id, result.metadata?.description as string || result.metadata?.caption as string || `Image ${i + 1}`)}
-                              disabled={isLoadingNeighbors && selectedItemId === result.id}
-                              className="w-full mt-3 text-xs"
-                            >
-                              {isLoadingNeighbors && selectedItemId === result.id ? (
-                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                              ) : (
-                                <Compass className="mr-1 h-3 w-3" />
-                              )}
-                              Explore Similar
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            )}
-            
             <TabsContent value="details">
               <Card>
                 <CardContent className="p-4">
@@ -1320,7 +1363,7 @@ export default function DiscoveryPage() {
           )}
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {neighborResults.neighbors.slice(0, 9).map((neighbor: any, i: number) => (
+            {neighborResults.neighbors.slice(0, neighborsDisplayCount).map((neighbor: any, i: number) => (
               <Card key={neighbor.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
@@ -1339,6 +1382,20 @@ export default function DiscoveryPage() {
                     {neighbor.metadata?.name || neighbor.metadata?.title || neighbor.metadata?.description || `Neighbor ${i + 1}`}
                   </div>
                   
+                  {/* 2D Structure Preview for molecules */}
+                  {(neighbor.modality === 'drug' || neighbor.modality === 'molecule') && (neighbor.metadata?.smiles || neighbor.content) && (
+                    <div className="my-2 flex justify-center">
+                      <div className="rounded-lg border bg-white dark:bg-slate-900 overflow-hidden">
+                        <Smiles2DViewer 
+                          smiles={String(neighbor.metadata?.smiles || neighbor.content)} 
+                          width={140} 
+                          height={100}
+                          className="p-1"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Connection Explanation - NEW: Addresses "Black Box" critique */}
                   {neighbor.connection_explanation && (
                     <div className="bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 mt-2 mb-2">
@@ -1352,45 +1409,18 @@ export default function DiscoveryPage() {
                     </div>
                   )}
                   
-                  {/* Render image if modality is image */}
-                  {neighbor.modality === 'image' ? (
-                    <div className="mt-2">
-                      {(() => {
-                        const base64Img = neighbor.metadata?.image;
-                        const directUrl = neighbor.metadata?.thumbnail_url || neighbor.metadata?.url;
-                        if (typeof base64Img === 'string' && base64Img.startsWith('data:')) {
-                          return (
-                            <img 
-                              src={base64Img} 
-                              alt={neighbor.metadata?.description || 'Neighbor image'}
-                              className="w-full h-24 object-cover rounded"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                          );
-                        }
-                        if (typeof directUrl === 'string' && directUrl.startsWith('http')) {
-                          return (
-                            <img 
-                              src={directUrl} 
-                              alt={neighbor.metadata?.description || 'Neighbor image'}
-                              className="w-full h-24 object-cover rounded"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                          );
-                        }
-                        return (
-                          <div className="w-full h-24 bg-muted rounded flex items-center justify-center">
-                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        );
-                      })()}
+                  {/* Show SMILES below structure for molecules */}
+                  {(neighbor.modality === 'drug' || neighbor.modality === 'molecule') ? (
+                    <div className="text-muted-foreground font-mono text-[10px] truncate mt-1 bg-muted/50 rounded px-1 py-0.5" title={neighbor.content}>
+                      {neighbor.content?.slice(0, 50)}
+                      {neighbor.content?.length > 50 ? '...' : ''}
                     </div>
-                  ) : (
-                    <div className="text-muted-foreground text-xs truncate mt-1">
-                      {neighbor.content?.slice(0, 80)}
-                      {neighbor.content?.length > 80 ? '...' : ''}
+                  ) : neighbor.modality === 'protein' || neighbor.modality === 'target' ? (
+                    <div className="text-muted-foreground font-mono text-[10px] truncate mt-1 bg-muted/50 rounded px-1 py-0.5" title={neighbor.content}>
+                      {neighbor.content?.slice(0, 60)}
+                      {neighbor.content?.length > 60 ? '...' : ''}
                     </div>
-                  )}
+                  ) : null}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1405,17 +1435,48 @@ export default function DiscoveryPage() {
             ))}
           </div>
           
-          <Button variant="outline" onClick={() => setNeighborResults(null)} className="w-full">
-            <X className="mr-2 h-4 w-4" />
-            Close Neighbors
-          </Button>
+          {/* Pagination controls for neighbors */}
+          <div className="flex gap-2">
+            {neighborsDisplayCount < neighborResults.neighbors.length && (
+              <Button 
+                variant="secondary" 
+                onClick={() => setNeighborsDisplayCount(prev => Math.min(prev + 6, neighborResults.neighbors.length))}
+                className="flex-1"
+              >
+                Load More ({neighborResults.neighbors.length - neighborsDisplayCount} remaining)
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              onClick={() => { setNeighborResults(null); setNeighborsDisplayCount(6); }} 
+              className={neighborsDisplayCount < neighborResults.neighbors.length ? '' : 'w-full'}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Close Neighbors
+            </Button>
+          </div>
         </div>
       )}
 
-      {step === 4 && results.length === 0 && !error && (
-        <Card>
-          <CardContent className="text-muted-foreground p-8 text-center">
-            No similar compounds found in Qdrant.
+      {step === 4 && results.length === 0 && !error && !invalidQueryError && (
+        <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="rounded-full bg-amber-100 dark:bg-amber-900/50 p-3">
+                <Search className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-800 dark:text-amber-200 mb-2">No Matching Compounds Found</h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                  Your search did not return any results from the database.
+                </p>
+                <div className="text-xs text-amber-600 dark:text-amber-400 space-y-1">
+                  <p>• Verify your SMILES string is chemically valid</p>
+                  <p>• Try a broader search using "Properties (Text Search)" mode</p>
+                  <p>• Check if the compound exists in DAVIS or KIBA datasets</p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -3,8 +3,12 @@
 import * as React from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
+  Award,
+  CheckCircle2,
   Copy,
   ExternalLink,
+  HelpCircle,
   Loader2,
   Sparkles,
   TrendingUp,
@@ -15,6 +19,7 @@ import {
   BookOpen,
   Star,
   Lightbulb,
+  ShieldCheck,
 } from 'lucide-react';
 
 import {
@@ -50,42 +55,48 @@ interface JustificationPart {
 type EvidenceStrengthLevel = 'GOLD' | 'STRONG' | 'MODERATE' | 'WEAK' | 'UNKNOWN';
 
 const EVIDENCE_STRENGTH_CONFIG: Record<EvidenceStrengthLevel, { 
-  emoji: string; 
+  icon: 'award' | 'shield-check' | 'check-circle' | 'alert-triangle' | 'help-circle'; 
+  label: string;
   color: string; 
   bgColor: string;
   borderColor: string;
   description: string;
 }> = {
   GOLD: {
-    emoji: '🥇',
+    icon: 'award',
+    label: 'Gold',
     color: 'text-yellow-600 dark:text-yellow-400',
     bgColor: 'bg-yellow-500/10',
     borderColor: 'border-yellow-500/30',
     description: '15+ supporting data points'
   },
   STRONG: {
-    emoji: '💪',
+    icon: 'shield-check',
+    label: 'Strong',
     color: 'text-green-600 dark:text-green-400',
     bgColor: 'bg-green-500/10',
     borderColor: 'border-green-500/30',
     description: '10-14 supporting data points'
   },
   MODERATE: {
-    emoji: '✅',
+    icon: 'check-circle',
+    label: 'Moderate',
     color: 'text-blue-600 dark:text-blue-400',
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/30',
     description: '5-9 supporting data points'
   },
   WEAK: {
-    emoji: '⚠️',
+    icon: 'alert-triangle',
+    label: 'Weak',
     color: 'text-amber-600 dark:text-amber-400',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/30',
     description: '2-4 supporting data points'
   },
   UNKNOWN: {
-    emoji: '❓',
+    icon: 'help-circle',
+    label: 'Unknown',
     color: 'text-gray-500 dark:text-gray-400',
     bgColor: 'bg-gray-500/10',
     borderColor: 'border-gray-500/30',
@@ -462,14 +473,21 @@ export function DesignAssistantModal({
 
                           {/* Scores column - PRIORITY vs SIMILARITY distinction */}
                           <div className="flex flex-col items-end gap-2 shrink-0 min-w-[120px]">
-                            {/* Evidence Strength Badge - NEW */}
+                            {/* Evidence Strength Badge - Professional icons instead of emojis */}
                             {(() => {
                               const strength = (variant.evidence_strength || variant.metadata?.evidence_strength || 'UNKNOWN') as EvidenceStrengthLevel;
                               const config = EVIDENCE_STRENGTH_CONFIG[strength] || EVIDENCE_STRENGTH_CONFIG.UNKNOWN;
+                              const IconComponent = {
+                                'award': Award,
+                                'shield-check': ShieldCheck,
+                                'check-circle': CheckCircle2,
+                                'alert-triangle': AlertTriangle,
+                                'help-circle': HelpCircle,
+                              }[config.icon];
                               return (
-                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bgColor} ${config.borderColor} border`}>
-                                  <span>{config.emoji}</span>
-                                  <span className={config.color}>{strength}</span>
+                                <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${config.bgColor} ${config.borderColor} border`} title={config.description}>
+                                  {IconComponent && <IconComponent className={`h-3.5 w-3.5 ${config.color}`} />}
+                                  <span className={config.color}>Evidence: {config.label}</span>
                                 </div>
                               );
                             })()}
@@ -493,21 +511,22 @@ export function DesignAssistantModal({
                               </div>
                             </div>
                             
-                            {/* Tanimoto Score (Structural Similarity) - NEW */}
+                            {/* Tanimoto Score (Structural Similarity) */}
                             {(() => {
                               const tanimoto = variant.tanimoto_score || variant.metadata?.tanimoto_score;
                               if (typeof tanimoto === 'number' && tanimoto > 0) {
                                 return (
                                   <div className="text-right border-t pt-1">
-                                    <div className="text-[10px] text-muted-foreground flex items-center gap-0.5 justify-end">
-                                      <span title="Tanimoto coefficient using Morgan fingerprints (ECFP4)">🧬 Tanimoto</span>
+                                    <div className="text-[10px] text-muted-foreground flex items-center gap-1 justify-end">
+                                      <Dna className="h-3 w-3" />
+                                      <span title="Tanimoto coefficient using Morgan fingerprints (ECFP4)">Tanimoto</span>
                                     </div>
-                                    <div className={`text-xs font-medium ${
+                                    <div className={`text-xs font-mono font-medium ${
                                       tanimoto >= 0.7 ? 'text-green-600' : 
                                       tanimoto >= 0.5 ? 'text-amber-600' : 
                                       'text-gray-500'
                                     }`}>
-                                      {formatScore(tanimoto)}
+                                      {tanimoto.toFixed(3)}
                                     </div>
                                   </div>
                                 );
@@ -517,8 +536,9 @@ export function DesignAssistantModal({
                             
                             {/* Cosine Similarity Score - The vector embedding distance */}
                             <div className="text-right border-t pt-1">
-                              <div className="text-[10px] text-muted-foreground flex items-center gap-0.5 justify-end">
-                                <span title="Cosine similarity in embedding space">📐 Cosine</span>
+                              <div className="text-[10px] text-muted-foreground flex items-center gap-1 justify-end">
+                                <TrendingUp className="h-3 w-3" />
+                                <span title="Cosine similarity in embedding space">Cosine Sim.</span>
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {formatScore(variant.similarity_score)}
@@ -558,15 +578,20 @@ export function DesignAssistantModal({
               <p>
                 Sorted by <span className="font-semibold text-purple-600">Priority</span> (not just similarity).
               </p>
-              <div className="mt-1 space-y-0.5">
+              <div className="mt-2 space-y-1 bg-muted/50 rounded p-2">
                 <div className="text-[10px] text-muted-foreground">
-                  <span className="font-medium">Priority</span> = Evidence(35%) + Drug-likeness(30%) + Similarity(20%) + Novelty(15%)
+                  <span className="font-medium">Priority Score</span> = Evidence(35%) + Drug-likeness(30%) + Similarity(20%) + Novelty(15%)
+                </div>
+                <div className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-x-2">
+                  <span className="font-medium">Evidence:</span>
+                  <span className="text-yellow-600">Gold (15+)</span> •
+                  <span className="text-green-600">Strong (10-14)</span> •
+                  <span className="text-blue-600">Moderate (5-9)</span> •
+                  <span className="text-amber-600">Weak (2-4)</span> •
+                  <span className="text-gray-500">Unknown (0-1)</span>
                 </div>
                 <div className="text-[10px] text-muted-foreground">
-                  <span className="font-medium">Evidence Strength:</span> 🥇 GOLD (15+) • 💪 STRONG (10-14) • ✅ MODERATE (5-9) • ⚠️ WEAK (2-4) • ❓ UNKNOWN (0-1)
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  <span className="font-medium">🧬 Tanimoto</span> = Structural (fingerprint), <span className="font-medium">📐 Cosine</span> = Embedding (semantic)
+                  <span className="font-medium">Tanimoto</span> = Structural fingerprint similarity • <span className="font-medium">Cosine</span> = Embedding space similarity
                 </div>
               </div>
             </div>

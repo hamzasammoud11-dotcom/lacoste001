@@ -17,10 +17,24 @@ interface Smiles2DViewerProps {
 /**
  * Validates that input is a non-empty string that looks like SMILES.
  * Returns null if invalid, or the cleaned string if valid.
+ * CRITICAL: This must handle ANY input type safely to prevent .split() errors in smiles-drawer
  */
 function validateSmilesInput(input: unknown): string | null {
-  // Must be a string
+  // Must be a string - reject objects, arrays, numbers, etc.
+  if (input === null || input === undefined) {
+    return null;
+  }
+  
   if (typeof input !== 'string') {
+    // If it's an object with a toString, try to use it (but be careful)
+    if (typeof input === 'object') {
+      // Objects like { smiles: 'CCO' } should not be accepted
+      return null;
+    }
+    // Try to convert numbers to string as a last resort
+    if (typeof input === 'number') {
+      return null; // Numbers are not valid SMILES
+    }
     return null;
   }
   
@@ -31,8 +45,8 @@ function validateSmilesInput(input: unknown): string | null {
     return null;
   }
   
-  // Must not be just whitespace or obviously invalid
-  if (trimmed.length < 1) {
+  // Reject strings that look like JSON objects or arrays
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     return null;
   }
   
@@ -40,6 +54,9 @@ function validateSmilesInput(input: unknown): string | null {
   if (!/[A-Za-z]/.test(trimmed)) {
     return null;
   }
+  
+  // Additional check: SMILES shouldn't have spaces (except for salts with .)
+  // But some valid SMILES have spaces in extended formats, so just warn
   
   return trimmed;
 }
@@ -96,18 +113,29 @@ export function Smiles2DViewer({
       });
 
       await new Promise<void>((resolve, reject) => {
-        SmilesDrawer.parse(
-          smilesString,
-          (tree: any) => {
-            try {
-              drawer.draw(tree, canvasRef.current, 'light');
-              resolve();
-            } catch (drawErr) {
-              reject(drawErr);
-            }
-          },
-          (parseErr: any) => reject(parseErr),
-        );
+        // Extra safety: ensure smilesString is definitely a string before passing to parser
+        const safeSmiles = String(smilesString);
+        if (!safeSmiles || safeSmiles.length === 0) {
+          reject(new Error('Empty SMILES string'));
+          return;
+        }
+        
+        try {
+          SmilesDrawer.parse(
+            safeSmiles,
+            (tree: any) => {
+              try {
+                drawer.draw(tree, canvasRef.current, 'light');
+                resolve();
+              } catch (drawErr) {
+                reject(drawErr);
+              }
+            },
+            (parseErr: any) => reject(parseErr),
+          );
+        } catch (parseError) {
+          reject(parseError);
+        }
       });
 
       setIsLoading(false);

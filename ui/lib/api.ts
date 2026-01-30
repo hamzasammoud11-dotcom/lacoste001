@@ -426,3 +426,44 @@ export async function getDesignVariants(params: {
         }),
     });
 }
+
+// --- EXPERIMENTAL IMAGES GALLERY ---
+
+export interface ExperimentalImage {
+    id: string;
+    score: number;
+    content: string;
+    modality: string;
+    metadata: {
+        image_type: 'gel' | 'microscopy' | 'fluorescence' | 'spectra';
+        description?: string;
+        caption?: string;
+        image?: string; // base64
+        thumbnail_url?: string;
+        url?: string;
+        source?: string;
+        experiment_type?: string;
+        target_protein?: string;
+        cell_line?: string;
+        treatment?: string;
+        magnification?: string;
+        protocol?: string;
+        notes?: string;
+        quality_score?: number;
+        [key: string]: unknown;
+    };
+}
+
+/**
+ * Fetch experimental images (gels, microscopy) for gallery display
+ */
+export async function getExperimentalImages(params?: {
+    type?: 'gel' | 'microscopy' | 'all';
+    limit?: number;
+}): Promise<{ images: ExperimentalImage[]; count: number; type: string }> {
+    const queryParams = new URLSearchParams();
+    if (params?.type) queryParams.set('type', params.type);
+    if (params?.limit) queryParams.set('limit', params.limit.toString());
+    
+    return fetchJson(`/api/images?${queryParams.toString()}`);
+}
