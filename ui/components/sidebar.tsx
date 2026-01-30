@@ -101,10 +101,6 @@ const navMain = [
         title: 'Builder',
         url: '/dashboard/workflow',
       },
-      {
-        title: 'Templates',
-        url: '/dashboard/workflow#templates',
-      },
     ],
   },
   {

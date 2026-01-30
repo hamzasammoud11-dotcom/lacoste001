@@ -2,9 +2,11 @@
 
 import { AlertCircle, FlaskConical } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import SmilesDrawer from 'smiles-drawer';
 
 import { Skeleton } from '@/components/ui/skeleton';
+
+// Dynamic import to avoid SSR issues with smiles-drawer
+let SmilesDrawer: any = null;
 
 interface Smiles2DViewerProps {
   smiles: string;
@@ -26,15 +28,18 @@ function validateSmilesInput(input: unknown): string | null {
   }
   
   if (typeof input !== 'string') {
-    // If it's an object with a toString, try to use it (but be careful)
-    if (typeof input === 'object') {
-      // Objects like { smiles: 'CCO' } should not be accepted
+    // If it's an object, try to extract smiles property
+    if (typeof input === 'object' && input !== null) {
+      const obj = input as Record<string, unknown>;
+      // Try common property names for SMILES
+      const smilesValue = obj.smiles || obj.SMILES || obj.canonical_smiles || obj.structure;
+      if (typeof smilesValue === 'string') {
+        return validateSmilesInput(smilesValue);
+      }
+      // Objects without extractable smiles should not be accepted
       return null;
     }
-    // Try to convert numbers to string as a last resort
-    if (typeof input === 'number') {
-      return null; // Numbers are not valid SMILES
-    }
+    // Numbers and other types are not valid SMILES
     return null;
   }
   
@@ -45,8 +50,25 @@ function validateSmilesInput(input: unknown): string | null {
     return null;
   }
   
+  // Reject "[object Object]" strings from improper String() conversion
+  if (trimmed === '[object Object]' || trimmed.startsWith('[object ')) {
+    return null;
+  }
+  
   // Reject strings that look like JSON objects or arrays
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      // Try to parse as JSON and extract smiles
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === 'object' && parsed !== null) {
+        const smilesValue = parsed.smiles || parsed.SMILES || parsed.canonical_smiles;
+        if (typeof smilesValue === 'string') {
+          return validateSmilesInput(smilesValue);
+        }
+      }
+    } catch {
+      // Not valid JSON, reject
+    }
     return null;
   }
   
@@ -94,6 +116,12 @@ export function Smiles2DViewer({
     setError(null);
 
     try {
+      // Dynamically import SmilesDrawer to avoid SSR issues
+      if (!SmilesDrawer) {
+        const module = await import('smiles-drawer');
+        SmilesDrawer = module.default;
+      }
+      
       const drawer = new SmilesDrawer.SmiDrawer({
         width,
         height,

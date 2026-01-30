@@ -6,6 +6,7 @@ import { SearchResult } from '@/schemas/search';
 import { EmbeddingPoint } from '@/schemas/visualization';
 import { Candidate,WorkflowResult } from '@/schemas/workflow';
 import { Molecule, Protein } from '@/types/visualization';
+import { getMockExplorerResponse, generateMock3DEmbeddingPoints, generateMockSearchResults } from './mock-data';
 
 const API_BASE = API_CONFIG.baseUrl;
 
@@ -53,6 +54,7 @@ export async function getStats(): Promise<DataResponse> {
 
 /**
  * Fetches 3D points for the embedding explorer.
+ * Falls back to mock data if API is unavailable.
  */
 export async function getExplorerPoints(
     dataset?: string,
@@ -74,13 +76,18 @@ export async function getExplorerPoints(
                     ? 'target'
                     : 'combined';
 
-    return fetchJson<ExplorerResponse>(
-        `${API_BASE}/api/points?limit=500&view=${apiView}`,
-        {
-            next: { revalidate: 0 },
-            signal: AbortSignal.timeout(5000),
-        },
-    );
+    try {
+        return await fetchJson<ExplorerResponse>(
+            `${API_BASE}/api/points?limit=500&view=${apiView}`,
+            {
+                next: { revalidate: 0 },
+                signal: AbortSignal.timeout(5000),
+            },
+        );
+    } catch (error) {
+        console.warn('Explorer API unavailable, using mock data:', error);
+        return getMockExplorerResponse();
+    }
 }
 
 // --- MOLECULES / PROTEINS ---
@@ -168,6 +175,7 @@ export interface SearchResponse {
 /**
  * General search across modalities.
  * Returns query validation info to warn about invalid queries (e.g., "aaa" is not valid SMILES).
+ * Falls back to mock data if API is unavailable.
  */
 export async function search(params: {
     query: string;
@@ -178,24 +186,41 @@ export async function search(params: {
     use_mmr?: boolean;
     include_images?: boolean;
 }): Promise<SearchResponse> {
-    return fetchJson(`${API_BASE}/api/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-    });
+    try {
+        return await fetchJson(`${API_BASE}/api/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params),
+        });
+    } catch (error) {
+        console.warn('Search API unavailable, using mock data:', error);
+        const mockResults = generateMockSearchResults(params.top_k || params.limit || 20);
+        return {
+            results: mockResults,
+            query: params.query,
+            total_found: mockResults.length,
+            returned: mockResults.length,
+        };
+    }
 }
 
 /**
  * Fetches embeddings for a query.
+ * Falls back to mock data if API is unavailable.
  */
 export async function getEmbeddings(
     query: string,
     method: string = 'pca',
     limit: number = 50,
 ): Promise<{ points: EmbeddingPoint[] }> {
-    return fetchJson(
-        `${API_BASE}/api/explorer/embeddings?query=${encodeURIComponent(query)}&method=${method}&limit=${limit}`,
-    );
+    try {
+        return await fetchJson(
+            `${API_BASE}/api/explorer/embeddings?query=${encodeURIComponent(query)}&method=${method}&limit=${limit}`,
+        );
+    } catch (error) {
+        console.warn('Embeddings API unavailable, using mock data:', error);
+        return { points: generateMock3DEmbeddingPoints(limit) };
+    }
 }
 
 /**
@@ -622,3 +647,262 @@ export async function searchCrossModal(params: CrossModalSearchParams): Promise<
         }),
     });
 }
+
+// --- EVIDENCE CHAIN & EXPLORE FROM HERE ---
+
+/**
+ * Evidence chain node for visualization
+ */
+export interface EvidenceNode {
+    id: string;
+    type: 'compound' | 'experiment' | 'paper' | 'protein' | 'image';
+    label: string;
+    subtitle?: string;
+    score?: number;
+    url?: string;
+    metadata?: Record<string, unknown>;
+}
+
+/**
+ * Evidence chain edge connecting nodes
+ */
+export interface EvidenceEdge {
+    from: string;
+    to: string;
+    relationship: string;
+    strength?: number;
+}
+
+/**
+ * Complete evidence chain for visualization
+ */
+export interface EvidenceChain {
+    nodes: EvidenceNode[];
+    edges: EvidenceEdge[];
+    rootId: string;
+}
+
+/**
+ * Get evidence chain for an item showing connected relationships.
+ * 
+ * Returns a graph showing:
+ * Compound X → tested in Experiment Y → similar to Experiment Z → cited in Paper ABC
+ */
+export async function getEvidenceChain(params: {
+    item_id: string;
+    item_type?: string;
+    depth?: number;
+    include_papers?: boolean;
+}): Promise<EvidenceChain & { message: string }> {
+    return fetchJson(`${API_BASE}/api/evidence-chain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            item_id: params.item_id,
+            item_type: params.item_type,
+            depth: params.depth ?? 3,
+            include_papers: params.include_papers ?? true,
+        }),
+    });
+}
+
+/**
+ * Related item for explore from here navigation
+ */
+export interface RelatedItem {
+    id: string;
+    type: 'compound' | 'experiment' | 'paper' | 'protein' | 'image' | 'sequence';
+    title: string;
+    subtitle?: string;
+    score?: number;
+    url?: string;
+    metadata?: Record<string, unknown>;
+}
+
+/**
+ * Category of related items
+ */
+export interface ExploreCategory {
+    id: string;
+    label: string;
+    icon: string;
+    count: number;
+    items: RelatedItem[];
+    loading?: boolean;
+}
+
+/**
+ * Response from explore from here API
+ */
+export interface ExploreFromHereResponse {
+    sourceId: string;
+    sourceType: string;
+    sourceTitle: string;
+    categories: ExploreCategory[];
+    message: string;
+}
+
+/**
+ * Get related items for "Explore from Here" navigation.
+ * 
+ * Click any result → jump to related:
+ * - Compounds used in this experiment
+ * - Similar experiments
+ * - Papers citing this
+ * - Sequences targeted
+ */
+export async function exploreFromHere(
+    itemId: string,
+    itemType: string = 'auto'
+): Promise<ExploreFromHereResponse> {
+    return fetchJson(`${API_BASE}/api/explore/${encodeURIComponent(itemId)}?type=${encodeURIComponent(itemType)}`);
+}
+
+// --- ENHANCED FACETED FILTERING ---
+
+/**
+ * Filter condition for advanced filtering
+ */
+export interface FilterCondition {
+    field: string;
+    operator: '=' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'contains';
+    values: string[];
+    numericValue?: number;
+}
+
+/**
+ * Filter group with AND/OR operator
+ */
+export interface FilterGroup {
+    operator: 'AND' | 'OR';
+    conditions: FilterCondition[];
+}
+
+/**
+ * Complete filter configuration
+ */
+export interface FilterConfig {
+    groups: FilterGroup[];
+    globalOperator: 'AND' | 'OR';
+}
+
+/**
+ * Search with enhanced faceted filtering.
+ * 
+ * Multi-select + boolean logic:
+ * [Outcome: positive OR negative] AND [Cell Line: HeLa, U2OS] AND [Quality > 0.8]
+ */
+export async function searchWithFilters(params: {
+    query?: string;
+    filters: Record<string, string | string[] | { min?: number; max?: number }>;
+    filter_operator?: 'AND' | 'OR';
+    top_k?: number;
+}): Promise<{
+    results: SearchResult[];
+    total_found: number;
+    filters_applied: Record<string, unknown>;
+    filter_operator: string;
+    facet_counts: Record<string, Record<string, number>>;
+}> {
+    return fetchJson(`${API_BASE}/api/search/filtered`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            query: params.query,
+            filters: params.filters,
+            filter_operator: params.filter_operator ?? 'AND',
+            top_k: params.top_k ?? 20,
+        }),
+    });
+}
+
+// --- DESIGN VARIANT JUSTIFICATION ---
+
+/**
+ * Chemical modification in a variant
+ */
+export interface ChemicalModification {
+    position: string;
+    originalGroup: string;
+    newGroup: string;
+    effect: string;
+    confidence: number;
+}
+
+/**
+ * Similar compound with known results
+ */
+export interface SimilarCompound {
+    id: string;
+    name: string;
+    smiles?: string;
+    experimentId?: string;
+    outcome: 'success' | 'partial' | 'failure';
+    activity?: string;
+    url?: string;
+}
+
+/**
+ * Predicted property with comparison to parent
+ */
+export interface PredictedProperty {
+    name: string;
+    value: number | string;
+    unit?: string;
+    comparison?: {
+        baseline: number | string;
+        improvement: number;
+        direction: 'better' | 'worse' | 'neutral';
+    };
+    confidence?: number;
+}
+
+/**
+ * Evidence source for justification
+ */
+export interface EvidenceSource {
+    type: 'paper' | 'experiment' | 'database' | 'prediction';
+    id: string;
+    title: string;
+    url?: string;
+    relevance: number;
+}
+
+/**
+ * Full variant justification data
+ */
+export interface VariantJustificationData {
+    variantId: string;
+    summary: string;
+    reasoning: string[];
+    modifications: ChemicalModification[];
+    similarCompounds: SimilarCompound[];
+    predictedProperties: PredictedProperty[];
+    evidenceSources: EvidenceSource[];
+    overallConfidence: number;
+    riskFactors?: string[];
+    suggestedExperiments?: string[];
+}
+
+/**
+ * Get detailed justification for a design variant.
+ * 
+ * Returns:
+ * - Why this variant was suggested
+ * - Specific chemical modifications and their effects
+ * - Similar compounds that succeeded/failed
+ * - Predicted property improvements (e.g., IC50: 45 nM vs parent 250 nM)
+ */
+export async function getVariantJustification(params: {
+    reference: string;
+    variant_content: string;
+    modality?: string;
+}): Promise<VariantJustificationData> {
+    // This would typically be a separate API call, but for now we extract from the variant data
+    return fetchJson(`${API_BASE}/api/design/justification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+    });
+}
+

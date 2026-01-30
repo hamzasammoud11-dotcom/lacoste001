@@ -413,8 +413,15 @@ class EnhancedSearchService:
         top_k = top_k or self.default_top_k
         
         # Parse filters
+        # Handle raw Qdrant filter dicts with must/should keys (from filtered search endpoint)
+        raw_qdrant_filter = None
         if isinstance(filters, dict):
-            filters = SearchFilters(**filters)
+            if 'must' in filters or 'should' in filters:
+                # This is a raw Qdrant filter, don't convert to SearchFilters
+                raw_qdrant_filter = filters
+                filters = SearchFilters()
+            else:
+                filters = SearchFilters(**filters)
         elif filters is None:
             filters = SearchFilters()
         
@@ -441,6 +448,7 @@ class EnhancedSearchService:
             filters=filters,
             with_vectors=need_vectors,
             include_images=include_images,
+            raw_qdrant_filter=raw_qdrant_filter,
         )
         
         logger.info(f"Initial search returned {len(raw_results)} results")
@@ -664,81 +672,90 @@ class EnhancedSearchService:
         filters: SearchFilters,
         with_vectors: bool,
         include_images: bool = False,
+        raw_qdrant_filter: Dict[str, Any] = None,
     ) -> List[Dict[str, Any]]:
         """Execute search against Qdrant."""
         from qdrant_client.models import Filter, FieldCondition, MatchValue
         
-        # Build filter conditions
-        must_conditions = []
+        # If raw Qdrant filter provided, use it directly
+        if raw_qdrant_filter:
+            # Build filter from raw must/should conditions
+            query_filter = Filter(
+                must=raw_qdrant_filter.get('must'),
+                should=raw_qdrant_filter.get('should'),
+            ) if raw_qdrant_filter.get('must') or raw_qdrant_filter.get('should') else None
+        else:
+            # Build filter conditions from SearchFilters
+            must_conditions = []
         
-        if filters.modality:
-            requested = str(filters.modality).lower()
-            modality_conditions = []
+            if filters.modality:
+                requested = str(filters.modality).lower()
+                modality_conditions = []
+                
+                # Handle molecule/smiles alias
+                if requested in ("molecule", "smiles"):
+                    modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="molecule")))
+                    modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="smiles")))
+                else:
+                    modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value=requested)))
+                
+                # If include_images is requested, add it to the allowed modalities
+                if include_images:
+                    modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="image")))
+                
+                # Combine into a SHOULD filter if we have multiple options
+                if len(modality_conditions) > 1:
+                    must_conditions.append(Filter(should=modality_conditions))
+                else:
+                    must_conditions.append(modality_conditions[0])
             
-            # Handle molecule/smiles alias
-            if requested in ("molecule", "smiles"):
-                modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="molecule")))
-                modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="smiles")))
-            else:
-                modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value=requested)))
+            if filters.source:
+                must_conditions.append(FieldCondition(
+                    key="source",
+                    match=MatchValue(value=filters.source)
+                ))
             
-            # If include_images is requested, add it to the allowed modalities
-            if include_images:
-                modality_conditions.append(FieldCondition(key="modality", match=MatchValue(value="image")))
+            if filters.sources:
+                must_conditions.append(Filter(should=[
+                    FieldCondition(key="source", match=MatchValue(value=s))
+                    for s in filters.sources
+                ]))
             
-            # Combine into a SHOULD filter if we have multiple options
-            if len(modality_conditions) > 1:
-                must_conditions.append(Filter(should=modality_conditions))
-            else:
-                must_conditions.append(modality_conditions[0])
-        
-        if filters.source:
-            must_conditions.append(FieldCondition(
-                key="source",
-                match=MatchValue(value=filters.source)
-            ))
-        
-        if filters.sources:
-            must_conditions.append(Filter(should=[
-                FieldCondition(key="source", match=MatchValue(value=s))
-                for s in filters.sources
-            ]))
-        
-        if filters.organism:
-            must_conditions.append(FieldCondition(
-                key="organism",
-                match=MatchValue(value=filters.organism)
-            ))
+            if filters.organism:
+                must_conditions.append(FieldCondition(
+                    key="organism",
+                    match=MatchValue(value=filters.organism)
+                ))
 
-        if filters.organism_id is not None:
-            must_conditions.append(FieldCondition(
-                key="organism_id",
-                match=MatchValue(value=filters.organism_id)
-            ))
-        
-        # Experiment-specific filters (Use Case 4)
-        if filters.experiment_type:
-            must_conditions.append(FieldCondition(
-                key="experiment_type",
-                match=MatchValue(value=filters.experiment_type)
-            ))
-        
-        if filters.outcome:
-            must_conditions.append(FieldCondition(
-                key="outcome",
-                match=MatchValue(value=filters.outcome)
-            ))
-        
-        if filters.target:
-            must_conditions.append(FieldCondition(
-                key="target",
-                match=MatchValue(value=filters.target)
-            ))
-        
-        # Build filter
-        query_filter = None
-        if must_conditions:
-            query_filter = Filter(must=must_conditions)
+            if filters.organism_id is not None:
+                must_conditions.append(FieldCondition(
+                    key="organism_id",
+                    match=MatchValue(value=filters.organism_id)
+                ))
+            
+            # Experiment-specific filters (Use Case 4)
+            if filters.experiment_type:
+                must_conditions.append(FieldCondition(
+                    key="experiment_type",
+                    match=MatchValue(value=filters.experiment_type)
+                ))
+            
+            if filters.outcome:
+                must_conditions.append(FieldCondition(
+                    key="outcome",
+                    match=MatchValue(value=filters.outcome)
+                ))
+            
+            if filters.target:
+                must_conditions.append(FieldCondition(
+                    key="target",
+                    match=MatchValue(value=filters.target)
+                ))
+            
+            # Build filter
+            query_filter = None
+            if must_conditions:
+                query_filter = Filter(must=must_conditions)
         
         # Get client and search
         client = self.qdrant._get_client()

@@ -1,14 +1,14 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   compress: true,
-  turbopack: {},
-  experimental: {
-    turbopackFileSystemCacheForDev: true,
-    turbopackFileSystemCacheForBuild: false,
+  // Disable dev indicators/overlays completely
+  devIndicators: {
+    appIsrStatus: false,
+    buildActivity: false,
   },
   images: {
     formats: ['image/avif', 'image/webp'],

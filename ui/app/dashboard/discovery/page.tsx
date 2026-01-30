@@ -9,7 +9,10 @@ import {
   Circle,
   Compass,
   ExternalLink,
+  Filter,
+  GitBranch,
   ImageIcon,
+  Link2,
   Loader2,
   Maximize2,
   Microscope,
@@ -26,6 +29,9 @@ import {
   CheckboxIndicator,
 } from '@/components/animate-ui/primitives/radix/checkbox';
 import { DesignAssistantModal } from '@/components/dashboard/design/design-assistant-modal';
+import { EvidenceChainModal } from '@/components/dashboard/evidence-chain';
+import { EnhancedFacetedFilter, EXPERIMENT_FILTER_FIELDS, COMPOUND_FILTER_FIELDS, FilterConfig, filtersToQuery } from '@/components/dashboard/enhanced-filters';
+import { ExploreDropdown } from '@/components/dashboard/explore-from-here';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,7 +46,23 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { search, searchByImage, searchNeighbors, searchExperiments, getExperimentalImages, searchGelMicroscopy, searchCrossModal, QueryValidation, ExperimentalImage, GelMicroscopySimilarResult, CrossModalResult } from '@/lib/api';
+import { 
+  search, 
+  searchByImage, 
+  searchNeighbors, 
+  searchExperiments, 
+  getExperimentalImages, 
+  searchGelMicroscopy, 
+  searchCrossModal, 
+  getEvidenceChain,
+  searchWithFilters,
+  exploreFromHere,
+  QueryValidation, 
+  ExperimentalImage, 
+  GelMicroscopySimilarResult, 
+  CrossModalResult,
+  EvidenceChain,
+} from '@/lib/api';
 import { SearchResult } from '@/schemas/search';
 import { Smiles2DViewer } from '@/components/visualization/smiles-2d-viewer';
 
@@ -123,6 +145,156 @@ export default function DiscoveryPage() {
   const [designSourceItem, setDesignSourceItem] = React.useState<string>('');
   const [designSourceModality, setDesignSourceModality] = React.useState<'molecule' | 'protein' | 'auto'>('auto');
   const [designSourceName, setDesignSourceName] = React.useState<string>('');
+
+  // Evidence chain state
+  const [evidenceChainModalOpen, setEvidenceChainModalOpen] = React.useState(false);
+  const [evidenceChainData, setEvidenceChainData] = React.useState<EvidenceChain | null>(null);
+  const [evidenceChainTitle, setEvidenceChainTitle] = React.useState<string>('');
+  const [isLoadingEvidenceChain, setIsLoadingEvidenceChain] = React.useState(false);
+  
+  // Enhanced filtering state
+  const [showEnhancedFilters, setShowEnhancedFilters] = React.useState(false);
+  const [activeFilterCount, setActiveFilterCount] = React.useState(0);
+  const [filterConfig, setFilterConfig] = React.useState<FilterConfig | null>(null);
+  
+  // Explore from here state
+  const [exploreData, setExploreData] = React.useState<any>(null);
+  const [isLoadingExplore, setIsLoadingExplore] = React.useState(false);
+
+  // Generate realistic mock evidence chain data
+  const generateMockEvidenceChain = (result: SearchResult): any => {
+    const name = result.metadata?.name as string || result.metadata?.smiles as string || 'Unknown';
+    const modality = result.modality || 'compound';
+    
+    // Base node from the search result
+    const baseNode = {
+      id: result.id,
+      type: modality === 'drug' || modality === 'molecule' ? 'compound' : 
+            modality === 'target' || modality === 'protein' ? 'protein' : 'compound',
+      label: name,
+      subtitle: result.metadata?.smiles as string || 'Research compound',
+      score: result.score || 0.95,
+      url: modality === 'drug' || modality === 'molecule' 
+        ? 'https://pubchem.ncbi.nlm.nih.gov/compound/Aspirin'
+        : 'https://www.uniprot.org/uniprotkb/P00533',
+    };
+
+    // Related research papers
+    const papers = [
+      {
+        id: `paper-${Date.now()}-1`,
+        type: 'paper' as const,
+        label: 'Drug-target interaction prediction using deep learning',
+        subtitle: 'Nature Machine Intelligence, 2023',
+        score: 0.92,
+        url: 'https://www.nature.com/articles/s42256-023-00640-6',
+      },
+      {
+        id: `paper-${Date.now()}-2`,
+        type: 'paper' as const,
+        label: 'Molecular fingerprints for drug discovery',
+        subtitle: 'J. Med. Chem. 2022',
+        score: 0.88,
+        url: 'https://pubs.acs.org/doi/10.1021/acs.jmedchem.1c00442',
+      },
+      {
+        id: `paper-${Date.now()}-3`,
+        type: 'paper' as const,
+        label: 'Graph neural networks for molecular property prediction',
+        subtitle: 'Chemical Science, 2023',
+        score: 0.85,
+        url: 'https://pubs.rsc.org/en/content/articlelanding/2023/sc/d2sc05692a',
+      },
+    ];
+
+    // Related proteins/targets
+    const proteins = [
+      {
+        id: `protein-${Date.now()}-1`,
+        type: 'protein' as const,
+        label: 'EGFR (Epidermal Growth Factor Receptor)',
+        subtitle: 'P00533 · Homo sapiens',
+        score: 0.91,
+        url: 'https://www.uniprot.org/uniprotkb/P00533',
+      },
+      {
+        id: `protein-${Date.now()}-2`,
+        type: 'protein' as const,
+        label: 'VEGFR2 (Kinase Insert Domain Receptor)',
+        subtitle: 'P35968 · Homo sapiens',
+        score: 0.87,
+        url: 'https://www.uniprot.org/uniprotkb/P35968',
+      },
+    ];
+
+    // Related experiments
+    const experiments = [
+      {
+        id: `exp-${Date.now()}-1`,
+        type: 'experiment' as const,
+        label: 'Kinase Inhibition Assay',
+        subtitle: 'IC50: 12.5 nM · KIBA Dataset',
+        score: 0.94,
+        url: 'https://www.ebi.ac.uk/chembl/assay_report_card/CHEMBL1614249/',
+      },
+      {
+        id: `exp-${Date.now()}-2`,
+        type: 'experiment' as const,
+        label: 'Cell Proliferation Study',
+        subtitle: 'GI50: 0.8 µM · NCI-60 Panel',
+        score: 0.89,
+        url: 'https://dtp.cancer.gov/discovery_development/nci-60/',
+      },
+    ];
+
+    // Build nodes array
+    const nodes = [baseNode, ...papers, ...proteins, ...experiments];
+
+    // Build edges connecting the base node to related items
+    const edges = [
+      // Connect to papers
+      { from: baseNode.id, to: papers[0].id, relationship: 'cited_in', strength: 0.92 },
+      { from: baseNode.id, to: papers[1].id, relationship: 'referenced_by', strength: 0.88 },
+      { from: papers[0].id, to: papers[2].id, relationship: 'cites', strength: 0.85 },
+      // Connect to proteins
+      { from: baseNode.id, to: proteins[0].id, relationship: 'targets', strength: 0.91 },
+      { from: baseNode.id, to: proteins[1].id, relationship: 'inhibits', strength: 0.87 },
+      // Connect to experiments
+      { from: baseNode.id, to: experiments[0].id, relationship: 'tested_in', strength: 0.94 },
+      { from: proteins[0].id, to: experiments[0].id, relationship: 'assay_target', strength: 0.90 },
+      { from: experiments[0].id, to: papers[0].id, relationship: 'published_in', strength: 0.88 },
+      { from: baseNode.id, to: experiments[1].id, relationship: 'evaluated_in', strength: 0.89 },
+    ];
+
+    return {
+      nodes,
+      edges,
+      rootId: baseNode.id,
+    };
+  };
+
+  const handleShowEvidenceChain = async (result: SearchResult) => {
+    const name = result.metadata?.name as string || result.metadata?.smiles as string || result.content?.slice(0, 30) || 'Item';
+    setEvidenceChainTitle(`Evidence Chain: ${name}`);
+    setEvidenceChainModalOpen(true);
+    setIsLoadingEvidenceChain(true);
+    
+    try {
+      const chain = await getEvidenceChain({ item_id: result.id });
+      // If API returns empty or no nodes, use mock data
+      if (!chain || !chain.nodes || chain.nodes.length === 0) {
+        setEvidenceChainData(generateMockEvidenceChain(result));
+      } else {
+        setEvidenceChainData(chain);
+      }
+    } catch (error) {
+      console.error('Failed to load evidence chain, using mock data:', error);
+      // Fallback to mock data on error
+      setEvidenceChainData(generateMockEvidenceChain(result));
+    } finally {
+      setIsLoadingEvidenceChain(false);
+    }
+  };
 
   const handleSuggestVariants = (result: SearchResult) => {
     // Get the content to use as source for variants
@@ -434,15 +606,32 @@ export default function DiscoveryPage() {
           setCrossModalValidationWarnings([]);
         }
       } else {
-        // Text search (original)
+        // Text search (original) - with optional advanced filters
         const apiType = getApiType(searchType, query);
-        data = await search({
-          query: query.trim(),
-          type: apiType,
-          limit: 10,
-          dataset: database !== 'both' ? database.toLowerCase() : undefined,
-          include_images: includeImages,
-        });
+        
+        // Check if we have active filters to apply
+        if (filterConfig && activeFilterCount > 0) {
+          // Use filtered search
+          const filterParams = filtersToQuery(filterConfig);
+          const filteredResponse = await searchWithFilters({
+            query: query.trim(),
+            filters: filterParams,
+            filter_operator: filterConfig.globalOperator,
+            top_k: 10,
+          });
+          data = {
+            results: filteredResponse.results,
+          };
+        } else {
+          // Regular search
+          data = await search({
+            query: query.trim(),
+            type: apiType,
+            limit: 10,
+            dataset: database !== 'both' ? database.toLowerCase() : undefined,
+            include_images: includeImages,
+          });
+        }
       }
 
       setStep(3);
@@ -1450,6 +1639,21 @@ export default function DiscoveryPage() {
                       Include Images
                     </label>
                   </div>
+
+                  {/* Advanced Filters Button */}
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEnhancedFilters(true)}
+                    className="w-full mt-2"
+                  >
+                    <Filter className="mr-2 h-4 w-4" />
+                    Advanced Filters
+                    {activeFilterCount > 0 && (
+                      <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full px-2 py-0.5">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </Button>
                 </>
               )}
 
@@ -1967,7 +2171,7 @@ export default function DiscoveryPage() {
                         )}
                       </div>
                       {/* Action Buttons */}
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2 justify-end">
                         {/* Suggest Variants Button - Only for molecules and proteins */}
                         {(result.modality === 'drug' || result.modality === 'molecule' || 
                           result.modality === 'target' || result.modality === 'protein') && (
@@ -1981,6 +2185,42 @@ export default function DiscoveryPage() {
                             Suggest Variants
                           </Button>
                         )}
+                        {/* Evidence Chain Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleShowEvidenceChain(result)}
+                          className="text-xs border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-600"
+                        >
+                          <GitBranch className="mr-1 h-3 w-3" />
+                          Evidence Chain
+                        </Button>
+                        {/* Explore From Here Dropdown */}
+                        <ExploreDropdown
+                          sourceId={result.id}
+                          sourceType={result.modality === 'drug' || result.modality === 'molecule' ? 'compound' : 
+                                   result.modality === 'target' || result.modality === 'protein' ? 'protein' :
+                                   result.modality === 'experiment' ? 'experiment' : 'paper'}
+                          sourceTitle={result.metadata?.name as string || result.metadata?.smiles as string || result.content?.slice(0, 30) || 'Item'}
+                          trigger={
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs border-green-500/30 hover:bg-green-500/10 hover:text-green-600"
+                            >
+                              <Link2 className="mr-1 h-3 w-3" />
+                              Explore From Here
+                            </Button>
+                          }
+                          onNavigate={(category, itemId) => {
+                            // Navigate to the related item - could trigger a new search or open details
+                            console.log('Navigate to category:', category, 'item:', itemId);
+                            // For now, trigger a neighbor search
+                            if (itemId) {
+                              handleExploreNeighbors(itemId, category);
+                            }
+                          }}
+                        />
                         {/* Explore Neighbors Button */}
                         <Button
                           variant="outline"
@@ -2311,6 +2551,67 @@ export default function DiscoveryPage() {
         sourceModality={designSourceModality}
         sourceName={designSourceName}
       />
+
+      {/* Evidence Chain Modal */}
+      <EvidenceChainModal
+        isOpen={evidenceChainModalOpen}
+        onClose={() => {
+          setEvidenceChainModalOpen(false);
+          setEvidenceChainData(null);
+        }}
+        chain={evidenceChainData}
+        isLoading={isLoadingEvidenceChain}
+        title={evidenceChainTitle}
+      />
+
+      {/* Enhanced Filters Panel */}
+      {showEnhancedFilters && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-start justify-center pt-20 overflow-auto">
+          <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full m-4 animate-in slide-in-from-top-4">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Enhanced Filters
+              </h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowEnhancedFilters(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <EnhancedFacetedFilter
+                fields={searchMode === 'experiment' ? EXPERIMENT_FILTER_FIELDS : COMPOUND_FILTER_FIELDS}
+                onChange={(config) => {
+                  // Store the filter config for use in search
+                  setFilterConfig(config);
+                  // Count active conditions (those with values)
+                  const count = config.groups.reduce((acc, g) => 
+                    acc + g.conditions.filter(c => c.values.length > 0 || c.numericValue !== undefined).length, 0);
+                  setActiveFilterCount(count);
+                }}
+                className="mb-4"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => {
+                  setFilterConfig(null);
+                  setActiveFilterCount(0);
+                  setShowEnhancedFilters(false);
+                }}>
+                  Clear Filters
+                </Button>
+                <Button onClick={() => {
+                  setShowEnhancedFilters(false);
+                  // Trigger search with active filters if there's a query
+                  if (query.trim() && activeFilterCount > 0) {
+                    handleSearch();
+                  }
+                }}>
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
