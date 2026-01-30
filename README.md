@@ -29,7 +29,6 @@
 - [API Reference](#-api-reference)
 - [Dashboard Modules](#-dashboard-modules)
 - [Deployment](#-deployment)
-- [Testing](#-testing)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -308,7 +307,6 @@ python start_server.py
 lacoste001/
 ├── README.md                 # This file
 ├── BIOFLOW_README.md         # Technical documentation
-├── HANDOVER.md               # AI handover document
 ├── requirements.txt          # Python dependencies
 ├── start_server.py           # Quick start script
 │
@@ -374,16 +372,10 @@ lacoste001/
 │   │
 │   └── schemas/              # TypeScript types
 │
-├── data/                     # Datasets
-│   ├── davis.tab             # DAVIS benchmark
-│   ├── kiba.tab              # KIBA benchmark
-│   └── images/               # Indexed images
-│
-├── tests/                    # Test Suite
-│   └── test_use_case_4.py
-│
-└── scripts/                  # Utility Scripts
-    └── seed_real_experiments.py
+└── data/                     # Datasets
+    ├── davis.tab             # DAVIS benchmark
+    ├── kiba.tab              # KIBA benchmark
+    └── images/               # Indexed images
 ```
 
 ---
@@ -544,25 +536,7 @@ NEXT_PUBLIC_API_URL=https://your-space.hf.space
 
 ---
 
-## 🧪 Testing
-
-```bash
-# Run all tests
-python -m pytest tests/ -v
-
-# Run specific test
-python tests/test_use_case_4.py
-
-# Type check frontend
-cd ui && pnpm type-check
-
-# Lint frontend
-cd ui && pnpm lint
-```
-
----
-
-## 🤝 Contributing
+##  Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
