@@ -66,9 +66,9 @@ export default function RootLayout({
           <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-              <main className="bg-background flex-1 overflow-y-auto p-8">
+              <div className="bg-background flex-1 overflow-y-auto p-8">
                 <div className="mx-auto max-w-7xl">{children}</div>
-              </main>
+              </div>
             </SidebarInset>
           </SidebarProvider>
         </ThemeProvider>

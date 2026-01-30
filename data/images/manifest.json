@@ -1,0 +1,255 @@
+[
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\aspirin_structure.png",
+    "image_type": "spectra",
+    "description": "Aspirin (acetylsalicylic acid) 2D chemical structure",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL25",
+      "compound_name": "Aspirin",
+      "pubchem_cid": "2244",
+      "smiles": "CC(=O)OC1=CC=CC=C1C(=O)O",
+      "source": "PubChem"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\ibuprofen_structure.png",
+    "image_type": "spectra",
+    "description": "Ibuprofen 2D chemical structure",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL521",
+      "compound_name": "Ibuprofen",
+      "pubchem_cid": "3672",
+      "smiles": "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",
+      "source": "PubChem"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\metformin_structure.png",
+    "image_type": "spectra",
+    "description": "Metformin 2D chemical structure - diabetes drug",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL1431",
+      "compound_name": "Metformin",
+      "pubchem_cid": "5090",
+      "smiles": "CN(C)C(=N)N=C(N)N",
+      "source": "PubChem"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\atorvastatin_structure.png",
+    "image_type": "spectra",
+    "description": "Atorvastatin 2D chemical structure - cholesterol drug (Lipitor)",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL1487",
+      "compound_name": "Atorvastatin",
+      "pubchem_cid": "36314",
+      "smiles": "CC(C)C1=C(C(=C(N1CCC(CC(CC(=O)O)O)O)C2=CC=C(C=C2)F)C3=CC=CC=C3)C(=O)NC4=CC=CC=C4",
+      "source": "PubChem"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\omeprazole_structure.png",
+    "image_type": "spectra",
+    "description": "Omeprazole 2D chemical structure - proton pump inhibitor",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL1503",
+      "compound_name": "Omeprazole",
+      "pubchem_cid": "5743",
+      "smiles": "CC1=CN=C(C(=C1OC)C)CS(=O)C2=NC3=C(N2)C=C(C=C3)OC",
+      "source": "PubChem"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\sildenafil_structure.png",
+    "image_type": "spectra",
+    "description": "Sildenafil 2D chemical structure - PDE5 inhibitor (Viagra)",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL192",
+      "compound_name": "Sildenafil",
+      "pubchem_cid": "60823",
+      "smiles": "CCCC1=NN(C2=C1NC(=NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C",
+      "source": "PubChem"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\sorafenib_structure.png",
+    "image_type": "spectra",
+    "description": "Sorafenib 2D structure - kinase inhibitor cancer drug",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL1336",
+      "compound_name": "Sorafenib",
+      "pubchem_cid": "5329102",
+      "smiles": "CNC(=O)C1=NC=CC(=C1)OC2=CC=C(C=C2)NC(=O)NC3=CC(=C(C=C3)Cl)C(F)(F)F",
+      "source": "PubChem",
+      "target": "VEGFR, RAF kinase"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\gefitinib_structure.png",
+    "image_type": "spectra",
+    "description": "Gefitinib 2D structure - EGFR tyrosine kinase inhibitor",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL939",
+      "compound_name": "Gefitinib",
+      "pubchem_cid": "176870",
+      "smiles": "COC1=C(C=C2C(=C1)N=CN=C2NC3=CC(=C(C=C3)F)Cl)OCCCN4CCOCC4",
+      "source": "PubChem",
+      "target": "EGFR"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\imatinib_structure.png",
+    "image_type": "spectra",
+    "description": "Imatinib 2D structure - BCR-ABL tyrosine kinase inhibitor (Gleevec)",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL941",
+      "compound_name": "Imatinib",
+      "pubchem_cid": "2733526",
+      "smiles": "CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5",
+      "source": "PubChem",
+      "target": "BCR-ABL kinase"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\amlodipine_structure.png",
+    "image_type": "spectra",
+    "description": "Amlodipine 2D structure - calcium channel blocker",
+    "modality": "molecule",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "compound_id": "CHEMBL1491",
+      "compound_name": "Amlodipine",
+      "pubchem_cid": "5288826",
+      "smiles": "CCOC(=O)C1=C(NC(=C(C1C2=CC=CC=C2Cl)C(=O)OC)C)COCCN",
+      "source": "PubChem",
+      "target": "L-type calcium channel"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\dna_helix_1bna.png",
+    "image_type": "xray",
+    "description": "B-DNA crystal structure (PDB: 1BNA)",
+    "modality": "protein",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "pdb_id": "1BNA",
+      "type": "DNA helix",
+      "resolution": "1.9 Angstrom",
+      "source": "PDB/EMBL-EBI"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\hemoglobin_4hhb.png",
+    "image_type": "xray",
+    "description": "Human hemoglobin structure (PDB: 4HHB)",
+    "modality": "protein",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "pdb_id": "4HHB",
+      "protein_name": "Hemoglobin",
+      "uniprot_id": "P69905",
+      "organism": "Homo sapiens",
+      "source": "PDB/EMBL-EBI"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\hemoglobin_oxygenated.png",
+    "image_type": "xray",
+    "description": "Oxygenated hemoglobin structure",
+    "modality": "protein",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "pdb_id": "1HHO",
+      "protein_name": "Oxygenated Hemoglobin",
+      "function": "Oxygen transport",
+      "source": "PDB/EMBL-EBI"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\nucleosome_1aoi.png",
+    "image_type": "xray",
+    "description": "Nucleosome core particle structure (PDB: 1AOI)",
+    "modality": "protein",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "pdb_id": "1AOI",
+      "complex_name": "Nucleosome",
+      "function": "DNA packaging",
+      "source": "PDB/EMBL-EBI"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\src_kinase_2src.png",
+    "image_type": "xray",
+    "description": "SRC tyrosine kinase structure (PDB: 2SRC)",
+    "modality": "protein",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "pdb_id": "2SRC",
+      "protein_name": "SRC kinase",
+      "uniprot_id": "P12931",
+      "function": "Signal transduction, cancer target",
+      "source": "PDB/EMBL-EBI"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\egfr_kinase.png",
+    "image_type": "xray",
+    "description": "EGFR tyrosine kinase domain with gefitinib",
+    "modality": "protein",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "pdb_id": "1OPK",
+      "protein_name": "EGFR",
+      "uniprot_id": "P00533",
+      "function": "Cancer drug target",
+      "source": "PDB/EMBL-EBI"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\abl_kinase_imatinib.png",
+    "image_type": "xray",
+    "description": "ABL kinase in complex with imatinib (Gleevec)",
+    "modality": "protein",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "pdb_id": "3EML",
+      "protein_name": "ABL kinase",
+      "ligand": "Imatinib",
+      "function": "Cancer drug target",
+      "source": "PDB/EMBL-EBI"
+    }
+  },
+  {
+    "image": "C:\\Users\\28k\\Pictures\\dataoverflowwebsite\\lacoste\\lacoste001\\data\\images\\egfr_erlotinib.png",
+    "image_type": "xray",
+    "description": "EGFR kinase with erlotinib (Tarceva)",
+    "modality": "protein",
+    "source": "biomedical_sample_dataset",
+    "metadata": {
+      "pdb_id": "1M17",
+      "protein_name": "EGFR",
+      "ligand": "Erlotinib",
+      "function": "NSCLC target",
+      "source": "PDB/EMBL-EBI"
+    }
+  }
+]

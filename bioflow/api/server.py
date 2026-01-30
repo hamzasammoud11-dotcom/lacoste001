@@ -657,47 +657,440 @@ async def hybrid_search(request: HybridSearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class ImageSearchRequest(BaseModel):
+    """Request for image similarity search."""
+    image: str = Field(..., description="Image file path, URL, or base64 encoded string")
+    image_type: str = Field(default="other", description="Type of image: microscopy, gel, spectra, xray, other")
+    collection: Optional[str] = Field(default=None, description="Target collection")
+    top_k: int = Field(default=10, ge=1, le=100, description="Number of results")
+    use_mmr: bool = Field(default=True, description="Apply MMR diversification")
+    lambda_param: float = Field(default=0.7, ge=0.0, le=1.0, description="MMR lambda")
+    filters: Optional[Dict[str, Any]] = Field(default=None, description="Search filters")
+
+
 @app.post("/api/search/image")
-async def search_image(
-    image: str,
-    collection: Optional[str] = None,
-    top_k: int = 10,
-    use_mmr: bool = True,
-    lambda_param: float = 0.7,
-    filters: Optional[Dict[str, Any]] = None
-):
+async def search_image(request: ImageSearchRequest):
     """
     Image similarity search.
 
     Find similar biological images (microscopy, gels, spectra).
     Supports query-by-image and cross-modal search.
     """
+    request_id = uuid.uuid4().hex[:12]
+    logger.info(f"[{request_id}] Image search request: image_type={request.image_type}, top_k={request.top_k}")
     try:
         if not qdrant_service:
             raise HTTPException(status_code=503, detail="Qdrant service not available")
 
         search_service = get_enhanced_search_service()
-        response = search_service.enhanced_search(
-            query=image,
+        logger.info(f"[{request_id}] Calling search service with modality=image")
+        
+        # Use 'search' method (not 'enhanced_search' which doesn't exist)
+        response = search_service.search(
+            query=request.image,
             modality="image",
-            collection=collection,
-            top_k=top_k,
-            use_mmr=use_mmr,
-            lambda_param=lambda_param,
-            filters=filters or {}
+            collection=request.collection,
+            top_k=request.top_k,
+            use_mmr=request.use_mmr,
+            lambda_param=request.lambda_param,
+            filters=request.filters or {}
         )
 
+        logger.info(f"[{request_id}] Image search returned {response.returned} results")
         return response.to_dict()
 
     except Exception as e:
-        logger.error(f"Image search failed: {e}")
+        logger.error(f"[{request_id}] Image search failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
-# Data Management
+# Use Case 4: Navigate Neighbors & Design Variants
 # ============================================================================
-@app.post("/api/ingest")
+
+class NeighborRequest(BaseModel):
+    """Request for guided neighbor exploration."""
+    item_id: str = Field(..., description="ID of the item to find neighbors for")
+    collection: Optional[str] = Field(default=None, description="Collection containing the item")
+    top_k: int = Field(default=20, ge=1, le=100, description="Number of neighbors")
+    include_cross_modal: bool = Field(default=True, description="Include results from other modalities")
+    diversity: float = Field(default=0.3, ge=0.0, le=1.0, description="Diversity factor (0=similar, 1=diverse)")
+
+
+class DesignVariantRequest(BaseModel):
+    """Request for design variant suggestions."""
+    reference: str = Field(..., description="Reference content (SMILES, sequence, or text)")
+    modality: str = Field(default="auto", description="Reference modality")
+    num_variants: int = Field(default=5, ge=1, le=20, description="Number of variants")
+    diversity: float = Field(default=0.5, ge=0.0, le=1.0, description="Diversity (0=close, 1=diverse)")
+    constraints: Optional[Dict[str, Any]] = Field(default=None, description="Design constraints")
+
+
+class ExperimentSearchRequest(BaseModel):
+    """Request for experiment-focused search (Use Case 4)."""
+    query: str = Field(..., description="Search query")
+    experiment_type: Optional[str] = Field(default=None, description="binding_assay, activity_assay, admet, phenotypic")
+    outcome: Optional[str] = Field(default=None, description="success, failure, partial")
+    target: Optional[str] = Field(default=None, description="Target name")
+    quality_min: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Minimum quality score")
+    top_k: int = Field(default=20, ge=1, le=100)
+
+
+@app.post("/api/neighbors")
+async def find_neighbors(request: NeighborRequest):
+    """
+    Navigate neighbors - guided exploration for Use Case 4.
+    
+    Given an item, find semantically similar items across modalities
+    with controlled diversity for exploration.
+    """
+    request_id = uuid.uuid4().hex[:12]
+    logger.info(f"[{request_id}] Neighbor search: item_id={request.item_id}, top_k={request.top_k}, diversity={request.diversity}")
+    try:
+        if not qdrant_service:
+            raise HTTPException(status_code=503, detail="Qdrant service not available")
+        
+        # Get the source item's vector
+        client = qdrant_service._get_client()
+        collections = [request.collection] if request.collection else qdrant_service.list_collections()
+        logger.info(f"[{request_id}] Searching in collections: {collections}")
+        
+        source_vector = None
+        source_item = None
+        source_collection = None
+        
+        for coll in collections:
+            try:
+                points = client.retrieve(
+                    collection_name=coll,
+                    ids=[request.item_id],
+                    with_payload=True,
+                    with_vectors=True,
+                )
+                if points:
+                    source_item = points[0]
+                    source_vector = source_item.vector
+                    source_collection = coll
+                    break
+            except Exception:
+                continue
+        
+        if not source_vector:
+            raise HTTPException(status_code=404, detail=f"Item {request.item_id} not found")
+        
+        logger.info(f"[{request_id}] Found source item in collection {source_collection}, vector dim={len(source_vector)}")
+        
+        # Search for neighbors using the item's vector
+        search_service = get_enhanced_search_service()
+        
+        # Adjust lambda based on diversity preference (inverse)
+        lambda_param = 1.0 - request.diversity
+        
+        # Perform search
+        all_neighbors = []
+        search_collections = collections if request.include_cross_modal else [source_collection]
+        
+        for coll in search_collections:
+            try:
+                results = client.search(
+                    collection_name=coll,
+                    query_vector=source_vector,
+                    limit=request.top_k * 2,  # Get more for diversity filtering
+                    with_payload=True,
+                    with_vectors=True,
+                )
+                
+                for r in results:
+                    if str(r.id) == request.item_id:
+                        continue  # Skip self
+                    
+                    all_neighbors.append({
+                        "id": str(r.id),
+                        "score": r.score,
+                        "content": r.payload.get("content", ""),
+                        "modality": r.payload.get("modality", "unknown"),
+                        "collection": coll,
+                        "metadata": r.payload,
+                        "vector": r.vector,
+                    })
+            except Exception as e:
+                logger.warning(f"Neighbor search in {coll} failed: {e}")
+        
+        # Apply MMR for diversity
+        logger.info(f"[{request_id}] Found {len(all_neighbors)} neighbors, applying MMR if needed (top_k={request.top_k})")
+        if len(all_neighbors) > request.top_k:
+            from bioflow.search.mmr import mmr_rerank
+            
+            logger.info(f"[{request_id}] Applying MMR reranking with lambda={lambda_param}")
+            neighbor_embeddings = [n["vector"] for n in all_neighbors]
+            neighbor_results = [
+                {
+                    "id": n["id"],
+                    "score": n["score"],
+                    "content": n["content"],
+                    "modality": n["modality"],
+                    "metadata": n["metadata"],
+                }
+                for n in all_neighbors
+            ]
+            
+            reranked = mmr_rerank(
+                results=neighbor_results,
+                query_embedding=source_vector,
+                lambda_param=lambda_param,
+                top_k=request.top_k,
+                embeddings=neighbor_embeddings,
+            )
+            
+            # Convert MMRResult back to neighbor format
+            all_neighbors = [
+                {
+                    "id": r.id,
+                    "score": r.original_score,
+                    "content": r.content,
+                    "modality": r.modality,
+                    "collection": next((n["collection"] for n in all_neighbors if n["id"] == r.id), ""),
+                    "metadata": r.metadata,
+                    "vector": r.embedding,
+                }
+                for r in reranked
+            ]
+        else:
+            all_neighbors = all_neighbors[:request.top_k]
+        
+        # Remove vectors from response
+        for n in all_neighbors:
+            n.pop("vector", None)
+        
+        # Group by modality for faceted navigation
+        facets = {}
+        for n in all_neighbors:
+            mod = n.get("modality", "unknown")
+            facets[mod] = facets.get(mod, 0) + 1
+        
+        return {
+            "source_id": request.item_id,
+            "source_modality": source_item.payload.get("modality", "unknown"),
+            "neighbors": all_neighbors,
+            "facets": facets,
+            "total_found": len(all_neighbors),
+            "diversity_applied": request.diversity,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[{request_id}] Neighbor search failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/design/variants")
+async def suggest_design_variants(request: DesignVariantRequest):
+    """
+    Design assistance - propose close but diverse variants.
+    
+    For Use Case 4: Given a reference (molecule, sequence, experiment description),
+    find similar items that offer diverse design alternatives with justifications.
+    """
+    request_id = uuid.uuid4().hex[:12]
+    try:
+        if not qdrant_service or not model_service:
+            raise HTTPException(status_code=503, detail="Services not available")
+        
+        search_service = get_enhanced_search_service()
+        
+        # Encode the reference
+        modality = request.modality
+        if modality == "auto":
+            # Auto-detect
+            ref = request.reference.strip()
+            if ref.isupper() and all(c in "ACDEFGHIKLMNPQRSTVWY" for c in ref[:20]) and len(ref) > 20:
+                modality = "protein"
+            elif any(c in ref for c in "[]()=#@") or (len(ref) < 100 and not " " in ref):
+                modality = "molecule"
+            else:
+                modality = "text"
+        
+        # Search with high diversity (low lambda)
+        lambda_param = 1.0 - request.diversity
+        
+        response = search_service.enhanced_search(
+            query=request.reference,
+            modality=modality,
+            top_k=request.num_variants * 3,  # Get more for filtering
+            use_mmr=True,
+            lambda_param=lambda_param,
+            filters=request.constraints or {},
+        )
+        
+        # Build variant suggestions with justifications
+        variants = []
+        for i, result in enumerate(response.results[:request.num_variants]):
+            # Generate justification based on similarity and differences
+            justification = _generate_variant_justification(
+                reference=request.reference,
+                variant=result,
+                modality=modality,
+                rank=i + 1,
+            )
+            
+            variants.append({
+                "rank": i + 1,
+                "id": result.id,
+                "content": result.content,
+                "modality": result.modality,
+                "similarity_score": result.score,
+                "diversity_score": result.diversity_penalty or 0.0,
+                "justification": justification,
+                "evidence_links": [
+                    {"source": l.source, "identifier": l.identifier, "url": l.url}
+                    for l in result.evidence_links
+                ],
+                "metadata": result.metadata,
+            })
+        
+        return {
+            "reference": request.reference[:200],
+            "reference_modality": modality,
+            "variants": variants,
+            "num_returned": len(variants),
+            "diversity_setting": request.diversity,
+            "constraints_applied": request.constraints or {},
+        }
+        
+    except Exception as e:
+        logger.error(f"Design variant suggestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/experiments/search")
+async def search_experiments(request: ExperimentSearchRequest):
+    """
+    Search experimental results with outcome-based filtering.
+    
+    For Use Case 4: Find experiments with specific outcomes, targets, or types.
+    Supports filtering by success/failure labels and quality scores.
+    """
+    try:
+        if not qdrant_service:
+            raise HTTPException(status_code=503, detail="Qdrant service not available")
+        
+        search_service = get_enhanced_search_service()
+        
+        # Build filters
+        filters = {
+            "modality": "experiment",
+        }
+        if request.experiment_type:
+            filters["experiment_type"] = request.experiment_type
+        if request.outcome:
+            filters["outcome"] = request.outcome
+        if request.target:
+            filters["target"] = request.target
+        
+        response = search_service.search(
+            query=request.query,
+            modality="text",  # Experiments are encoded as text
+            top_k=request.top_k,
+            use_mmr=True,
+            lambda_param=0.7,
+            filters=filters,
+        )
+        
+        # Post-filter by quality if specified
+        results = response.results
+        if request.quality_min is not None:
+            results = [
+                r for r in results 
+                if r.metadata.get("quality_score", 0) >= request.quality_min
+            ]
+        
+        # Enrich with experiment-specific info
+        enriched = []
+        for r in results:
+            enriched.append({
+                "id": r.id,
+                "score": r.score,
+                "experiment_id": r.metadata.get("experiment_id"),
+                "title": r.metadata.get("title"),
+                "experiment_type": r.metadata.get("experiment_type"),
+                "outcome": r.metadata.get("outcome"),
+                "quality_score": r.metadata.get("quality_score"),
+                "measurements": r.metadata.get("measurements", []),
+                "conditions": r.metadata.get("conditions", {}),
+                "target": r.metadata.get("target"),
+                "molecule": r.metadata.get("molecule"),
+                "description": r.metadata.get("description"),
+                "evidence_links": [l.to_dict() if hasattr(l, 'to_dict') else l.__dict__ for l in r.evidence_links],
+            })
+        
+        return {
+            "query": request.query,
+            "experiments": enriched,
+            "total_found": len(enriched),
+            "filters_applied": {
+                "experiment_type": request.experiment_type,
+                "outcome": request.outcome,
+                "target": request.target,
+                "quality_min": request.quality_min,
+            },
+        }
+        
+    except Exception as e:
+        logger.error(f"Experiment search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _generate_variant_justification(
+    reference: str,
+    variant,
+    modality: str,
+    rank: int,
+) -> str:
+    """Generate a justification for why this variant is suggested."""
+    score = variant.score if hasattr(variant, 'score') else 0.0
+    content = variant.content if hasattr(variant, 'content') else ""
+    metadata = variant.metadata if hasattr(variant, 'metadata') else {}
+    
+    justifications = []
+    
+    # Similarity-based justification
+    if score > 0.9:
+        justifications.append(f"Highly similar (score: {score:.2f}) to reference")
+    elif score > 0.7:
+        justifications.append(f"Moderately similar (score: {score:.2f})")
+    else:
+        justifications.append(f"Diverse alternative (score: {score:.2f})")
+    
+    # Source-based justification
+    source = metadata.get("source", "")
+    if source == "pubmed":
+        justifications.append("Supported by published literature")
+    elif source == "chembl":
+        justifications.append("Has experimental activity data")
+    elif source == "uniprot":
+        justifications.append("Annotated protein with known function")
+    elif source == "experiment":
+        outcome = metadata.get("outcome", "")
+        if outcome == "success":
+            justifications.append("From successful experiment")
+        elif outcome == "failure":
+            justifications.append("Negative control reference")
+    
+    # Modality-specific justification
+    if modality == "molecule":
+        if "target" in metadata:
+            justifications.append(f"Known to bind {metadata['target']}")
+    elif modality == "protein":
+        if "organism" in metadata:
+            justifications.append(f"From {metadata['organism']}")
+    
+    # Evidence links
+    evidence = variant.evidence_links if hasattr(variant, 'evidence_links') else []
+    if evidence:
+        justifications.append(f"Traceable to {len(evidence)} source(s)")
+    
+    return "; ".join(justifications) if justifications else f"Ranked #{rank} by relevance"
 async def ingest_data(request: IngestRequest):
     """Ingest data into vector database."""
     request_id = uuid.uuid4().hex[:12]
@@ -1502,6 +1895,121 @@ async def ingest_images_batch(request: BatchImageIngestRequest):
         }
     except Exception as e:
         logger.error(f"Batch image ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Use Case 4: Experiment Ingestion
+# ============================================================================
+
+class ExperimentIngestRequest(BaseModel):
+    """Request to ingest experimental data."""
+    experiment_id: Optional[str] = Field(default=None, description="Unique experiment identifier")
+    title: str = Field(..., description="Experiment title")
+    type: str = Field(default="other", description="Experiment type: binding_assay, activity_assay, admet, phenotypic")
+    measurements: List[Dict[str, Any]] = Field(default_factory=list, description="Measurements [{name, value, unit}]")
+    conditions: Dict[str, Any] = Field(default_factory=dict, description="Experimental conditions")
+    outcome: str = Field(default="unknown", description="success, failure, partial, inconclusive")
+    quality_score: float = Field(default=0.5, ge=0.0, le=1.0, description="Quality score")
+    description: str = Field(default="", description="Experiment description")
+    protocol: Optional[str] = Field(default=None, description="Protocol used")
+    molecule: Optional[str] = Field(default=None, description="SMILES if applicable")
+    target: Optional[str] = Field(default=None, description="Target name/sequence")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+    collection: Optional[str] = Field(default="bioflow_memory", description="Target collection")
+
+
+class BatchExperimentIngestRequest(BaseModel):
+    """Request to batch ingest experiments."""
+    experiments: List[ExperimentIngestRequest] = Field(..., description="List of experiments")
+    collection: Optional[str] = Field(default="bioflow_memory", description="Target collection")
+
+
+@app.post("/api/ingest/experiment")
+async def ingest_experiment(request: ExperimentIngestRequest):
+    """
+    Ingest a single experimental result.
+    
+    Supports Use Case 4: Measurements, conditions, outcomes.
+    """
+    try:
+        from bioflow.ingestion.experiment_ingestor import ExperimentIngestor
+        
+        ingestor = ExperimentIngestor(
+            qdrant_service=qdrant_service,
+            obm_encoder=model_service.get_obm_encoder(),
+            collection=request.collection
+        )
+        
+        experiment_data = {
+            "experiment_id": request.experiment_id,
+            "title": request.title,
+            "type": request.type,
+            "measurements": request.measurements,
+            "conditions": request.conditions,
+            "outcome": request.outcome,
+            "quality_score": request.quality_score,
+            "description": request.description,
+            "protocol": request.protocol,
+            "molecule": request.molecule,
+            "target": request.target,
+            "metadata": request.metadata or {},
+        }
+        
+        result = ingestor.ingest_experiments([experiment_data], collection=request.collection)
+        
+        return {
+            "success": result.total_indexed > 0,
+            "experiment_id": request.experiment_id,
+            "result": result.to_dict()
+        }
+    except Exception as e:
+        logger.error(f"Experiment ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/ingest/experiment/batch")
+async def ingest_experiments_batch(request: BatchExperimentIngestRequest):
+    """
+    Batch ingest multiple experiments.
+    
+    Supports Use Case 4: Bulk experiment data loading.
+    """
+    try:
+        from bioflow.ingestion.experiment_ingestor import ExperimentIngestor
+        
+        ingestor = ExperimentIngestor(
+            qdrant_service=qdrant_service,
+            obm_encoder=model_service.get_obm_encoder(),
+            collection=request.collection
+        )
+        
+        experiments_data = []
+        for exp in request.experiments:
+            experiments_data.append({
+                "experiment_id": exp.experiment_id,
+                "title": exp.title,
+                "type": exp.type,
+                "measurements": exp.measurements,
+                "conditions": exp.conditions,
+                "outcome": exp.outcome,
+                "quality_score": exp.quality_score,
+                "description": exp.description,
+                "protocol": exp.protocol,
+                "molecule": exp.molecule,
+                "target": exp.target,
+                "metadata": exp.metadata or {},
+            })
+        
+        result = ingestor.ingest_experiments(experiments_data, collection=request.collection)
+        
+        return {
+            "success": result.total_indexed > 0,
+            "total": len(experiments_data),
+            "result": result.to_dict()
+        }
+    except Exception as e:
+        logger.error(f"Batch experiment ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

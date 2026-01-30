@@ -212,3 +212,144 @@ export async function batchIngest(items: any[]): Promise<{ ingested: number }> {
         body: JSON.stringify({ items }),
     });
 }
+
+// --- IMAGE SEARCH (Use Case 4) ---
+
+/**
+ * Search by image - encodes image and finds similar items.
+ */
+export async function searchByImage(params: {
+    image: string; // base64 encoded image
+    image_type?: string;
+    top_k?: number;
+    use_mmr?: boolean;
+    lambda_param?: number;
+}): Promise<{ results: SearchResult[] }> {
+    return fetchJson(`${API_BASE}/api/search/image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            image: params.image,
+            image_type: params.image_type || 'other',
+            top_k: params.top_k || 20,
+            use_mmr: params.use_mmr ?? true,
+            lambda_param: params.lambda_param || 0.7,
+        }),
+    });
+}
+
+// --- NEIGHBOR EXPLORATION (Use Case 4) ---
+
+/**
+ * Find neighbors of an item for guided exploration.
+ */
+export async function searchNeighbors(params: {
+    item_id: string;
+    collection?: string;
+    top_k?: number;
+    include_cross_modal?: boolean;
+    diversity?: number;
+}): Promise<{
+    source_id: string;
+    source_modality: string;
+    neighbors: Array<{
+        id: string;
+        score: number;
+        content: string;
+        modality: string;
+        collection: string;
+        metadata: Record<string, unknown>;
+    }>;
+    facets: Record<string, number>;
+    total_found: number;
+}> {
+    return fetchJson(`${API_BASE}/api/neighbors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            item_id: params.item_id,
+            collection: params.collection,
+            top_k: params.top_k || 20,
+            include_cross_modal: params.include_cross_modal ?? true,
+            diversity: params.diversity || 0.3,
+        }),
+    });
+}
+
+// --- EXPERIMENT SEARCH (Use Case 4) ---
+
+/**
+ * Search experiments with outcome-based filtering.
+ */
+export async function searchExperiments(params: {
+    query: string;
+    experiment_type?: string;
+    outcome?: string;
+    target?: string;
+    quality_min?: number;
+    top_k?: number;
+}): Promise<{
+    query: string;
+    experiments: Array<{
+        id: string;
+        score: number;
+        experiment_id: string;
+        title: string;
+        experiment_type: string;
+        outcome: string;
+        quality_score: number;
+        measurements: Array<{ name: string; value: number; unit: string }>;
+        conditions: Record<string, unknown>;
+        target: string;
+        molecule: string;
+        description: string;
+        evidence_links: Array<{ source: string; identifier: string; url: string }>;
+    }>;
+    total_found: number;
+}> {
+    return fetchJson(`${API_BASE}/api/experiments/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+    });
+}
+
+// --- DESIGN VARIANTS (Use Case 4) ---
+
+/**
+ * Get design variant suggestions with justifications.
+ */
+export async function getDesignVariants(params: {
+    reference: string;
+    modality?: string;
+    num_variants?: number;
+    diversity?: number;
+    constraints?: Record<string, unknown>;
+}): Promise<{
+    reference: string;
+    reference_modality: string;
+    variants: Array<{
+        rank: number;
+        id: string;
+        content: string;
+        modality: string;
+        similarity_score: number;
+        diversity_score: number;
+        justification: string;
+        evidence_links: Array<{ source: string; identifier: string; url: string }>;
+        metadata: Record<string, unknown>;
+    }>;
+    num_returned: number;
+}> {
+    return fetchJson(`${API_BASE}/api/design/variants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            reference: params.reference,
+            modality: params.modality || 'auto',
+            num_variants: params.num_variants || 5,
+            diversity: params.diversity || 0.5,
+            constraints: params.constraints,
+        }),
+    });
+}

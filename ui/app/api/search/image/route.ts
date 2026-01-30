@@ -8,6 +8,7 @@ import { API_CONFIG } from '@/config/api.config';
  * 
  * Body: {
  *   image: string (file path, URL, or base64)
+ *   image_type?: string
  *   collection?: string
  *   top_k?: number
  *   use_mmr?: boolean
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       image,
+      image_type = 'other',
       collection,
       top_k = 10,
       use_mmr = true,
@@ -34,26 +36,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Build query parameters
-    const params = new URLSearchParams({
-      image,
-      top_k: String(top_k),
-      use_mmr: String(use_mmr),
-      lambda_param: String(lambda_param),
-    });
-
-    if (collection) {
-      params.append('collection', collection);
-    }
-
-    // Call the FastAPI backend
-    const url = `${API_CONFIG.baseUrl}/api/search/image?${params.toString()}`;
+    // Call the FastAPI backend with JSON body
+    const url = `${API_CONFIG.baseUrl}/api/search/image`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ filters }),
+      body: JSON.stringify({
+        image,
+        image_type,
+        collection,
+        top_k,
+        use_mmr,
+        lambda_param,
+        filters,
+      }),
       cache: 'no-store',
     });
 

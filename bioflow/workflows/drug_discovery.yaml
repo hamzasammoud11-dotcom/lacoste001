@@ -1,15 +1,19 @@
 # =============================================================================
 # BioFlow Workflow Example: Drug Discovery Pipeline
 # =============================================================================
-# This YAML defines a simple drug discovery workflow that:
+# This YAML defines a comprehensive drug discovery workflow that:
 # 1. Encodes a query molecule
 # 2. Retrieves similar compounds from memory
 # 3. Predicts binding affinity for top candidates
+# 4. Finds related experiments and images (Use Case 4 multimodal)
 # =============================================================================
 
-name: drug_discovery_basic
+name: drug_discovery_multimodal
 description: >
-  Basic drug discovery pipeline: encode query -> retrieve analogs -> predict DTI
+  Multimodal drug discovery pipeline supporting Use Case 4:
+  - encode query -> retrieve analogs -> predict DTI
+  - find related experiments -> images -> evidence linking
+  - navigate neighbors -> propose design variants
 
 # Define the nodes in execution order
 nodes:
@@ -18,16 +22,17 @@ nodes:
     tool: obm                    # Uses OBM multimodal encoder
     inputs: [input]              # Takes pipeline input
     params:
-      modality: smiles
+      modality: auto             # Auto-detect: smiles, protein, or text
 
   - id: find_analogs
     type: retrieve
     tool: qdrant                 # Uses Qdrant vector search
     inputs: [encode_query]       # Takes encoded vector
     params:
-      limit: 10
+      limit: 20
       modality: smiles
       collection: molecules
+      include_images: true       # UC4: Include related images
 
   - id: predict_binding
     type: predict
@@ -44,11 +49,65 @@ nodes:
       threshold: 0.7
       key: score
 
-# Final output comes from this node
+  # Use Case 4: Find related experiments
+  - id: find_experiments
+    type: retrieve
+    tool: qdrant
+    inputs: [encode_query]
+    params:
+      limit: 10
+      modality: experiment
+      filters:
+        outcome: success         # Only successful experiments
+        quality_min: 0.8
+
+  # Use Case 4: Find related images (gels, microscopy, spectra)
+  - id: find_images
+    type: retrieve
+    tool: qdrant
+    inputs: [encode_query]
+    params:
+      limit: 5
+      modality: image
+
+  # Use Case 4: Navigate neighbors for guided exploration
+  - id: explore_neighbors
+    type: retrieve
+    tool: neighbors
+    inputs: [find_analogs]
+    params:
+      diversity: 0.3             # Some diversity
+      include_cross_modal: true  # Include experiments, images
+
+  # Use Case 4: Suggest design variants
+  - id: suggest_variants
+    type: generate
+    tool: design_variants
+    inputs: [filter_hits]
+    params:
+      num_variants: 5
+      diversity: 0.5
+      
+# Final output combines filtered hits with experimental evidence
 output_node: filter_hits
+
+# Use Case 4: Evidence linking configuration
+evidence:
+  enabled: true
+  sources:
+    - pubmed                     # Link to papers
+    - chembl                     # Link to activity data
+    - uniprot                    # Link to targets
+    - experiments                # Link to internal experiments
 
 # Optional metadata
 metadata:
-  version: "1.0"
+  version: "2.0"
   author: "BioFlow Team"
-  tags: [drug-discovery, dti, molecules]
+  use_case: "UC4 - Multimodal Biological Design & Discovery Intelligence"
+  tags: [drug-discovery, dti, molecules, multimodal, experiments, images]
+  capabilities:
+    - Multimodal similarity search
+    - Guided exploration (navigate neighbors)
+    - Design assistance (propose variants)
+    - Scientific traceability (evidence linking)

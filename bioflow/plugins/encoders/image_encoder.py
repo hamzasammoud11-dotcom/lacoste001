@@ -187,11 +187,11 @@ class ImageEncoder(BioEncoder):
                     
                 except Exception as e:
                     logger.error(f"Failed to encode image: {e}")
-                    # Return zero vector on error
+                    # Return zero vector on error - must match self.dimension (512)
                     results.append(EmbeddingResult(
-                        vector=[0.0] * 768,
+                        vector=[0.0] * 512,
                         modality=Modality.IMAGE,
-                        dimension=768,
+                        dimension=512,
                         metadata={"error": str(e)}
                     ))
         

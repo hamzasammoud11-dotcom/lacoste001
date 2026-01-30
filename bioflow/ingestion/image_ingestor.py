@@ -318,6 +318,20 @@ class ImageIngestor(BaseIngestor):
         
         logger.info(f"Starting batch ingestion of {len(images)} images...")
         
+        # Ensure collection exists before ingesting
+        try:
+            self.qdrant._ensure_collection(collection)
+        except Exception as e:
+            logger.error(f"Failed to ensure collection {collection}: {e}")
+            return IngestionResult(
+                source=self.source_name,
+                total_fetched=len(images),
+                total_indexed=0,
+                failed=len(images),
+                duration_seconds=0,
+                errors=[f"Collection error: {e}"]
+            )
+        
         indexed = 0
         failed = 0
         errors = []

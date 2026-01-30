@@ -146,6 +146,7 @@ class BaseIngestor(ABC):
             "molecule": Modality.SMILES,
             "protein": Modality.PROTEIN,
             "image": Modality.IMAGE,
+            "experiment": Modality.TEXT,  # Experiments use text encoding
         }
         return mapping.get(modality_str)
     

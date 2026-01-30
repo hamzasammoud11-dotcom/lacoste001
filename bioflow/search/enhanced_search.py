@@ -38,9 +38,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SearchFilters:
-    """Advanced search filters."""
-    modality: Optional[str] = None  # text, molecule, protein
-    source: Optional[str] = None  # pubmed, uniprot, chembl
+    """Advanced search filters for multimodal biological discovery."""
+    modality: Optional[str] = None  # text, molecule, protein, image, experiment
+    source: Optional[str] = None  # pubmed, uniprot, chembl, experiment
     sources: Optional[List[str]] = None  # Multiple sources
     year_min: Optional[int] = None
     year_max: Optional[int] = None
@@ -48,6 +48,11 @@ class SearchFilters:
     organism_id: Optional[int] = None
     has_structure: Optional[bool] = None
     keywords: Optional[List[str]] = None  # For hybrid search
+    # Experiment-specific filters (Use Case 4)
+    experiment_type: Optional[str] = None  # binding_assay, activity_assay, admet, phenotypic
+    outcome: Optional[str] = None  # success, failure, partial
+    quality_min: Optional[float] = None  # Minimum quality score (0-1)
+    target: Optional[str] = None  # Target name for experiments
 
 
 @dataclass
@@ -185,6 +190,8 @@ class EnhancedSearchService:
         import time
         start_time = time.time()
         
+        logger.info(f"EnhancedSearchService.search: query='{query[:100] if len(query) > 100 else query}...', modality={modality}, include_images={include_images}")
+        
         top_k = top_k or self.default_top_k
         
         # Parse filters
@@ -217,10 +224,13 @@ class EnhancedSearchService:
             with_vectors=need_vectors,
             include_images=include_images,
         )
+        
+        logger.info(f"Initial search returned {len(raw_results)} results")
 
         # If include_images is True, perform a dedicated image search to ensure they are represented
         # often image scores are on a different scale or lower than exact molecule matches
         if include_images:
+            logger.info(f"Performing dedicated image search for include_images=True")
             # Create image-specific filters (preserving other filters like source/year)
             image_filters = SearchFilters(**{
                 k: v for k, v in filters.__dict__.items() 
@@ -236,6 +246,8 @@ class EnhancedSearchService:
                 with_vectors=need_vectors,
                 include_images=False  # Avoid efficient OR logic recursion
             )
+            
+            logger.info(f"Dedicated image search returned {len(image_results)} image results")
             
             # Merge results (deduplicate by id)
             existing_ids = {r['id'] for r in raw_results}
@@ -486,6 +498,25 @@ class EnhancedSearchService:
                 match=MatchValue(value=filters.organism_id)
             ))
         
+        # Experiment-specific filters (Use Case 4)
+        if filters.experiment_type:
+            must_conditions.append(FieldCondition(
+                key="experiment_type",
+                match=MatchValue(value=filters.experiment_type)
+            ))
+        
+        if filters.outcome:
+            must_conditions.append(FieldCondition(
+                key="outcome",
+                match=MatchValue(value=filters.outcome)
+            ))
+        
+        if filters.target:
+            must_conditions.append(FieldCondition(
+                key="target",
+                match=MatchValue(value=filters.target)
+            ))
+        
         # Build filter
         query_filter = None
         if must_conditions:
@@ -669,6 +700,8 @@ class EnhancedSearchService:
             "molecule": Modality.SMILES,
             "smiles": Modality.SMILES,
             "protein": Modality.PROTEIN,
+            "image": Modality.IMAGE,
+            "experiment": Modality.TEXT,  # Experiments use text encoder
         }
         return mapping.get(modality.lower(), Modality.TEXT)
 
