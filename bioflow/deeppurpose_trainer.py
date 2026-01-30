@@ -6,6 +6,8 @@ import argparse
 from datetime import datetime
 import matplotlib.pyplot as plt
 import torch
+import pickle
+
 
 import numpy as np
 import pandas as pd
@@ -304,6 +306,11 @@ def main():
         result_folder=run_dir,
         cuda_id=use_cuda  # <<< GPU CONFIG HERE
     )
+    # --- Persist config for API (server/api.py expects config.pkl) ---
+    with open(os.path.join(run_dir, "config.pkl"), "wb") as f:
+        pickle.dump(config, f)
+    print(f"[FILE] saved config: {os.path.join(run_dir, 'config.pkl')}")
+
 
     print("[MODEL] config:")
     print(f"  epochs={args.epochs} | batch={args.batch} | lr={args.lr}")
@@ -324,6 +331,23 @@ def main():
         model.train(train, val)
     t_train1 = time.time()
     print(f"[TIME] train_seconds={t_train1 - t_train0:.1f}")
+    # --- Persist weights for API (server/api.py expects model.pt) ---
+    model_path = os.path.join(run_dir, "model.pt")
+
+    try:
+        model.save_model(run_dir)  # DeepPurpose-style save (often writes model.pt in the folder)
+    except Exception as e:
+        print(f"[WARNING] model.save_model(run_dir) failed: {e}")
+
+    # Fallback if model.pt not created
+    if not os.path.exists(model_path):
+        try:
+            model.save_model(model_path)
+        except Exception as e:
+            print(f"[WARNING] model.save_model(model_path) failed: {e}")
+
+    print(f"[FILE] model.pt exists? {os.path.exists(model_path)} -> {model_path}")
+
 
     # -------------------------
     # 5) EVAL + EXPORT
