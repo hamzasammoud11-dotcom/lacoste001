@@ -12,7 +12,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Team](https://img.shields.io/badge/Team-Lacoste-purple)
 
-🚀 **[Live Demo on Hugging Face Spaces](https://huggingface.co/spaces/vignt97867896/bioflow)**
+🚀 **[Live Demo on Hugging Face Spaces](https://lacoste001d.vercel.app/)**
 
 ---
 
